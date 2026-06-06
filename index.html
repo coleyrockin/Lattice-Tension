@@ -1165,10 +1165,12 @@
 
   function updateCamera(dt = 0.016) {
     if (!state.introDone) {
-      const t = easeInOutCubic(state.introPhase);
-      const seg = t * (INTRO_KEYFRAMES.length - 1);
-      const i = Math.min(INTRO_KEYFRAMES.length - 2, Math.floor(seg));
-      camera.position.lerpVectors(INTRO_KEYFRAMES[i], INTRO_KEYFRAMES[i + 1], seg - i);
+      const t = easeInOutCubic(Math.max(0, Math.min(1, state.introPhase)));
+      const lastSeg = INTRO_KEYFRAMES.length - 1;
+      const seg = t * lastSeg;
+      const i = Math.max(0, Math.min(lastSeg - 1, Math.floor(seg)));
+      const alpha = Math.max(0, Math.min(1, seg - i));
+      camera.position.lerpVectors(INTRO_KEYFRAMES[i], INTRO_KEYFRAMES[i + 1], alpha);
       introLookTarget.set(0, THREE.MathUtils.lerp(0, 1.2, Math.sin(t * Math.PI)), 0);
       camera.lookAt(introLookTarget);
       latticeGroup.rotation.y = state.introPhase * 0.35;
@@ -1409,18 +1411,47 @@
   // Animation loop
   // ═══════════════════════════════════════════════════════════════════════════
 
-  let lastTime = performance.now();
+  let lastTime = 0;
   let raycastFrame = 0;
   let lastMoveTime = performance.now();
   let coherence = 0;
   const strandLock = new Float32Array(V_LAYERS * V_STRANDS);
   state.prevPointerNdc = { x: 0, y: 0 };
 
+  function vortexPos(n, t, stir, attn, rf, fl) {
+    const base = n.home.clone();
+    const r = Math.sqrt(base.x * base.x + base.z * base.z) || 0.001;
+    const layer = Math.max(0, n.layer);
+    const precess = t * (0.22 + fl * 1.6) * (layer % 2 === 0 ? 1 : -1);
+    const rot = precess + n.phase * 0.6;
+    const x0 = Math.cos(rot) * r;
+    const z0 = Math.sin(rot) * r;
+    const tt = (n.phase / (Math.PI * 2)) % 1;
+    const rdg = ridge(fbm({ x: tt * rf * 3.9 + layer * 1.3, y: t * 0.07 * fl + 7 }, 4));
+    const radJ = (rdg - 0.5) * (0.18 + rf * 0.04) * (0.7 + layer * 0.08);
+    const yJ = (fbm({ x: tt * 5.2 + 11, y: t * 0.04 }, 3) - 0.5) * 0.11;
+    let px = x0 + (base.x / r) * radJ;
+    let pz = z0 + (base.z / r) * radJ;
+    let py = base.y + yJ;
+    const toC = new THREE.Vector3(-px, -py, -pz);
+    const d = toC.length() || 0.001;
+    const lockPull = Math.max(0, (attn * 0.9 - stir * 0.7)) * 0.018 * (1.0 - layer * 0.07);
+    if (lockPull > 0.0005) {
+      const f = toC.multiplyScalar(lockPull / d);
+      px += f.x; py += f.y; pz += f.z;
+    }
+    px = px * 0.985 + base.x * 0.015;
+    py = py * 0.985 + base.y * 0.015;
+    pz = pz * 0.985 + base.z * 0.015;
+    return new THREE.Vector3(px, py, pz);
+  }
+
   function getStir() {
-    const dx = pointer.x - state.prevPointerNdc.x;
-    const dy = pointer.y - state.prevPointerNdc.y;
-    state.prevPointerNdc.x = pointer.x;
-    state.prevPointerNdc.y = pointer.y;
+    const prev = state.prevPointerNdc || (state.prevPointerNdc = { x: 0, y: 0 });
+    const dx = pointer.x - prev.x;
+    const dy = pointer.y - prev.y;
+    prev.x = pointer.x;
+    prev.y = pointer.y;
     const vel = Math.min(2.8, Math.hypot(dx, dy) * 22 + Math.abs(state.velTheta) * 3 + (state.dragging ? 0.5 : 0));
     if (vel > 0.05 || state.dragging) lastMoveTime = performance.now();
     return vel;
@@ -1430,7 +1461,11 @@
     requestAnimationFrame(animate);
     if (state.paused) return;
 
-    const dt = Math.min((now - lastTime) / 1000, 0.05);
+    if (!lastTime) {
+      lastTime = now;
+      return;
+    }
+    const dt = Math.max(0, Math.min((now - lastTime) / 1000, 0.05));
     lastTime = now;
     state.time += dt;
 
@@ -1443,7 +1478,7 @@
     }
 
     if (!state.introDone) {
-      state.introPhase = Math.min(1, state.introPhase + dt * 0.11);
+      state.introPhase = Math.max(0, Math.min(1, state.introPhase + dt * 0.11));
       if (state.introPhase >= 1) state.introDone = true;
     }
     processRipples(dt);
@@ -1575,56 +1610,8 @@
       }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-  // Vortex dynamics — the living attempt.
-  // Continuous helical precession + ridge perturbations + central attractor.
-  // When pointer velocity stays low for a while and attn is high, strands phase-lock,
-  // particles form coherent inflow, "crystals" (extra brightness + scale) emerge around the point.
-  // The moment of almost-understanding. Then it slips again. Beautiful.
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  function vortexPos(n, t, stir, attn, rf, fl) {
-    // Base helix from home (the "ideal" the strand wants)
-    const base = n.home.clone();
-    const r = Math.sqrt(base.x * base.x + base.z * base.z) || 0.001;
-    const layer = Math.max(0, n.layer);
-
-    // Slow global precession + layer twist (the constant attempt)
-    const precess = t * (0.22 + fl * 1.6) * (layer % 2 === 0 ? 1 : -1);
-    const rot = precess + n.phase * 0.6;
-    const x0 = Math.cos(rot) * r;
-    const z0 = Math.sin(rot) * r;
-
-    // Ridge modulation along the strand (same math the 2D Field uses)
-    const tt = (n.phase / (Math.PI * 2)) % 1;
-    const rdg = ridge(fbm({ x: tt * rf * 3.9 + layer * 1.3, y: t * 0.07 * fl + 7 }, 4));
-    const radJ = (rdg - 0.5) * (0.18 + rf * 0.04) * (0.7 + layer * 0.08);
-    const yJ = (fbm({ x: tt * 5.2 + 11, y: t * 0.04 }, 3) - 0.5) * 0.11;
-
-    let px = x0 + (base.x / r) * radJ;
-    let pz = z0 + (base.z / r) * radJ;
-    let py = base.y + yJ;
-
-    // The observer / central attractor — the "point"
-    // High attn + low stir lets the vortex tighten meaningfully around the quiet center.
-    const toC = new THREE.Vector3(-px, -py, -pz);
-    const d = toC.length() || 0.001;
-    const lockPull = Math.max(0, (attn * 0.9 - stir * 0.7)) * 0.018 * (1.0 - layer * 0.07);
-    if (lockPull > 0.0005) {
-      const f = toC.multiplyScalar(lockPull / d);
-      px += f.x; py += f.y; pz += f.z;
-    }
-
-    // Very soft memory/home so it never completely forgets its spiral
-    px = px * 0.985 + base.x * 0.015;
-    py = py * 0.985 + base.y * 0.015;
-    pz = pz * 0.985 + base.z * 0.015;
-
-    return new THREE.Vector3(px, py, pz);
-  }
-
-  const stir = getStir();
-  nodes.forEach((n, i) => {
+    const stir = getStir();
+    nodes.forEach((n, i) => {
     const now = performance.now();
     const stillMs = now - lastMoveTime;
     const attn = (state.presetBlend ? (state.presetBlend.gold * 0.6 + 0.55) : 0.85) * (1.0 - Math.min(1, stir * 0.6));
