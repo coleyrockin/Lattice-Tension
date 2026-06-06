@@ -661,7 +661,7 @@
     return { edgePositions, edgePhases };
   }
 
-  const { edgePositions, edgePhases } = buildLattice();
+  const { edgePositions, edgePhases } = buildVortexLattice();
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Shaders
@@ -1043,18 +1043,22 @@
       ];
   dustLayers.forEach(d => scene.add(d));
 
-  // God-ray motes (orbiting light sprites)
-  const MOTE_COUNT = 24;
+  // Vortex stream particles — the visible flowing aether.
+  // Under sustained attention they form coherent helical streams into the central point.
+  const MOTE_COUNT = 68;
   const moteGroup = new THREE.Group();
   for (let i = 0; i < MOTE_COUNT; i++) {
-    const geo = new THREE.SphereGeometry(0.02, 4, 4);
+    const geo = new THREE.SphereGeometry(0.011, 3, 3);
     const mat = new THREE.MeshBasicMaterial({
-      color: 0xf0c878,
+      color: 0xffe9c8,
       transparent: true,
-      opacity: 0.15 + Math.random() * 0.2,
+      opacity: 0.07,
+      depthWrite: false,
     });
     const mote = new THREE.Mesh(geo, mat);
-    mote.userData = { orbitR: 1.5 + Math.random() * 2, phase: Math.random() * Math.PI * 2, speed: 0.2 + Math.random() * 0.3 };
+    const layer = i % 5;
+    mote.userData = { vortex: true, layer, phase: i * 0.9 };
+    mote.scale.setScalar(0.65 + (i % 4) * 0.11);
     moteGroup.add(mote);
   }
   latticeGroup.add(moteGroup);
@@ -1407,6 +1411,20 @@
 
   let lastTime = performance.now();
   let raycastFrame = 0;
+  let lastMoveTime = performance.now();
+  let coherence = 0;
+  const strandLock = new Float32Array(V_LAYERS * V_STRANDS);
+  state.prevPointerNdc = { x: 0, y: 0 };
+
+  function getStir() {
+    const dx = pointer.x - state.prevPointerNdc.x;
+    const dy = pointer.y - state.prevPointerNdc.y;
+    state.prevPointerNdc.x = pointer.x;
+    state.prevPointerNdc.y = pointer.y;
+    const vel = Math.min(2.8, Math.hypot(dx, dy) * 22 + Math.abs(state.velTheta) * 3 + (state.dragging ? 0.5 : 0));
+    if (vel > 0.05 || state.dragging) lastMoveTime = performance.now();
+    return vel;
+  }
 
   function animate(now) {
     requestAnimationFrame(animate);
@@ -1415,6 +1433,14 @@
     const dt = Math.min((now - lastTime) / 1000, 0.05);
     lastTime = now;
     state.time += dt;
+
+    if (reducedMotion) {
+      // Reduced motion: show the single most beautiful resolved frame the vortex can reach.
+      // The lattice has phase-locked, streams are laminar, crystals are bright around the quiet point.
+      // This is what sustained gentle attention achieves. Still, profound.
+      coherence = 0.96;
+      lastMoveTime = performance.now() - 8000; // pretend long perfect stillness
+    }
 
     if (!state.introDone) {
       state.introPhase = Math.min(1, state.introPhase + dt * 0.11);
@@ -1549,27 +1575,129 @@
       }
     }
 
-    function livePos(n) {
-      const layerDelay = Math.max(0, n.layer) * 0.06;
-      const t = Math.max(0, Math.min(1, (state.climax - layerDelay) / (1 - layerDelay + 0.001)));
-      const pull = climaxEase(t) * 0.92;
-      const scale = (1 - pull) * breathScale;
-      const wave = Math.sin(state.time * 0.6 + n.phase) * 0.035 * breath * (1 - pull);
-      const target = n.home.clone().multiplyScalar(scale);
-      target.lerp(new THREE.Vector3(0, 0, 0), pull);
-      return target.add(n.home.clone().normalize().multiplyScalar(wave));
+    // ═══════════════════════════════════════════════════════════════════════════
+  // Vortex dynamics — the living attempt.
+  // Continuous helical precession + ridge perturbations + central attractor.
+  // When pointer velocity stays low for a while and attn is high, strands phase-lock,
+  // particles form coherent inflow, "crystals" (extra brightness + scale) emerge around the point.
+  // The moment of almost-understanding. Then it slips again. Beautiful.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function vortexPos(n, t, stir, attn, rf, fl) {
+    // Base helix from home (the "ideal" the strand wants)
+    const base = n.home.clone();
+    const r = Math.sqrt(base.x * base.x + base.z * base.z) || 0.001;
+    const layer = Math.max(0, n.layer);
+
+    // Slow global precession + layer twist (the constant attempt)
+    const precess = t * (0.22 + fl * 1.6) * (layer % 2 === 0 ? 1 : -1);
+    const rot = precess + n.phase * 0.6;
+    const x0 = Math.cos(rot) * r;
+    const z0 = Math.sin(rot) * r;
+
+    // Ridge modulation along the strand (same math the 2D Field uses)
+    const tt = (n.phase / (Math.PI * 2)) % 1;
+    const rdg = ridge(fbm({ x: tt * rf * 3.9 + layer * 1.3, y: t * 0.07 * fl + 7 }, 4));
+    const radJ = (rdg - 0.5) * (0.18 + rf * 0.04) * (0.7 + layer * 0.08);
+    const yJ = (fbm({ x: tt * 5.2 + 11, y: t * 0.04 }, 3) - 0.5) * 0.11;
+
+    let px = x0 + (base.x / r) * radJ;
+    let pz = z0 + (base.z / r) * radJ;
+    let py = base.y + yJ;
+
+    // The observer / central attractor — the "point"
+    // High attn + low stir lets the vortex tighten meaningfully around the quiet center.
+    const toC = new THREE.Vector3(-px, -py, -pz);
+    const d = toC.length() || 0.001;
+    const lockPull = Math.max(0, (attn * 0.9 - stir * 0.7)) * 0.018 * (1.0 - layer * 0.07);
+    if (lockPull > 0.0005) {
+      const f = toC.multiplyScalar(lockPull / d);
+      px += f.x; py += f.y; pz += f.z;
     }
 
-    nodes.forEach((n, i) => {
-      const target = livePos(n);
-      n.pos.copy(target);
-      dummy.position.copy(target);
-      dummy.updateMatrix();
-      nodeMesh.setMatrixAt(i, dummy.matrix);
-      haloMesh.setMatrixAt(i, dummy.matrix);
+    // Very soft memory/home so it never completely forgets its spiral
+    px = px * 0.985 + base.x * 0.015;
+    py = py * 0.985 + base.y * 0.015;
+    pz = pz * 0.985 + base.z * 0.015;
+
+    return new THREE.Vector3(px, py, pz);
+  }
+
+  const stir = getStir();
+  nodes.forEach((n, i) => {
+    const now = performance.now();
+    const stillMs = now - lastMoveTime;
+    const attn = (state.presetBlend ? (state.presetBlend.gold * 0.6 + 0.55) : 0.85) * (1.0 - Math.min(1, stir * 0.6));
+
+    // coherence builds only on sustained stillness + decent attn
+    const wantLock = (stillMs > 1350 && stir < 0.55 && attn > 0.58) ? 1 : 0;
+    coherence = coherence * 0.94 + wantLock * 0.06;
+
+    // Update strand lock factors
+    const l = Math.max(0, n.layer);
+    const st = (n.phase / (Math.PI * 2)) % 1;
+    const sIdx = (l * V_STRANDS + Math.floor(st * V_STRANDS)) % (V_LAYERS * V_STRANDS);
+    strandLock[sIdx] = strandLock[sIdx] * 0.965 + (wantLock ? 0.035 : -0.012);
+    strandLock[sIdx] = Math.max(0, Math.min(1, strandLock[sIdx]));
+
+    const lock = strandLock[sIdx];
+    const rf = (state.presetBlend ? state.presetBlend.violet * 1.8 + 1.4 : 2.1);
+    const fl = (state.presetBlend ? state.presetBlend.particleSpeed * 0.9 + 0.18 : 0.28);
+
+    const target = vortexPos(n, state.time, stir, attn, rf, fl);
+
+    // When locked, pull even harder toward a "perfect" common phase around the point
+    if (lock > 0.6) {
+      const toCenter = new THREE.Vector3(-target.x, -target.y, -target.z).normalize().multiplyScalar(lock * 0.009);
+      target.add(toCenter);
+    }
+
+    n.pos.copy(target);
+
+    // visual pulse from heat + lock crystals
+    const heat = (n.heat || 0) * 0.7 + lock * 0.9;
+    state.nodePulse[i] = heat;
+
+    dummy.position.copy(target);
+    const sc = 1.0 + lock * 0.55 + heat * 0.35;
+    dummy.scale.setScalar(sc);
+    dummy.updateMatrix();
+    nodeMesh.setMatrixAt(i, dummy.matrix);
+    haloMesh.setMatrixAt(i, dummy.matrix);
+  });
+  nodeMesh.instanceMatrix.needsUpdate = true;
+  haloMesh.instanceMatrix.needsUpdate = true;
+
+  // Stream particles — the visible aether flowing into the attempt.
+  // They follow helical projections of the ridge field and get sucked to the point on high coherence.
+  if (moteGroup && moteGroup.children.length > 8) {
+    const stir = getStir();
+    const attn = Math.max(0.3, 1.0 - stir * 0.65);
+    moteGroup.children.forEach((m, mi) => {
+      const ud = m.userData;
+      const layer = ud.layer || (mi % 5);
+      const radBase = 0.7 + layer * 0.38;
+      const ang = (mi * 1.7 + state.time * (0.6 + layer * 0.4)) % (Math.PI * 2);
+      const tt = ((mi * 0.13) % 1);
+      const rdg = ridge(fbm({ x: tt * 3.8 + layer, y: state.time * 0.05 }, 3));
+      let r = radBase * (0.82 + rdg * 0.36);
+      let y = (tt - 0.5) * (2.1 - layer * 0.2) + Math.sin(mi) * 0.2;
+
+      const p = new THREE.Vector3(Math.cos(ang) * r, y, Math.sin(ang) * r);
+
+      // On high coherence the streams become laminar and accelerate into the point
+      if (coherence > 0.35) {
+        const toC = new THREE.Vector3(-p.x, -p.y, -p.z).normalize().multiplyScalar(coherence * 0.028 * attn);
+        p.add(toC);
+        m.scale.setScalar(0.6 + coherence * 0.9);
+        m.material.opacity = 0.18 + coherence * 0.55;
+      } else {
+        m.scale.setScalar(0.9);
+        m.material.opacity = 0.08 + 0.12 * (0.5 + 0.5 * Math.sin(state.time * 2 + mi));
+      }
+      m.position.copy(p);
     });
-    nodeMesh.instanceMatrix.needsUpdate = true;
-    haloMesh.instanceMatrix.needsUpdate = true;
+  }
 
     if (raycastFrame % 2 === 0 || state.climax > 0) {
       const posAttr = edgeGeo.attributes.position;
@@ -1589,16 +1717,16 @@
       holoEl.style.transform = 'translate(-50%, -50%)';
     }
 
-    // God-ray motes
-    moteGroup.children.forEach(mote => {
-      const { orbitR, phase, speed } = mote.userData;
-      const t = state.time * speed + phase;
-      mote.position.set(
-        Math.cos(t) * orbitR,
-        Math.sin(t * 0.7) * orbitR * 0.4,
-        Math.sin(t) * orbitR
-      );
-      mote.material.opacity = 0.1 + 0.15 * (0.5 + 0.5 * Math.sin(t * 2));
+    // Vortex stream particles (the aether the lattice is attempting to resolve into the point)
+    // Repositioned every frame inside the main vortex nodes update block above when coherence is active.
+    // Fallback gentle motion if the block didn't catch them.
+    moteGroup.children.forEach((mote, mi) => {
+      if (!mote.userData.vortex) {
+        const t = state.time * 0.9 + mi;
+        const r = 1.6 + (mi % 5) * 0.35;
+        mote.position.set(Math.cos(t + mi) * r * 0.6, Math.sin(t * 0.6) * 0.8, Math.sin(t + mi * 1.3) * r * 0.6);
+        mote.material.opacity = 0.06 + 0.08 * Math.sin(t * 1.7);
+      }
     });
 
     // Drone
