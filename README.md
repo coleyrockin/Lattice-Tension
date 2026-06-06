@@ -1,20 +1,7 @@
 # LATTICE
 
-A single-file sacred 3D experience — the invisible geometry that holds the turning and the light.
-
-## Run locally
+Open `index.html` in a browser, or visit the Vercel deployment.
 
 ```bash
-npm install
-npm run dev
+npx serve .
 ```
-
-Open [http://localhost:3000](http://localhost:3000).
-
-## Edit
-
-The experience lives in [`public/lattice.html`](public/lattice.html). Next.js serves it at `/` via middleware rewrite.
-
-## Deploy
-
-Push to `main` — Vercel auto-deploys.
