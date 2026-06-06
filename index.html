@@ -23,11 +23,39 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: radial-gradient(ellipse 120% 80% at 50% 40%, #0a0820 0%, var(--indigo) 35%, var(--void) 100%);
+      background: #000;
       color: var(--light);
       font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
       font-feature-settings: "kern";
       -webkit-font-smoothing: antialiased;
+    }
+
+    #aurora {
+      position: fixed;
+      inset: -20%;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 55% 35% at 20% 25%, rgba(107,74,138,0.22) 0%, transparent 70%),
+        radial-gradient(ellipse 45% 30% at 78% 18%, rgba(196,122,138,0.14) 0%, transparent 65%),
+        radial-gradient(ellipse 70% 45% at 50% 85%, rgba(212,165,116,0.1) 0%, transparent 60%),
+        radial-gradient(ellipse 120% 80% at 50% 40%, #0a0820 0%, var(--indigo) 35%, var(--void) 100%);
+      animation: auroraDrift 28s ease-in-out infinite alternate;
+      filter: blur(1px);
+    }
+    @keyframes auroraDrift {
+      0% { transform: translate(0, 0) scale(1); opacity: 0.85; }
+      50% { transform: translate(2%, -1.5%) scale(1.03); opacity: 1; }
+      100% { transform: translate(-1.5%, 2%) scale(1.01); opacity: 0.9; }
+    }
+
+    #lens-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 8;
+      pointer-events: none;
+      background: radial-gradient(ellipse 90% 75% at 50% 45%, transparent 35%, rgba(0,0,0,0.55) 100%);
+      mix-blend-mode: multiply;
     }
 
     #canvas {
@@ -38,6 +66,8 @@
       display: block;
       touch-action: none;
       cursor: grab;
+      z-index: 2;
+      mix-blend-mode: screen;
     }
     #canvas.dragging { cursor: grabbing; }
 
@@ -62,11 +92,17 @@
       font-size: clamp(2.2rem, 7vw, 5rem);
       letter-spacing: 0.42em;
       text-indent: 0.42em;
-      background: linear-gradient(180deg, #fff 0%, var(--gold) 55%, var(--rose) 100%);
+      background: linear-gradient(105deg, #fff 0%, var(--gold) 28%, #fff 42%, var(--rose) 58%, var(--gold) 72%, #fff 100%);
+      background-size: 220% 100%;
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
-      filter: drop-shadow(0 0 50px rgba(212, 165, 116, 0.35));
+      filter: drop-shadow(0 0 60px rgba(212, 165, 116, 0.45)) drop-shadow(0 0 120px rgba(107,74,138,0.25));
+      animation: titleShimmer 9s ease-in-out infinite;
+    }
+    @keyframes titleShimmer {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
     }
     #title-layer .subtitle {
       margin-top: 1.2rem;
@@ -183,12 +219,23 @@
       opacity: 0;
       padding: 1.1rem 1.5rem;
       max-width: min(400px, 85vw);
-      border: 1px solid rgba(212, 165, 116, 0.22);
-      background: linear-gradient(135deg, rgba(107,74,138,0.14), rgba(5,8,24,0.65));
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(212, 165, 116, 0.32);
+      box-shadow: 0 0 40px rgba(212,165,116,0.12), inset 0 0 30px rgba(107,74,138,0.08);
+      background: linear-gradient(135deg, rgba(107,74,138,0.22), rgba(5,8,24,0.78));
+      backdrop-filter: blur(16px) saturate(1.4);
+      -webkit-backdrop-filter: blur(16px) saturate(1.4);
       clip-path: polygon(0 10px, 10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px));
     }
+    #fragment-holo::before, #fragment-holo::after {
+      content: '';
+      position: absolute;
+      width: 14px; height: 14px;
+      border-color: rgba(212,165,116,0.55);
+      border-style: solid;
+      pointer-events: none;
+    }
+    #fragment-holo::before { top: 6px; left: 6px; border-width: 1px 0 0 1px; }
+    #fragment-holo::after { bottom: 6px; right: 6px; border-width: 0 1px 1px 0; }
     #fragment-holo.show { animation: holoIn 5s ease forwards; }
     @keyframes holoIn {
       0% { opacity: 0; filter: blur(6px); transform: translate(-50%, -50%) scale(0.94); }
@@ -239,6 +286,8 @@
 
     /* ── Reduced motion ── */
     @media (prefers-reduced-motion: reduce) {
+      #aurora { animation: none; }
+      #title-layer h1 { animation: none; background-position: 50% 50%; }
       #title-layer, #title-layer .subtitle, #controls, #sigil {
         animation: none;
         opacity: 1;
@@ -250,7 +299,9 @@
   </style>
 </head>
 <body>
+  <div id="aurora" aria-hidden="true"></div>
   <canvas id="canvas"></canvas>
+  <div id="lens-overlay" aria-hidden="true"></div>
 
   <div id="title-layer">
     <h1>LATTICE</h1>
@@ -373,7 +424,7 @@
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setClearColor(0x050818, 1);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.2;
+  renderer.toneMappingExposure = 1.35;
 
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x050818, 0.02);
@@ -410,7 +461,7 @@
     uniforms: {
       tDiffuse: { value: null },
       uTime: { value: 0 },
-      uAmount: { value: 0.03 },
+      uAmount: { value: 0.028 },
       uSeed: { value: Math.random() },
     },
     vertexShader: VignetteShader.vertexShader,
@@ -428,33 +479,97 @@
       }`,
   };
 
+  const ChromaticShader = {
+    uniforms: {
+      tDiffuse: { value: null },
+      uAmount: { value: 0.0018 },
+      uClimax: { value: 0 },
+    },
+    vertexShader: VignetteShader.vertexShader,
+    fragmentShader: `
+      uniform sampler2D tDiffuse; uniform float uAmount; uniform float uClimax;
+      varying vec2 vUv;
+      void main(){
+        vec2 off = vec2(uAmount*(1.0+uClimax*2.5), 0.0);
+        float r = texture2D(tDiffuse, vUv + off).r;
+        float g = texture2D(tDiffuse, vUv).g;
+        float b = texture2D(tDiffuse, vUv - off).b;
+        gl_FragColor = vec4(r,g,b,1.0);
+      }`,
+  };
+
+  const ColorGradeShader = {
+    uniforms: {
+      tDiffuse: { value: null },
+      uWarmth: { value: 0.2 },
+      uSymmetry: { value: 0 },
+      uClimax: { value: 0 },
+      uTime: { value: 0 },
+    },
+    vertexShader: VignetteShader.vertexShader,
+    fragmentShader: `
+      uniform sampler2D tDiffuse; uniform float uWarmth; uniform float uSymmetry; uniform float uClimax; uniform float uTime;
+      varying vec2 vUv;
+      void main(){
+        vec4 col = texture2D(tDiffuse, vUv);
+        vec3 graded = col.rgb;
+        graded = mix(graded, graded * vec3(1.08, 1.02, 0.92), uWarmth * 0.55);
+        graded = mix(graded, graded * vec3(0.92, 0.96, 1.12), uSymmetry * 0.35);
+        graded = mix(graded, graded * 1.25 + vec3(0.04, 0.03, 0.02), uClimax * 0.65);
+        float vig = smoothstep(0.95, 0.2, length(vUv - 0.5) * 1.35);
+        graded *= mix(0.82, 1.0, vig);
+        graded += vec3(0.01, 0.008, 0.015) * sin(uTime * 0.4 + vUv.y * 6.0) * uSymmetry;
+        gl_FragColor = vec4(graded, col.a);
+      }`,
+  };
+
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
   const bloomPass = new UnrealBloomPass(
     new THREE.Vector2(window.innerWidth * (isMobile ? 0.5 : 1), window.innerHeight * (isMobile ? 0.5 : 1)),
-    0.9, 0.55, 0.16
+    1.35, 0.72, 0.12
   );
   composer.addPass(bloomPass);
+  const chromaticPass = new ShaderPass(ChromaticShader);
+  composer.addPass(chromaticPass);
+  const colorGradePass = new ShaderPass(ColorGradeShader);
+  composer.addPass(colorGradePass);
   const vignettePass = new ShaderPass(VignetteShader);
   composer.addPass(vignettePass);
   const filmGrainPass = new ShaderPass(FilmGrainShader);
   composer.addPass(filmGrainPass);
   composer.addPass(new OutputPass());
 
-  // Void sky sphere
+  // Void sky — procedural nebula + star field
   const voidSky = new THREE.Mesh(
-    new THREE.SphereGeometry(80, 32, 32),
+    new THREE.SphereGeometry(90, 48, 48),
     new THREE.ShaderMaterial({
       side: THREE.BackSide,
-      uniforms: { uTime: { value: 0 } },
-      vertexShader: `varying vec3 vPos; void main(){ vPos=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+      uniforms: { uTime: { value: 0 }, uWarmth: { value: 0.2 } },
+      vertexShader: `varying vec3 vPos; varying vec3 vDir; void main(){ vPos=position; vDir=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
       fragmentShader: `
-        varying vec3 vPos; uniform float uTime;
+        varying vec3 vPos; varying vec3 vDir; uniform float uTime; uniform float uWarmth;
+        float hash(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453); }
+        float noise3(vec3 p){
+          vec3 i=floor(p); vec3 f=fract(p); f=f*f*(3.0-2.0*f);
+          float n=mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
+                      mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);
+          return n;
+        }
         void main(){
-          float r=length(vPos.xz)/80.0;
-          vec3 indigo=vec3(0.04,0.03,0.09);
-          vec3 black=vec3(0.0);
-          vec3 col=mix(indigo,black,smoothstep(0.15,1.0,r));
+          float r=length(vPos.xz)/90.0;
+          vec3 indigo=vec3(0.03,0.025,0.08);
+          vec3 voidCol=vec3(0.0);
+          vec3 col=mix(indigo,voidCol,smoothstep(0.1,1.0,r));
+          float neb=noise3(vDir*3.5+vec3(uTime*0.02,0.0,uTime*0.015));
+          neb+=noise3(vDir*7.0+vec3(0.0,uTime*0.01,1.3))*0.5;
+          neb=pow(max(neb,0.0),1.8);
+          col+=vec3(0.18,0.08,0.28)*neb*0.35;
+          col+=vec3(0.28,0.16,0.08)*neb*uWarmth*0.4;
+          float star=hash(floor(vDir*420.0));
+          float tw=sin(uTime*2.5+star*60.0)*0.5+0.5;
+          float starBright=step(0.992,star)*(0.4+tw*0.6);
+          col+=vec3(0.95,0.9,1.0)*starBright;
           col+=vec3(0.02,0.015,0.04)*sin(uTime*0.1+vPos.y*0.05);
           gl_FragColor=vec4(col,1.0);
         }`,
@@ -568,9 +683,9 @@
   // All perturbations and locking use the same ridge/fbm as the 2D field would.
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const V_LAYERS = 5;
-  const V_STRANDS = 7;
-  const V_NODES_PER = 6;
+  const V_LAYERS = 7;
+  const V_STRANDS = 9;
+  const V_NODES_PER = 8;
 
   function buildVortexLattice(seed = 0xA0ED) {
     nodes.length = 0;
@@ -586,8 +701,8 @@
 
     // Helical shells
     for (let l = 0; l < V_LAYERS; l++) {
-      const radius = 0.55 + l * 0.42;
-      const height = 2.4 - l * 0.22;
+      const radius = 0.48 + l * 0.36;
+      const height = 2.8 - l * 0.18;
       const twist = (l % 2 === 0 ? 1.0 : -1.0) * (2.1 + l * 0.55); // counter-rotating frustration
 
       for (let st = 0; st < V_STRANDS; st++) {
@@ -634,11 +749,21 @@
     }
 
     // Tiny stable ring around the point + spokes (the closest the lattice ever gets to "knowing" the point)
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2;
-      const r = 0.22;
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      const r = 0.2 + (i % 2) * 0.04;
       const ring = addNode(Math.cos(a) * r, (Math.sin(i) * 0.03), Math.sin(a) * r, -1, i);
       addEdge(centerIdx, ring);
+      if (i > 0) addEdge(ring - 1, ring);
+    }
+
+    // Diagonal bridge arcs between outer shells (cathedral buttresses)
+    for (let l = 2; l < V_LAYERS; l += 2) {
+      for (let st = 0; st < V_STRANDS; st += 3) {
+        const a = (l * V_STRANDS + st) * V_NODES_PER + 2;
+        const b = ((l - 1) * V_STRANDS + ((st + 4) % V_STRANDS)) * V_NODES_PER + 5;
+        if (a < nodes.length && b < nodes.length) addEdge(a, b);
+      }
     }
 
     nodeCount = nodes.length;
@@ -673,25 +798,28 @@
     uniform float uTime;
     uniform float uBreath;
     uniform float uClimax;
+    uniform float uCoherence;
     varying float vFresnel;
     varying float vPhase;
     varying float vRipple;
     varying float vDepth;
+    varying float vAlong;
     void main() {
       vec3 pos = position;
-      float wave = sin(uTime * 0.8 + edgePhase * 3.0) * 0.05 * uBreath;
-      float wave2 = cos(uTime * 0.5 + edgePhase * 1.7) * 0.03 * uBreath;
+      float wave = sin(uTime * 0.8 + edgePhase * 3.0) * 0.06 * uBreath;
+      float wave2 = cos(uTime * 0.5 + edgePhase * 1.7) * 0.04 * uBreath;
       vec3 radial = normalize(pos + vec3(0.001));
-      pos += radial * (wave + wave2 + edgeRipple * 0.06);
+      pos += radial * (wave + wave2 + edgeRipple * 0.08 + uCoherence * 0.025);
       pos *= 1.0 - uClimax * 0.88;
       vec4 mvPos = modelViewMatrix * vec4(pos, 1.0);
       gl_Position = projectionMatrix * mvPos;
       vDepth = -mvPos.z;
       vec3 viewDir = normalize(-mvPos.xyz);
       vec3 fakeNormal = normalize((modelViewMatrix * vec4(radial, 0.0)).xyz);
-      vFresnel = pow(1.0 - abs(dot(fakeNormal, viewDir)), 2.2);
+      vFresnel = pow(1.0 - abs(dot(fakeNormal, viewDir)), 2.0);
       vPhase = edgePhase;
       vRipple = edgeRipple;
+      vAlong = edgePhase + length(pos) * 0.5;
     }
   `;
 
@@ -700,12 +828,14 @@
     uniform float uWarmth;
     uniform float uSymmetry;
     uniform float uClimax;
+    uniform float uCoherence;
     uniform vec3 uFogColor;
     uniform float uFogDensity;
     varying float vFresnel;
     varying float vPhase;
     varying float vRipple;
     varying float vDepth;
+    varying float vAlong;
     vec3 iridescence(float t) {
       vec3 a=vec3(0.42,0.29,0.54), b=vec3(0.77,0.48,0.54), c=vec3(0.83,0.65,0.45), d=vec3(0.55,0.85,0.95);
       float w=sin(t*6.283+vPhase*2.0)*0.5+0.5;
@@ -713,17 +843,19 @@
     }
     void main() {
       float cablePulse = 0.5 + 0.5*sin(uTime*2.2+vPhase*3.0);
-      float irisT = vFresnel*1.2 + uWarmth*0.4 + cablePulse*0.2 + vRipple*0.5;
+      float traveler = pow(0.5+0.5*sin(uTime*3.5-vAlong*4.0), 6.0);
+      float irisT = vFresnel*1.3 + uWarmth*0.45 + cablePulse*0.25 + vRipple*0.55 + traveler*0.4;
       vec3 col = iridescence(irisT);
-      col = mix(col, vec3(0.97,0.96,1.0), uClimax*0.8);
-      float core = pow(vFresnel, 0.55);
-      float halo = pow(vFresnel, 2.6) * 0.4;
-      float alpha = (core*0.9 + halo + vRipple*0.45) * cablePulse;
-      alpha *= 0.5 + uWarmth*0.35 + uSymmetry*0.15;
-      alpha = clamp(alpha, 0.1, 1.0);
+      col += vec3(1.0,0.95,0.85) * traveler * (0.35 + uCoherence * 0.5);
+      col = mix(col, vec3(0.97,0.96,1.0), uClimax*0.85);
+      float core = pow(vFresnel, 0.45);
+      float halo = pow(vFresnel, 2.2) * 0.55;
+      float alpha = (core*1.0 + halo + vRipple*0.55 + traveler*0.35) * cablePulse;
+      alpha *= 0.55 + uWarmth*0.4 + uSymmetry*0.2 + uCoherence*0.15;
+      alpha = clamp(alpha, 0.12, 1.0);
       float fog = 1.0 - exp(-uFogDensity * vDepth * vDepth * 0.002);
-      col = mix(col, uFogColor, fog*0.6);
-      alpha *= (1.0 - fog*0.4);
+      col = mix(col, uFogColor, fog*0.55);
+      alpha *= (1.0 - fog*0.35);
       gl_FragColor = vec4(col, alpha);
     }
   `;
@@ -816,21 +948,27 @@
     varying float vTrail;
     varying float vDepth;
     varying float vLayer;
+    float hexBokeh(vec2 c) {
+      c = abs(c);
+      float d = max(dot(c, normalize(vec2(1.0, 1.73))), c.x);
+      return smoothstep(0.52, 0.08, d);
+    }
     void main() {
       vec2 c = gl_PointCoord - 0.5;
       float d = length(c);
-      vec2 streak = c; streak.x += vTrail*0.18;
-      float trailShape = exp(-dot(streak,streak)*mix(6.0,14.0,vTrail));
-      float core = exp(-d*d*10.0);
-      float a = (core*0.5 + trailShape*0.5) * vAlpha;
-      vec3 nearCol = vec3(0.95,0.85,0.65);
-      vec3 farCol = vec3(0.55,0.50,0.85);
+      vec2 streak = c; streak.x += vTrail*0.22;
+      float trailShape = exp(-dot(streak,streak)*mix(5.0,12.0,vTrail));
+      float core = hexBokeh(c) * exp(-d*d*6.0);
+      float ring = smoothstep(0.42, 0.12, d) * 0.35;
+      float a = (core*0.65 + trailShape*0.45 + ring) * vAlpha;
+      vec3 nearCol = vec3(0.98,0.88,0.68);
+      vec3 farCol = vec3(0.58,0.52,0.88);
       vec3 col = mix(nearCol, farCol, vLayer);
-      col = mix(col, vec3(0.92,0.88,1.0), uWarmth*0.3);
+      col = mix(col, vec3(0.95,0.92,1.0), uWarmth*0.35);
       float fog = 1.0 - exp(-uFogDensity*vDepth*vDepth*0.0012);
       col = mix(col, uFogColor, fog);
-      a *= (1.0 - fog*0.7);
-      if (a < 0.01) discard;
+      a *= (1.0 - fog*0.65);
+      if (a < 0.008) discard;
       gl_FragColor = vec4(col, a);
     }
   `;
@@ -862,6 +1000,7 @@
     uWarmth: { value: 0.2 },
     uSymmetry: { value: 0 },
     uClimax: { value: 0 },
+    uCoherence: { value: 0 },
     ...fogUniforms,
   };
 
@@ -883,10 +1022,24 @@
     blending: THREE.AdditiveBlending,
   });
 
+  const edgeCoreMat = new THREE.ShaderMaterial({
+    vertexShader: edgeVertexShader,
+    fragmentShader: edgeFragmentShader.replace(
+      'gl_FragColor = vec4(col, alpha);',
+      'col = mix(col, vec3(1.0), 0.35); alpha = min(1.0, alpha * 1.6); gl_FragColor = vec4(col, alpha);'
+    ),
+    uniforms: THREE.UniformsUtils.clone(edgeUniforms),
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+
   const edgeGlow = new THREE.LineSegments(edgeGeo, edgeGlowMat);
   const edgeLines = new THREE.LineSegments(edgeGeo, edgeMat);
+  const edgeCore = new THREE.LineSegments(edgeGeo, edgeCoreMat);
   latticeGroup.add(edgeGlow);
   latticeGroup.add(edgeLines);
+  latticeGroup.add(edgeCore);
 
   const edgeRipple = new Float32Array(edges.length);
   const adjacency = Array.from({ length: nodeCount }, () => []);
@@ -900,7 +1053,7 @@
   const nodeRipple = new Float32Array(nodeCount);
 
   // Instanced nodes
-  const nodeGeo = new THREE.IcosahedronGeometry(0.048, 2);
+  const nodeGeo = new THREE.IcosahedronGeometry(0.042, 2);
   const nodePhases = new Float32Array(nodeCount);
   const nodeHeats = new Float32Array(nodeCount);
   nodes.forEach((n, i) => {
@@ -957,14 +1110,17 @@
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: `
-      uniform float uWarmth; uniform float uClimax; varying float vHeat; varying vec2 vUv;
+      uniform float uWarmth; uniform float uClimax; uniform float uTime;
+      varying float vHeat; varying vec2 vUv;
       void main(){
         vec2 c = vUv - 0.5;
         float d = length(c);
-        float glow = exp(-d*d*7.0);
-        float ring = smoothstep(0.48,0.1,d)*0.35;
+        float ang = atan(c.y, c.x);
+        float glow = exp(-d*d*6.0);
+        float ring = smoothstep(0.48,0.1,d)*0.4;
+        float spikes = pow(abs(sin(ang*6.0+uTime*0.8)), 12.0)*exp(-d*3.5)*0.45;
         vec3 col = mix(vec3(0.95,0.75,0.45), vec3(1.0), uClimax*0.8+vHeat*0.5);
-        float a = (glow*0.65+ring)*(0.22+uWarmth*0.38+vHeat*0.75);
+        float a = (glow*0.7+ring+spikes)*(0.25+uWarmth*0.42+vHeat*0.8);
         if (a<0.01) discard;
         gl_FragColor = vec4(col,a);
       }`,
@@ -995,8 +1151,102 @@
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
-  const singularity = new THREE.Mesh(new THREE.TorusKnotGeometry(0.14, 0.028, 128, 16, 2, 3), singularityMat);
+  const singularity = new THREE.Mesh(new THREE.TorusKnotGeometry(0.16, 0.032, 160, 20, 2, 3), singularityMat);
   latticeGroup.add(singularity);
+
+  const coronaMat = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uClimax: { value: 0 }, uCoherence: { value: 0 } },
+    vertexShader: `
+      uniform float uTime; uniform float uCoherence;
+      varying vec3 vN; varying vec3 vV;
+      void main(){
+        vN = normalize(normalMatrix * normal);
+        float pulse = 1.05 + sin(uTime*1.2)*0.03 + uCoherence*0.08;
+        vec4 mv = modelViewMatrix * vec4(position * pulse, 1.0);
+        vV = -mv.xyz; gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform float uClimax; uniform float uCoherence;
+      varying vec3 vN; varying vec3 vV;
+      void main(){
+        float f = pow(1.0 - max(dot(normalize(vN), normalize(vV)), 0.0), 3.0);
+        vec3 col = mix(vec3(0.95,0.75,0.45), vec3(1.0,0.98,0.95), uClimax);
+        float a = f * (0.15 + uCoherence * 0.45 + uClimax * 0.35);
+        if (a < 0.01) discard;
+        gl_FragColor = vec4(col, a);
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.BackSide,
+  });
+  const corona = new THREE.Mesh(new THREE.SphereGeometry(0.38, 32, 32), coronaMat);
+  latticeGroup.add(corona);
+
+  const coherenceRingMat = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uCoherence: { value: 0 } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader: `uniform float uTime; uniform float uCoherence; varying vec2 vUv;
+      void main(){ vec2 c=vUv-0.5; float d=length(c);
+        float ring=smoothstep(0.48,0.44,d)*smoothstep(0.36,0.4,d);
+        ring *= 0.5+0.5*sin(uTime*2.0+atan(c.y,c.x)*6.0);
+        float a=ring*uCoherence*0.7; if(a<0.01)discard;
+        gl_FragColor=vec4(vec3(0.95,0.82,0.55),a); }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+  });
+  const coherenceRing = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.72, 64), coherenceRingMat);
+  coherenceRing.rotation.x = Math.PI / 2;
+  latticeGroup.add(coherenceRing);
+
+  // Volumetric god rays from the singularity
+  const godRayMat = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uCoherence: { value: 0 }, uClimax: { value: 0 } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader: `
+      uniform float uTime; uniform float uCoherence; uniform float uClimax;
+      varying vec2 vUv;
+      void main(){
+        float along = 1.0 - vUv.y;
+        float across = abs(vUv.x - 0.5) * 2.0;
+        float beam = exp(-across*across*8.0) * pow(along, 1.6);
+        beam *= 0.5 + 0.5*sin(uTime*1.4 + along*12.0);
+        float a = beam * (0.04 + uCoherence*0.12 + uClimax*0.2);
+        vec3 col = mix(vec3(0.95,0.82,0.55), vec3(1.0,0.98,0.95), uClimax);
+        if (a < 0.005) discard;
+        gl_FragColor = vec4(col, a);
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+  });
+  const godRays = new THREE.Group();
+  for (let i = 0; i < 8; i++) {
+    const ray = new THREE.Mesh(new THREE.PlaneGeometry(0.35, 9, 1, 1), godRayMat.clone());
+    ray.material.uniforms = THREE.UniformsUtils.clone(godRayMat.uniforms);
+    ray.rotation.z = (i / 8) * Math.PI;
+    ray.position.y = 0.2;
+    godRays.add(ray);
+  }
+  latticeGroup.add(godRays);
+
+  // Outer cathedral geodesic shells
+  const shellMat = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uWarmth: { value: 0.2 }, uSymmetry: { value: 0 } },
+    vertexShader: `varying vec3 vPos; void main(){
+      vPos=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader: `uniform float uTime; uniform float uWarmth; uniform float uSymmetry;
+      varying vec3 vPos;
+      void main(){
+        float pulse = 0.5+0.5*sin(uTime*0.6+length(vPos)*2.0);
+        vec3 col = mix(vec3(0.35,0.25,0.55), vec3(0.85,0.65,0.45), uWarmth);
+        float a = 0.04 + pulse*0.03 + uSymmetry*0.05;
+        gl_FragColor = vec4(col, a);
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    wireframe: true,
+  });
+  [2.8, 3.6, 4.5].forEach((r, i) => {
+    const shell = new THREE.Mesh(new THREE.IcosahedronGeometry(r, i + 1), shellMat.clone());
+    shell.material.uniforms = THREE.UniformsUtils.clone(shellMat.uniforms);
+    shell.rotation.set(i * 0.3, i * 0.7, i * 0.2);
+    latticeGroup.add(shell);
+  });
+  const cathedralShells = latticeGroup.children.filter(c => c.geometry?.type === 'IcosahedronGeometry' && c.material?.wireframe);
 
   const climaxLight = new THREE.PointLight(0xfff5e6, 0, 20);
   climaxLight.position.set(0, 0, 0);
@@ -1035,30 +1285,86 @@
   }
 
   const dustLayers = reducedMotion
-    ? [makeDustLayer(800, 6, 30, 0.5)]
+    ? [makeDustLayer(1200, 6, 30, 0.5)]
     : [
-        makeDustLayer(600, 4, 12, 0),
-        makeDustLayer(1200, 10, 22, 0.5),
-        makeDustLayer(isMobile ? 500 : 800, 20, 40, 1),
+        makeDustLayer(isMobile ? 900 : 1400, 3, 14, 0),
+        makeDustLayer(isMobile ? 1400 : 2200, 8, 24, 0.5),
+        makeDustLayer(isMobile ? 800 : 1400, 18, 42, 1),
       ];
   dustLayers.forEach(d => scene.add(d));
 
+  // Foreground sparkle field
+  const sparkleCount = isMobile ? 400 : 900;
+  const sparkleGeo = new THREE.BufferGeometry();
+  const sparklePos = new Float32Array(sparkleCount * 3);
+  const sparklePhase = new Float32Array(sparkleCount);
+  for (let i = 0; i < sparkleCount; i++) {
+    const r = 1.2 + Math.random() * 8;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    sparklePos[i*3] = r * Math.sin(phi) * Math.cos(theta);
+    sparklePos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+    sparklePos[i*3+2] = r * Math.cos(phi);
+    sparklePhase[i] = Math.random() * Math.PI * 2;
+  }
+  sparkleGeo.setAttribute('position', new THREE.BufferAttribute(sparklePos, 3));
+  sparkleGeo.setAttribute('phase', new THREE.BufferAttribute(sparklePhase, 1));
+  const sparkleMat = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uCoherence: { value: 0 } },
+    vertexShader: `
+      attribute float phase; uniform float uTime; uniform float uCoherence;
+      varying float vA;
+      void main(){
+        vec3 p = position + vec3(sin(uTime*0.4+phase)*0.05, cos(uTime*0.35+phase)*0.04, 0.0);
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        gl_Position = projectionMatrix * mv;
+        gl_PointSize = (2.5 + uCoherence*3.0) * (180.0 / -mv.z);
+        vA = 0.35 + 0.65*sin(uTime*1.8+phase)*0.5 + uCoherence*0.4;
+      }`,
+    fragmentShader: `
+      varying float vA;
+      void main(){
+        float d = length(gl_PointCoord - 0.5);
+        float a = exp(-d*d*14.0) * vA;
+        if (a < 0.01) discard;
+        gl_FragColor = vec4(vec3(1.0,0.95,0.82), a);
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  const sparkles = new THREE.Points(sparkleGeo, sparkleMat);
+  latticeGroup.add(sparkles);
+
   // Vortex stream particles — the visible flowing aether.
-  // Under sustained attention they form coherent helical streams into the central point.
-  const MOTE_COUNT = 68;
+  const MOTE_COUNT = isMobile ? 80 : 140;
   const moteGroup = new THREE.Group();
+  const moteMat = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uCoherence: { value: 0 } },
+    vertexShader: `
+      varying vec3 vN; varying vec3 vV;
+      void main(){
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vV = normalize(-mv.xyz);
+        vN = normalize(normalMatrix * normal);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform float uCoherence;
+      varying vec3 vN; varying vec3 vV;
+      void main(){
+        float f = pow(1.0 - max(dot(vN, vV), 0.0), 2.5);
+        vec3 col = mix(vec3(1.0,0.88,0.65), vec3(1.0,0.98,1.0), uCoherence);
+        float a = 0.06 + f * (0.18 + uCoherence * 0.55);
+        if (a < 0.01) discard;
+        gl_FragColor = vec4(col, a);
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
   for (let i = 0; i < MOTE_COUNT; i++) {
-    const geo = new THREE.SphereGeometry(0.011, 3, 3);
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0xffe9c8,
-      transparent: true,
-      opacity: 0.07,
-      depthWrite: false,
-    });
-    const mote = new THREE.Mesh(geo, mat);
-    const layer = i % 5;
+    const mote = new THREE.Mesh(new THREE.SphereGeometry(0.012, 4, 4), moteMat.clone());
+    mote.material.uniforms = THREE.UniformsUtils.clone(moteMat.uniforms);
+    const layer = i % 6;
     mote.userData = { vortex: true, layer, phase: i * 0.9 };
-    mote.scale.setScalar(0.65 + (i % 4) * 0.11);
+    mote.scale.setScalar(0.55 + (i % 5) * 0.1);
     moteGroup.add(mote);
   }
   latticeGroup.add(moteGroup);
@@ -1151,9 +1457,10 @@
   let pinchDist = 0;
 
   const INTRO_KEYFRAMES = [
-    new THREE.Vector3(0, 7, 20),
-    new THREE.Vector3(10, 3, 14),
-    new THREE.Vector3(-6, -1, 11),
+    new THREE.Vector3(0, 12, 28),
+    new THREE.Vector3(14, 5, 18),
+    new THREE.Vector3(-10, 2, 15),
+    new THREE.Vector3(6, -2, 11),
     new THREE.Vector3(0, 0.5, 9),
   ];
   const introLookTarget = new THREE.Vector3(0, 0, 0);
@@ -1547,18 +1854,25 @@
 
     scene.fog.density = 0.016 + state.symmetry * 0.024 + state.climax * 0.01;
     fogUniforms.uFogDensity.value = scene.fog.density;
-    bloomPass.strength = 0.65 + state.presetBlend.warmth * 0.55 + state.climax * 0.75;
-    bloomPass.threshold = 0.18 - state.climax * 0.1;
-    vignettePass.uniforms.uStrength.value = 0.42 + state.symmetry * 0.28;
+    bloomPass.strength = 0.85 + state.presetBlend.warmth * 0.75 + state.climax * 0.95 + coherence * 0.35;
+    bloomPass.threshold = 0.14 - state.climax * 0.12 - coherence * 0.04;
+    chromaticPass.uniforms.uAmount.value = 0.0012 + state.symmetry * 0.0015 + state.climax * 0.002;
+    chromaticPass.uniforms.uClimax.value = state.climax;
+    colorGradePass.uniforms.uWarmth.value = state.presetBlend.warmth;
+    colorGradePass.uniforms.uSymmetry.value = state.symmetry;
+    colorGradePass.uniforms.uClimax.value = state.climax;
+    colorGradePass.uniforms.uTime.value = state.time;
+    vignettePass.uniforms.uStrength.value = 0.38 + state.symmetry * 0.32;
     if (!reducedMotion) filmGrainPass.uniforms.uTime.value = state.time;
 
     const uTime = state.time;
-    [edgeMat, edgeGlowMat].forEach(m => {
+    [edgeMat, edgeGlowMat, edgeCoreMat].forEach(m => {
       m.uniforms.uTime.value = uTime;
       m.uniforms.uBreath.value = breath;
       m.uniforms.uWarmth.value = state.presetBlend.warmth;
       m.uniforms.uSymmetry.value = state.symmetry;
       m.uniforms.uClimax.value = state.climax;
+      m.uniforms.uCoherence.value = coherence;
       m.uniforms.uFogDensity.value = fogUniforms.uFogDensity.value;
     });
     nodeMat.uniforms.uTime.value = uTime;
@@ -1573,6 +1887,26 @@
     singularity.rotation.y += dt * 0.15;
     singularity.rotation.x = Math.sin(state.time * 0.3) * 0.2;
     voidSky.material.uniforms.uTime.value = uTime;
+    voidSky.material.uniforms.uWarmth.value = state.presetBlend.warmth;
+    coronaMat.uniforms.uTime.value = uTime;
+    coronaMat.uniforms.uClimax.value = state.climax;
+    coronaMat.uniforms.uCoherence.value = coherence;
+    coherenceRingMat.uniforms.uTime.value = uTime;
+    coherenceRingMat.uniforms.uCoherence.value = coherence;
+    sparkleMat.uniforms.uTime.value = uTime;
+    sparkleMat.uniforms.uCoherence.value = coherence;
+    godRays.children.forEach((ray, i) => {
+      ray.material.uniforms.uTime.value = uTime;
+      ray.material.uniforms.uCoherence.value = coherence;
+      ray.material.uniforms.uClimax.value = state.climax;
+      ray.rotation.z = (i / 8) * Math.PI + state.time * 0.04 * (i % 2 === 0 ? 1 : -1);
+    });
+    cathedralShells.forEach((s, i) => {
+      s.rotation.y += dt * (0.02 + i * 0.008);
+      s.material.uniforms.uTime.value = uTime;
+      s.material.uniforms.uWarmth.value = state.presetBlend.warmth;
+      s.material.uniforms.uSymmetry.value = state.symmetry;
+    });
     dustLayers.forEach(d => {
       d.material.uniforms.uTime.value = uTime;
       d.material.uniforms.uParticleSpeed.value = state.presetBlend.particleSpeed;
@@ -1580,10 +1914,13 @@
       d.material.uniforms.uFogDensity.value = fogUniforms.uFogDensity.value;
     });
 
-    // Lights respond to preset
-    lightGold.intensity = 1.8 * state.presetBlend.gold;
-    lightViolet.intensity = 1.2 * state.presetBlend.violet;
-    lightRose.intensity = 0.9 * state.presetBlend.warmth;
+    // Lights respond to preset + slow orbit
+    const lorbit = state.time * 0.22;
+    lightGold.intensity = 2.2 * state.presetBlend.gold + coherence * 1.5;
+    lightViolet.intensity = 1.5 * state.presetBlend.violet;
+    lightRose.intensity = 1.1 * state.presetBlend.warmth;
+    lightViolet.position.set(Math.cos(lorbit) * 5, 3 + Math.sin(state.time * 0.15) * 0.8, Math.sin(lorbit) * 5);
+    lightRose.position.set(Math.sin(lorbit * 0.7) * 4, -2 + Math.cos(state.time * 0.18) * 0.6, Math.cos(lorbit * 0.7) * 4);
 
     // Node pulse decay
     let heatDirty = false;
@@ -1677,11 +2014,12 @@
         const toC = new THREE.Vector3(-p.x, -p.y, -p.z).normalize().multiplyScalar(coherence * 0.028 * attn);
         p.add(toC);
         m.scale.setScalar(0.6 + coherence * 0.9);
-        m.material.opacity = 0.18 + coherence * 0.55;
+        m.material.uniforms.uCoherence.value = coherence;
       } else {
         m.scale.setScalar(0.9);
-        m.material.opacity = 0.08 + 0.12 * (0.5 + 0.5 * Math.sin(state.time * 2 + mi));
+        m.material.uniforms.uCoherence.value = 0.15 + 0.25 * (0.5 + 0.5 * Math.sin(state.time * 2 + mi));
       }
+      m.material.uniforms.uTime.value = state.time;
       m.position.copy(p);
     });
   }
@@ -1712,7 +2050,7 @@
         const t = state.time * 0.9 + mi;
         const r = 1.6 + (mi % 5) * 0.35;
         mote.position.set(Math.cos(t + mi) * r * 0.6, Math.sin(t * 0.6) * 0.8, Math.sin(t + mi * 1.3) * r * 0.6);
-        mote.material.opacity = 0.06 + 0.08 * Math.sin(t * 1.7);
+        mote.material.uniforms.uCoherence.value = 0.1 + 0.15 * Math.sin(t * 1.7);
       }
     });
 
