@@ -58,12 +58,15 @@
       100% { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
     #title-layer h1 {
-      font-weight: 300;
-      font-size: clamp(2rem, 6vw, 4.5rem);
-      letter-spacing: 0.35em;
-      text-indent: 0.35em;
-      color: var(--light);
-      text-shadow: 0 0 40px rgba(212, 165, 116, 0.25);
+      font-weight: 200;
+      font-size: clamp(2.2rem, 7vw, 5rem);
+      letter-spacing: 0.42em;
+      text-indent: 0.42em;
+      background: linear-gradient(180deg, #fff 0%, var(--gold) 55%, var(--rose) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 0 50px rgba(212, 165, 116, 0.35));
     }
     #title-layer .subtitle {
       margin-top: 1.2rem;
@@ -173,6 +176,67 @@
     }
     @keyframes sigilIn { to { opacity: 1; } }
 
+    #fragment-holo {
+      position: fixed;
+      pointer-events: none;
+      z-index: 25;
+      opacity: 0;
+      padding: 1.1rem 1.5rem;
+      max-width: min(400px, 85vw);
+      border: 1px solid rgba(212, 165, 116, 0.22);
+      background: linear-gradient(135deg, rgba(107,74,138,0.14), rgba(5,8,24,0.65));
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      clip-path: polygon(0 10px, 10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px));
+    }
+    #fragment-holo.show { animation: holoIn 5s ease forwards; }
+    @keyframes holoIn {
+      0% { opacity: 0; filter: blur(6px); transform: translate(-50%, -50%) scale(0.94); }
+      12% { opacity: 1; filter: blur(0); transform: translate(-50%, -50%) scale(1); }
+      72% { opacity: 0.95; }
+      100% { opacity: 0; filter: blur(3px); transform: translate(-50%, -58%) scale(0.98); }
+    }
+    #fragment-holo .holo-text {
+      font-style: italic;
+      font-weight: 300;
+      font-size: clamp(0.9rem, 2vw, 1.1rem);
+      line-height: 1.65;
+      letter-spacing: 0.04em;
+      color: var(--light);
+      text-shadow: 0 0 24px rgba(212, 165, 116, 0.4);
+    }
+    #fragment-holo .holo-coords {
+      display: block;
+      margin-top: 0.6rem;
+      font-family: ui-monospace, monospace;
+      font-size: 8px;
+      letter-spacing: 0.2em;
+      color: var(--text-faint);
+    }
+    #fragment-holo .holo-scanlines {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.025) 2px, rgba(255,255,255,0.025) 4px);
+      animation: scan 4s linear infinite;
+    }
+    @keyframes scan { to { background-position: 0 40px; } }
+
+    #climax-flash {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      pointer-events: none;
+      opacity: 0;
+      background: radial-gradient(circle at 50% 50%, rgba(255,248,235,0.55) 0%, transparent 65%);
+    }
+    #climax-flash.active { animation: flashPulse 1.2s ease-out forwards; }
+    @keyframes flashPulse {
+      0% { opacity: 0; }
+      15% { opacity: 0.7; }
+      100% { opacity: 0; }
+    }
+
     /* ── Reduced motion ── */
     @media (prefers-reduced-motion: reduce) {
       #title-layer, #title-layer .subtitle, #controls, #sigil {
@@ -193,9 +257,14 @@
     <p class="subtitle" id="subtitle">The unseen geometry that holds the turning and the light.</p>
   </div>
 
-  <p id="fragment" aria-live="polite"></p>
+  <div id="fragment-holo" aria-live="polite">
+    <div class="holo-scanlines"></div>
+    <p class="holo-text"></p>
+    <span class="holo-coords"></span>
+  </div>
   <p id="deep-message" aria-live="polite"></p>
   <p id="climax-revelation" aria-live="polite"></p>
+  <div id="climax-flash"></div>
 
   <nav id="controls" aria-label="Emotional states">
     <button data-preset="stillness">stillness</button>
@@ -210,13 +279,19 @@
   <script type="importmap">
   {
     "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
     }
   }
   </script>
 
   <script type="module">
   import * as THREE from 'three';
+  import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+  import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+  import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+  import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+  import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
   // ═══════════════════════════════════════════════════════════════════════════
   // LATTICE — Sacred digital cathedral in the cosmic void
@@ -257,23 +332,135 @@
   const GOLDEN = Math.PI * (3 - Math.sqrt(5));
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Shared ridge / fbm math — the same "field" the 2D instrument would use.
+  // The vortex is the 3D attempt to resolve structure out of this field.
+  // ═══════════════════════════════════════════════════════════════════════════
+  function hash(n) { return n - Math.floor(n) * 43758.5453123 % 1; }
+  function noise2(p) {
+    const i = { x: Math.floor(p.x), y: Math.floor(p.y) };
+    const f = { x: p.x - i.x, y: p.y - i.y };
+    const a = hash(i.x + i.y * 57.0);
+    const b = hash(i.x + 1.0 + i.y * 57.0);
+    const c = hash(i.x + (i.y + 1.0) * 57.0);
+    const d = hash(i.x + 1.0 + (i.y + 1.0) * 57.0);
+    const u = { x: f.x * f.x * (3.0 - 2.0 * f.x), y: f.y * f.y * (3.0 - 2.0 * f.y) };
+    return (a + (b - a) * u.x) + ((c - a) * (1.0 - u.x) + (d - b) * u.x) * u.y;
+  }
+  function fbm(p, oct = 5) {
+    let v = 0, a = 0.5, pp = { x: p.x, y: p.y };
+    for (let i = 0; i < oct; i++) { v += a * noise2(pp); pp.x *= 2.02; pp.y *= 2.02; a *= 0.5; }
+    return v;
+  }
+  function ridge(x) { return 1.0 - Math.abs(2.0 * x - 1.0); }
+
   // ── DOM refs ──
   const canvas = document.getElementById('canvas');
-  const fragmentEl = document.getElementById('fragment');
+  const holoEl = document.getElementById('fragment-holo');
+  const holoText = holoEl.querySelector('.holo-text');
+  const holoCoords = holoEl.querySelector('.holo-coords');
+  const climaxFlash = document.getElementById('climax-flash');
   const deepEl = document.getElementById('deep-message');
   const climaxEl = document.getElementById('climax-revelation');
   const subtitleEl = document.getElementById('subtitle');
   const controlBtns = [...document.querySelectorAll('#controls button')];
+  const isMobile = window.innerWidth < 768;
+  const holoWorld = new THREE.Vector3();
 
   // ── Renderer & scene ──
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.25 : 1.5));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setClearColor(0x000000, 0);
+  renderer.setClearColor(0x050818, 1);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.2;
 
   const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x050818, 0.02);
+  scene.background = new THREE.Color(0x050818);
+
   const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 200);
   camera.position.set(0, 0, 9);
+
+  const fogUniforms = {
+    uFogColor: { value: new THREE.Color(0x050818) },
+    uFogDensity: { value: 0.028 },
+  };
+
+  // ── Post-processing ──
+  const VignetteShader = {
+    uniforms: {
+      tDiffuse: { value: null },
+      uStrength: { value: 0.5 },
+      uSoftness: { value: 0.45 },
+      uRoundness: { value: 0.85 },
+    },
+    vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader: `
+      uniform sampler2D tDiffuse; uniform float uStrength; uniform float uSoftness; uniform float uRoundness;
+      varying vec2 vUv;
+      void main(){
+        vec4 col=texture2D(tDiffuse,vUv);
+        vec2 p=vUv*2.0-1.0; p.x*=uRoundness;
+        float vig=smoothstep(0.0,uSoftness,1.0-dot(p,p)*uStrength);
+        gl_FragColor=vec4(col.rgb*vig,col.a);
+      }`,
+  };
+  const FilmGrainShader = {
+    uniforms: {
+      tDiffuse: { value: null },
+      uTime: { value: 0 },
+      uAmount: { value: 0.03 },
+      uSeed: { value: Math.random() },
+    },
+    vertexShader: VignetteShader.vertexShader,
+    fragmentShader: `
+      uniform sampler2D tDiffuse; uniform float uTime; uniform float uAmount; uniform float uSeed;
+      varying vec2 vUv;
+      float hash(vec2 p){ return fract(sin(dot(p+uSeed,vec2(127.1,311.7)))*43758.5453); }
+      void main(){
+        vec4 col=texture2D(tDiffuse,vUv);
+        float n=(hash(vUv*1024.0+floor(uTime*24.0))-0.5)*uAmount;
+        float luma=dot(col.rgb,vec3(0.299,0.587,0.114));
+        float mask=smoothstep(0.05,0.35,luma)*(1.0-smoothstep(0.75,0.95,luma));
+        col.rgb+=n*mask;
+        gl_FragColor=col;
+      }`,
+  };
+
+  const composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  const bloomPass = new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth * (isMobile ? 0.5 : 1), window.innerHeight * (isMobile ? 0.5 : 1)),
+    0.9, 0.55, 0.16
+  );
+  composer.addPass(bloomPass);
+  const vignettePass = new ShaderPass(VignetteShader);
+  composer.addPass(vignettePass);
+  const filmGrainPass = new ShaderPass(FilmGrainShader);
+  composer.addPass(filmGrainPass);
+  composer.addPass(new OutputPass());
+
+  // Void sky sphere
+  const voidSky = new THREE.Mesh(
+    new THREE.SphereGeometry(80, 32, 32),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      uniforms: { uTime: { value: 0 } },
+      vertexShader: `varying vec3 vPos; void main(){ vPos=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+      fragmentShader: `
+        varying vec3 vPos; uniform float uTime;
+        void main(){
+          float r=length(vPos.xz)/80.0;
+          vec3 indigo=vec3(0.04,0.03,0.09);
+          vec3 black=vec3(0.0);
+          vec3 col=mix(indigo,black,smoothstep(0.15,1.0,r));
+          col+=vec3(0.02,0.015,0.04)*sin(uTime*0.1+vPos.y*0.05);
+          gl_FragColor=vec4(col,1.0);
+        }`,
+    })
+  );
+  scene.add(voidSky);
 
   // ── Lights ──
   const ambient = new THREE.AmbientLight(0x0a0818, 0.6);
@@ -343,71 +530,121 @@
     edges.push([a, b]);
   }
 
-  // Icosahedron vertices (normalized, scaled)
-  function buildIcosahedron(scale) {
-    const t = (1 + Math.sqrt(5)) / 2;
-    const verts = [
-      [-1,t,0],[1,t,0],[-1,-t,0],[1,-t,0],
-      [0,-1,t],[0,1,t],[0,-1,-t],[0,1,-t],
-      [t,0,-1],[t,0,1],[-t,0,-1],[-t,0,1],
-    ].map(v => new THREE.Vector3(v[0], v[1], v[2]).normalize().multiplyScalar(scale));
+  function subdivideIcosahedron(scale, subdiv = 1) {
+    const geo = new THREE.IcosahedronGeometry(1, subdiv);
+    const pos = geo.attributes.position;
+    const verts = [];
+    const seen = new Map();
+    for (let i = 0; i < pos.count; i++) {
+      const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)).normalize().multiplyScalar(scale);
+      const key = `${v.x.toFixed(2)},${v.y.toFixed(2)},${v.z.toFixed(2)}`;
+      if (!seen.has(key)) { seen.set(key, verts.length); verts.push(v); }
+    }
+    geo.dispose();
     return verts;
   }
 
-  function buildLattice() {
-    const shellScales = [0.55, 1.1, 1.85];
-    const shellIndices = [[], [], []];
+  const ICO_EDGES = [
+    [0,1],[0,5],[0,7],[0,10],[0,11],[1,5],[1,7],[1,8],[1,9],
+    [2,3],[2,4],[2,6],[2,10],[2,11],[3,4],[3,6],[3,8],[3,9],
+    [4,5],[4,9],[5,6],[6,7],[7,8],[8,9],[10,11],
+  ];
 
-    // Three nested icosahedral shells
-    shellScales.forEach((scale, layer) => {
-      const verts = buildIcosahedron(scale);
-      verts.forEach((v, i) => {
-        const phase = i * GOLDEN;
-        const idx = addNode(v.x, v.y, v.z, layer, phase);
-        shellIndices[layer].push(idx);
-      });
-      // Icosahedron edges (20 faces × 3 edges, deduplicated)
-      const icoEdges = [
-        [0,1],[0,5],[0,7],[0,10],[0,11],[1,5],[1,7],[1,8],[1,9],
-        [2,3],[2,4],[2,6],[2,10],[2,11],[3,4],[3,6],[3,8],[3,9],
-        [4,5],[4,9],[5,6],[6,7],[7,8],[8,9],[10,11],
-      ];
-      icoEdges.forEach(([a, b]) => {
-        addEdge(shellIndices[layer][a], shellIndices[layer][b]);
-      });
+  function connectShellsKNN(outerIdx, innerIdx) {
+    outerIdx.forEach(oi => {
+      const o = nodes[oi].home;
+      const dists = innerIdx.map(ii => ({ ii, d: o.distanceToSquared(nodes[ii].home) }));
+      dists.sort((a, b) => a.d - b.d);
+      addEdge(oi, dists[0].ii);
+      if (dists[1] && dists[1].d < dists[0].d * 2.5) addEdge(oi, dists[1].ii);
     });
+  }
 
-    // Connect shells radially (bridge struts)
-    shellIndices.forEach((outer, layer) => {
-      if (layer === 0) return;
-      const inner = shellIndices[layer - 1];
-      outer.forEach((oi, i) => {
-        const ii = i % inner.length;
-        addEdge(oi, inner[ii]);
-        if (i % 2 === 0) addEdge(oi, inner[(ii + 3) % inner.length]);
-      });
-    });
+  // ═══════════════════════════════════════════════════════════════════════════
+  // VORTEX LATTICE — the crazy beautiful attempt to understand the point of the universe.
+  // Multiple counter-rotating helical shells. Tension filaments try to hold perfect spirals.
+  // The center is the quiet "point". Sustained low-stir + high attn lets strands phase-lock,
+  // particles stream coherently inward, crystals emerge. Then it slips. The attempt continues.
+  // All perturbations and locking use the same ridge/fbm as the 2D field would.
+  // ═══════════════════════════════════════════════════════════════════════════
 
-    // Golden-angle spiral connectors on outer shell
-    const outer = shellIndices[2];
-    for (let i = 0; i < outer.length; i++) {
-      const j = (i + 5) % outer.length;
-      addEdge(outer[i], outer[j]);
+  const V_LAYERS = 5;
+  const V_STRANDS = 7;
+  const V_NODES_PER = 6;
+
+  function buildVortexLattice(seed = 0xA0ED) {
+    nodes.length = 0;
+    edges.length = 0;
+    addEdge._seen = new Set();
+
+    const s = seed * 0.019;
+    const ridgeFreq = 2.1;
+    const flowBase = 0.28;
+
+    // Central singularity — the "point" the entire lattice is attempting to resolve.
+    const centerIdx = addNode(0, 0, 0, -1, 0);
+
+    // Helical shells
+    for (let l = 0; l < V_LAYERS; l++) {
+      const radius = 0.55 + l * 0.42;
+      const height = 2.4 - l * 0.22;
+      const twist = (l % 2 === 0 ? 1.0 : -1.0) * (2.1 + l * 0.55); // counter-rotating frustration
+
+      for (let st = 0; st < V_STRANDS; st++) {
+        const basePhase = (st / V_STRANDS) * Math.PI * 2 + l * 0.65;
+
+        for (let p = 0; p < V_NODES_PER; p++) {
+          const t = p / (V_NODES_PER - 1);
+          const y = (t - 0.5) * height + (fbm({ x: s + l * 2.7 + st, y: t * 5.1 }, 3) - 0.5) * 0.18;
+
+          let ang = basePhase + t * twist * 3.1 + l * 1.1;
+          let x = Math.cos(ang) * radius;
+          let z = Math.sin(ang) * radius;
+
+          // Ridge + flow displacement on the helix itself (synergy with 2D Field)
+          const r1 = ridge(fbm({ x: t * ridgeFreq * 4.2 + s + st * 1.6, y: l * 1.9 }, 4));
+          const r2 = ridge(fbm({ x: t * ridgeFreq * 9.1 + 13, y: flowBase * 0.8 }, 3));
+          const radDisp = (r1 - 0.5) * 0.29;
+          const axDisp = (r2 - 0.5) * 0.17;
+
+          x += (x / (radius + 0.001)) * radDisp + axDisp * 0.28;
+          z += (z / (radius + 0.001)) * radDisp + axDisp * 0.28;
+
+          const idx = addNode(x, y, z, l, basePhase + t * twist);
+          // Longitudinal helical cable
+          if (p > 0) addEdge(idx - 1, idx);
+          // Occasional cross-helix interference (frustration + crazy visuals)
+          if (st > 0 && p % 2 === 0) {
+            const prevStrandBase = (l * V_STRANDS + (st - 1)) * V_NODES_PER;
+            addEdge(idx, prevStrandBase + p);
+          }
+        }
+      }
     }
 
-    // 12 radial bridge struts to distant points (cosmic connections)
-    for (let i = 0; i < 12; i++) {
-      const ang = (i / 12) * Math.PI * 2;
-      const r = 3.2;
-      const y = Math.sin(i * GOLDEN * 2) * 0.8;
-      const idx = addNode(Math.cos(ang) * r, y, Math.sin(ang) * r, 3, i * 0.7);
-      addEdge(outer[i % outer.length], idx);
+    // Radial tension struts trying to hold the vortex from flying apart or collapsing
+    for (let l = 1; l < V_LAYERS; l++) {
+      for (let st = 0; st < V_STRANDS; st++) {
+        const outerBase = (l * V_STRANDS + st) * V_NODES_PER;
+        const innerBase = ((l - 1) * V_STRANDS + st) * V_NODES_PER;
+        for (let p = 0; p < V_NODES_PER; p += 2) {
+          addEdge(outerBase + p, innerBase + p);
+        }
+      }
+    }
+
+    // Tiny stable ring around the point + spokes (the closest the lattice ever gets to "knowing" the point)
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const r = 0.22;
+      const ring = addNode(Math.cos(a) * r, (Math.sin(i) * 0.03), Math.sin(a) * r, -1, i);
+      addEdge(centerIdx, ring);
     }
 
     nodeCount = nodes.length;
     state.nodePulse = new Float32Array(nodeCount);
 
-    // Edge geometry
+    // Build edge geometry (the visible spiraling tension cables)
     const edgePositions = new Float32Array(edges.length * 6);
     const edgePhases = new Float32Array(edges.length * 2);
     edges.forEach(([a, b], i) => {
@@ -432,24 +669,29 @@
 
   const edgeVertexShader = `
     attribute float edgePhase;
+    attribute float edgeRipple;
     uniform float uTime;
     uniform float uBreath;
     uniform float uClimax;
     varying float vFresnel;
     varying float vPhase;
+    varying float vRipple;
+    varying float vDepth;
     void main() {
       vec3 pos = position;
-      float wave = sin(uTime * 0.8 + edgePhase * 3.0) * 0.04 * uBreath;
-      float wave2 = cos(uTime * 0.5 + edgePhase * 1.7) * 0.025 * uBreath;
+      float wave = sin(uTime * 0.8 + edgePhase * 3.0) * 0.05 * uBreath;
+      float wave2 = cos(uTime * 0.5 + edgePhase * 1.7) * 0.03 * uBreath;
       vec3 radial = normalize(pos + vec3(0.001));
-      pos += radial * (wave + wave2);
-      pos *= 1.0 - uClimax * 0.65;
+      pos += radial * (wave + wave2 + edgeRipple * 0.06);
+      pos *= 1.0 - uClimax * 0.88;
       vec4 mvPos = modelViewMatrix * vec4(pos, 1.0);
       gl_Position = projectionMatrix * mvPos;
+      vDepth = -mvPos.z;
       vec3 viewDir = normalize(-mvPos.xyz);
       vec3 fakeNormal = normalize((modelViewMatrix * vec4(radial, 0.0)).xyz);
-      vFresnel = pow(1.0 - abs(dot(fakeNormal, viewDir)), 2.5);
+      vFresnel = pow(1.0 - abs(dot(fakeNormal, viewDir)), 2.2);
       vPhase = edgePhase;
+      vRipple = edgeRipple;
     }
   `;
 
@@ -458,20 +700,30 @@
     uniform float uWarmth;
     uniform float uSymmetry;
     uniform float uClimax;
+    uniform vec3 uFogColor;
+    uniform float uFogDensity;
     varying float vFresnel;
     varying float vPhase;
+    varying float vRipple;
+    varying float vDepth;
+    vec3 iridescence(float t) {
+      vec3 a=vec3(0.42,0.29,0.54), b=vec3(0.77,0.48,0.54), c=vec3(0.83,0.65,0.45), d=vec3(0.55,0.85,0.95);
+      float w=sin(t*6.283+vPhase*2.0)*0.5+0.5;
+      return mix(mix(a,b,w), mix(c,d,1.0-w), sin(t*12.566+uTime*0.3)*0.5+0.5);
+    }
     void main() {
-      vec3 gold = vec3(0.83, 0.65, 0.45);
-      vec3 rose = vec3(0.77, 0.48, 0.54);
-      vec3 violet = vec3(0.42, 0.29, 0.54);
-      vec3 white = vec3(0.97, 0.96, 1.0);
-      float t = uWarmth + vFresnel * 0.3 + uSymmetry * 0.2;
-      vec3 col = mix(violet, rose, smoothstep(0.2, 0.6, t));
-      col = mix(col, gold, smoothstep(0.5, 0.85, t));
-      col = mix(col, white, uClimax * 0.7);
-      float pulse = 0.7 + 0.3 * sin(uTime * 1.2 + vPhase * 2.0);
-      float alpha = vFresnel * pulse * (0.55 + uWarmth * 0.35);
-      alpha = clamp(alpha, 0.08, 0.95);
+      float cablePulse = 0.5 + 0.5*sin(uTime*2.2+vPhase*3.0);
+      float irisT = vFresnel*1.2 + uWarmth*0.4 + cablePulse*0.2 + vRipple*0.5;
+      vec3 col = iridescence(irisT);
+      col = mix(col, vec3(0.97,0.96,1.0), uClimax*0.8);
+      float core = pow(vFresnel, 0.55);
+      float halo = pow(vFresnel, 2.6) * 0.4;
+      float alpha = (core*0.9 + halo + vRipple*0.45) * cablePulse;
+      alpha *= 0.5 + uWarmth*0.35 + uSymmetry*0.15;
+      alpha = clamp(alpha, 0.1, 1.0);
+      float fog = 1.0 - exp(-uFogDensity * vDepth * vDepth * 0.002);
+      col = mix(col, uFogColor, fog*0.6);
+      alpha *= (1.0 - fog*0.4);
       gl_FragColor = vec4(col, alpha);
     }
   `;
@@ -484,58 +736,102 @@
     uniform float uClimax;
     varying float vHeat;
     varying vec3 vNormal;
+    varying vec3 vViewPos;
+    varying float vDepth;
     void main() {
       float pulse = nodeHeat * (0.5 + 0.5 * sin(uTime * 3.0 + nodePhase));
-      vec3 pos = position * (1.0 + pulse * 0.35 + uBreath * 0.05);
-      pos *= 1.0 - uClimax * 0.65;
+      vec3 pos = position * (1.0 + pulse * 0.45 + uBreath * 0.06);
+      pos *= 1.0 - uClimax * 0.88;
+      vec4 worldPos = instanceMatrix * vec4(pos, 1.0);
+      vec4 mv = modelViewMatrix * worldPos;
+      vViewPos = mv.xyz;
+      vDepth = -mv.z;
       vHeat = nodeHeat;
-      vNormal = normalMatrix * normal;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+      vNormal = normalize(normalMatrix * mat3(instanceMatrix) * normal);
+      gl_Position = projectionMatrix * mv;
     }
   `;
 
   const nodeFragmentShader = `
+    uniform float uTime;
     uniform float uWarmth;
     uniform float uClimax;
+    uniform vec3 uFogColor;
+    uniform float uFogDensity;
     varying float vHeat;
     varying vec3 vNormal;
+    varying vec3 vViewPos;
+    varying float vDepth;
     void main() {
-      vec3 viewDir = vec3(0.0, 0.0, 1.0);
-      float fresnel = pow(1.0 - abs(dot(normalize(vNormal), viewDir)), 2.0);
-      vec3 core = mix(vec3(0.83, 0.65, 0.45), vec3(0.97, 0.96, 1.0), uClimax);
-      vec3 rim = mix(vec3(0.77, 0.48, 0.54), vec3(0.42, 0.29, 0.54), 1.0 - uWarmth);
-      vec3 col = mix(core, rim, fresnel);
-      col += vec3(1.0) * vHeat * 0.4;
-      float alpha = 0.75 + fresnel * 0.2 + vHeat * 0.3;
-      gl_FragColor = vec4(col, clamp(alpha, 0.5, 1.0));
+      vec3 N = normalize(vNormal);
+      vec3 V = normalize(-vViewPos);
+      float fresnel = pow(1.0 - max(dot(N,V),0.0), 2.5);
+      float core = pow(1.0 - fresnel, 4.0);
+      vec3 coreCol = mix(vec3(0.95,0.78,0.45), vec3(1.0,0.98,0.92), uClimax);
+      coreCol += vec3(1.0) * vHeat * 0.9;
+      vec3 rim = mix(vec3(0.42,0.29,0.54), vec3(0.77,0.48,0.54), uWarmth);
+      vec3 col = mix(rim, coreCol, core);
+      col *= 0.85 + 0.15*sin(uTime*1.8+vHeat*6.0);
+      float alpha = 0.55 + core*0.45 + fresnel*0.25 + vHeat*0.4;
+      float fog = 1.0 - exp(-uFogDensity * vDepth * vDepth * 0.0015);
+      col = mix(col, uFogColor, fog*0.45);
+      alpha *= (1.0 - fog*0.3);
+      gl_FragColor = vec4(col, clamp(alpha, 0.4, 1.0));
     }
   `;
 
   const particleVertexShader = `
     attribute float size;
     attribute float phase;
+    attribute float layerDepth;
     uniform float uTime;
     uniform float uParticleSpeed;
     varying float vAlpha;
+    varying float vTrail;
+    varying float vDepth;
+    varying float vLayer;
     void main() {
       vec3 pos = position;
-      pos.x += sin(uTime * 0.3 * uParticleSpeed + phase) * 0.15;
-      pos.y += cos(uTime * 0.25 * uParticleSpeed + phase * 1.3) * 0.12;
-      pos.z += sin(uTime * 0.2 * uParticleSpeed + phase * 0.7) * 0.1;
+      float spd = uParticleSpeed * mix(1.2, 0.35, layerDepth);
+      pos.x += sin(uTime*0.3*spd+phase)*0.15*(1.0-layerDepth*0.5);
+      pos.y += cos(uTime*0.25*spd+phase*1.3)*0.12;
+      pos.z += sin(uTime*0.2*spd+phase*0.7)*0.1;
       vec4 mv = modelViewMatrix * vec4(pos, 1.0);
+      vDepth = -mv.z;
+      vLayer = layerDepth;
+      float vx = cos(uTime*0.3*spd+phase)*0.15;
+      float vy = -sin(uTime*0.25*spd+phase*1.3)*0.12;
+      vTrail = clamp(length(vec2(vx,vy))*4.0, 0.0, 1.0);
       gl_Position = projectionMatrix * mv;
-      gl_PointSize = size * (200.0 / -mv.z);
-      vAlpha = 0.3 + 0.4 * sin(uTime * 0.5 + phase);
+      gl_PointSize = size * mix(240.0, 110.0, layerDepth) / vDepth;
+      vAlpha = mix(0.45, 0.15, layerDepth) + 0.25*sin(uTime*0.5+phase);
     }
   `;
 
   const particleFragmentShader = `
+    uniform float uWarmth;
+    uniform vec3 uFogColor;
+    uniform float uFogDensity;
     varying float vAlpha;
+    varying float vTrail;
+    varying float vDepth;
+    varying float vLayer;
     void main() {
       vec2 c = gl_PointCoord - 0.5;
       float d = length(c);
-      float glow = exp(-d * d * 8.0);
-      gl_FragColor = vec4(0.92, 0.88, 1.0, glow * vAlpha * 0.6);
+      vec2 streak = c; streak.x += vTrail*0.18;
+      float trailShape = exp(-dot(streak,streak)*mix(6.0,14.0,vTrail));
+      float core = exp(-d*d*10.0);
+      float a = (core*0.5 + trailShape*0.5) * vAlpha;
+      vec3 nearCol = vec3(0.95,0.85,0.65);
+      vec3 farCol = vec3(0.55,0.50,0.85);
+      vec3 col = mix(nearCol, farCol, vLayer);
+      col = mix(col, vec3(0.92,0.88,1.0), uWarmth*0.3);
+      float fog = 1.0 - exp(-uFogDensity*vDepth*vDepth*0.0012);
+      col = mix(col, uFogColor, fog);
+      a *= (1.0 - fog*0.7);
+      if (a < 0.01) discard;
+      gl_FragColor = vec4(col, a);
     }
   `;
 
@@ -550,32 +846,61 @@
   const edgeGeo = new THREE.BufferGeometry();
   edgeGeo.setAttribute('position', new THREE.BufferAttribute(edgePositions, 3));
   const edgePhaseAttr = new Float32Array(edges.length * 2);
+  const edgeRippleAttr = new Float32Array(edges.length * 2);
   edges.forEach(([a, b], i) => {
     edgePhaseAttr[i * 2] = nodes[a].phase;
     edgePhaseAttr[i * 2 + 1] = nodes[b].phase;
+    edgeRippleAttr[i * 2] = 0;
+    edgeRippleAttr[i * 2 + 1] = 0;
   });
   edgeGeo.setAttribute('edgePhase', new THREE.BufferAttribute(edgePhaseAttr, 1));
+  edgeGeo.setAttribute('edgeRipple', new THREE.BufferAttribute(edgeRippleAttr, 1));
+
+  const edgeUniforms = {
+    uTime: { value: 0 },
+    uBreath: { value: 0.4 },
+    uWarmth: { value: 0.2 },
+    uSymmetry: { value: 0 },
+    uClimax: { value: 0 },
+    ...fogUniforms,
+  };
 
   const edgeMat = new THREE.ShaderMaterial({
     vertexShader: edgeVertexShader,
     fragmentShader: edgeFragmentShader,
-    uniforms: {
-      uTime: { value: 0 },
-      uBreath: { value: 0.4 },
-      uWarmth: { value: 0.2 },
-      uSymmetry: { value: 0 },
-      uClimax: { value: 0 },
-    },
+    uniforms: edgeUniforms,
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
   });
 
+  const edgeGlowMat = new THREE.ShaderMaterial({
+    vertexShader: edgeVertexShader,
+    fragmentShader: edgeFragmentShader.replace('gl_FragColor=vec4(col,alpha);', 'alpha*=0.35; gl_FragColor=vec4(col,alpha);'),
+    uniforms: THREE.UniformsUtils.clone(edgeUniforms),
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+
+  const edgeGlow = new THREE.LineSegments(edgeGeo, edgeGlowMat);
   const edgeLines = new THREE.LineSegments(edgeGeo, edgeMat);
+  latticeGroup.add(edgeGlow);
   latticeGroup.add(edgeLines);
 
+  const edgeRipple = new Float32Array(edges.length);
+  const adjacency = Array.from({ length: nodeCount }, () => []);
+  const edgeByPair = new Map();
+  edges.forEach(([a, b], i) => {
+    adjacency[a].push(b);
+    adjacency[b].push(a);
+    edgeByPair.set(a < b ? `${a}-${b}` : `${b}-${a}`, i);
+  });
+  const rippleQueue = [];
+  const nodeRipple = new Float32Array(nodeCount);
+
   // Instanced nodes
-  const nodeGeo = new THREE.IcosahedronGeometry(0.055, 1);
+  const nodeGeo = new THREE.IcosahedronGeometry(0.048, 2);
   const nodePhases = new Float32Array(nodeCount);
   const nodeHeats = new Float32Array(nodeCount);
   nodes.forEach((n, i) => {
@@ -596,6 +921,7 @@
       uBreath: { value: 0.4 },
       uWarmth: { value: 0.2 },
       uClimax: { value: 0 },
+      ...fogUniforms,
     },
     transparent: true,
     depthWrite: true,
@@ -611,44 +937,111 @@
   nodeMesh.instanceMatrix.needsUpdate = true;
   latticeGroup.add(nodeMesh);
 
-  // Central convergence light (climax)
-  const climaxLight = new THREE.PointLight(0xfff5e6, 0, 15);
-  climaxLight.position.set(0, 0, 0);
-  latticeGroup.add(climaxLight);
-
-  // Cosmic dust particles
-  const DUST_COUNT = reducedMotion ? 800 : 3000;
-  const dustPositions = new Float32Array(DUST_COUNT * 3);
-  const dustSizes = new Float32Array(DUST_COUNT);
-  const dustPhases = new Float32Array(DUST_COUNT);
-  for (let i = 0; i < DUST_COUNT; i++) {
-    const r = 8 + Math.random() * 25;
-    const theta = Math.random() * Math.PI * 2;
-    const phi = Math.acos(2 * Math.random() - 1);
-    dustPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-    dustPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-    dustPositions[i * 3 + 2] = r * Math.cos(phi);
-    dustSizes[i] = 0.5 + Math.random() * 2.5;
-    dustPhases[i] = Math.random() * Math.PI * 2;
-  }
-  const dustGeo = new THREE.BufferGeometry();
-  dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
-  dustGeo.setAttribute('size', new THREE.BufferAttribute(dustSizes, 1));
-  dustGeo.setAttribute('phase', new THREE.BufferAttribute(dustPhases, 1));
-
-  const dustMat = new THREE.ShaderMaterial({
-    vertexShader: particleVertexShader,
-    fragmentShader: particleFragmentShader,
-    uniforms: {
-      uTime: { value: 0 },
-      uParticleSpeed: { value: 0.15 },
-    },
+  // Node halos (bloom seeds)
+  const haloGeo = new THREE.PlaneGeometry(1, 1);
+  haloGeo.setAttribute('nodeHeat', new THREE.InstancedBufferAttribute(nodeHeats.slice(), 1));
+  const haloMat = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uWarmth: { value: 0.2 }, uClimax: { value: 0 } },
+    vertexShader: `
+      attribute float nodeHeat;
+      uniform float uTime;
+      varying float vHeat;
+      varying vec2 vUv;
+      void main(){
+        vHeat = nodeHeat;
+        vUv = uv;
+        vec4 mv = modelViewMatrix * instanceMatrix * vec4(0.0,0.0,0.0,1.0);
+        float pulse = 1.0 + nodeHeat*0.7 + sin(uTime*2.0+nodeHeat*10.0)*0.1;
+        vec2 scale = vec2(0.32,0.32)*pulse;
+        mv.xy += position.xy*scale;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform float uWarmth; uniform float uClimax; varying float vHeat; varying vec2 vUv;
+      void main(){
+        vec2 c = vUv - 0.5;
+        float d = length(c);
+        float glow = exp(-d*d*7.0);
+        float ring = smoothstep(0.48,0.1,d)*0.35;
+        vec3 col = mix(vec3(0.95,0.75,0.45), vec3(1.0), uClimax*0.8+vHeat*0.5);
+        float a = (glow*0.65+ring)*(0.22+uWarmth*0.38+vHeat*0.75);
+        if (a<0.01) discard;
+        gl_FragColor = vec4(col,a);
+      }`,
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
   });
-  const dust = new THREE.Points(dustGeo, dustMat);
-  scene.add(dust);
+  const haloMesh = new THREE.InstancedMesh(haloGeo, haloMat, nodeCount);
+  nodes.forEach((n, i) => {
+    dummy.position.copy(n.pos);
+    dummy.updateMatrix();
+    haloMesh.setMatrixAt(i, dummy.matrix);
+  });
+  haloMesh.instanceMatrix.needsUpdate = true;
+  latticeGroup.add(haloMesh);
+
+  // Singularity heart
+  const singularityMat = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uClimax: { value: 0 } },
+    vertexShader: `uniform float uTime; uniform float uClimax; varying vec3 vN;
+      void main(){ vN=normal; vec3 p=position*(1.0+uClimax*0.3+sin(uTime*1.5)*0.05);
+        gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.0); }`,
+    fragmentShader: `uniform float uClimax; varying vec3 vN;
+      void main(){ float f=pow(1.0-abs(dot(normalize(vN),vec3(0,0,1))),2.0);
+        vec3 col=mix(vec3(0.95,0.78,0.5),vec3(1.0,0.98,0.95),uClimax);
+        gl_FragColor=vec4(col,0.6+f*0.4+uClimax*0.3); }`,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const singularity = new THREE.Mesh(new THREE.TorusKnotGeometry(0.14, 0.028, 128, 16, 2, 3), singularityMat);
+  latticeGroup.add(singularity);
+
+  const climaxLight = new THREE.PointLight(0xfff5e6, 0, 20);
+  climaxLight.position.set(0, 0, 0);
+  latticeGroup.add(climaxLight);
+
+  function makeDustLayer(count, rMin, rMax, layerDepth) {
+    const positions = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
+    const phases = new Float32Array(count);
+    const layers = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      const r = rMin + Math.random() * (rMax - rMin);
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      positions[i*3] = r * Math.sin(phi) * Math.cos(theta);
+      positions[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+      positions[i*3+2] = r * Math.cos(phi);
+      sizes[i] = (0.5 + Math.random() * 2.5) * (layerDepth < 0.5 ? 1.4 : 1);
+      phases[i] = Math.random() * Math.PI * 2;
+      layers[i] = layerDepth;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    geo.setAttribute('phase', new THREE.BufferAttribute(phases, 1));
+    geo.setAttribute('layerDepth', new THREE.BufferAttribute(layers, 1));
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: particleVertexShader,
+      fragmentShader: particleFragmentShader,
+      uniforms: { uTime: { value: 0 }, uParticleSpeed: { value: 0.15 }, uWarmth: { value: 0.2 }, ...fogUniforms },
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    return new THREE.Points(geo, mat);
+  }
+
+  const dustLayers = reducedMotion
+    ? [makeDustLayer(800, 6, 30, 0.5)]
+    : [
+        makeDustLayer(600, 4, 12, 0),
+        makeDustLayer(1200, 10, 22, 0.5),
+        makeDustLayer(isMobile ? 500 : 800, 20, 40, 1),
+      ];
+  dustLayers.forEach(d => scene.add(d));
 
   // God-ray motes (orbiting light sprites)
   const MOTE_COUNT = 24;
@@ -753,26 +1146,46 @@
   const pointer = new THREE.Vector2();
   let pinchDist = 0;
 
-  function updateCamera() {
+  const INTRO_KEYFRAMES = [
+    new THREE.Vector3(0, 7, 20),
+    new THREE.Vector3(10, 3, 14),
+    new THREE.Vector3(-6, -1, 11),
+    new THREE.Vector3(0, 0.5, 9),
+  ];
+  const introLookTarget = new THREE.Vector3(0, 0, 0);
+  const introScratch = new THREE.Vector3();
+
+  function easeInOutCubic(t) {
+    return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
+  }
+
+  function updateCamera(dt = 0.016) {
     if (!state.introDone) {
-      // Cinematic intro orbit
-      const t = state.introPhase;
-      state.theta = 0.4 + t * 1.2;
-      state.phi = 1.1 + Math.sin(t * Math.PI) * 0.3;
-      state.radius = 9 - t * 1.5;
-    } else {
-      state.theta += state.velTheta;
-      state.phi += state.velPhi;
-      state.phi = Math.max(0.15, Math.min(Math.PI - 0.15, state.phi));
-      state.velTheta *= 0.92;
-      state.velPhi *= 0.92;
-      state.radius += (state.targetRadius - state.radius) * 0.08;
+      const t = easeInOutCubic(state.introPhase);
+      const seg = t * (INTRO_KEYFRAMES.length - 1);
+      const i = Math.min(INTRO_KEYFRAMES.length - 2, Math.floor(seg));
+      camera.position.lerpVectors(INTRO_KEYFRAMES[i], INTRO_KEYFRAMES[i + 1], seg - i);
+      introLookTarget.set(0, THREE.MathUtils.lerp(0, 1.2, Math.sin(t * Math.PI)), 0);
+      camera.lookAt(introLookTarget);
+      latticeGroup.rotation.y = state.introPhase * 0.35;
+      state.radius = camera.position.length();
+      return;
     }
+    state.theta += state.velTheta;
+    state.phi += state.velPhi;
+    state.phi = Math.max(0.15, Math.min(Math.PI - 0.15, state.phi));
+    state.velTheta *= 0.9;
+    state.velPhi *= 0.9;
+    state.radius += (state.targetRadius - state.radius) * Math.min(1, dt * 4);
 
     camera.position.x = state.radius * Math.sin(state.phi) * Math.sin(state.theta);
     camera.position.y = state.radius * Math.cos(state.phi);
     camera.position.z = state.radius * Math.sin(state.phi) * Math.cos(state.theta);
     camera.lookAt(0, 0, 0);
+
+    const zoomNorm = 1 - (state.radius - 2.8) / (14 - 2.8);
+    camera.fov = THREE.MathUtils.lerp(42, 28, Math.max(0, Math.min(1, zoomNorm)) ** 2);
+    camera.updateProjectionMatrix();
   }
 
   let pointerDownPos = { x: 0, y: 0 };
@@ -843,25 +1256,63 @@
   // Node engagement
   // ═══════════════════════════════════════════════════════════════════════════
 
+  function showHolographicFragment(text, worldPos) {
+    holoText.textContent = text;
+    holoCoords.textContent = `node · ${worldPos.x.toFixed(2)}, ${worldPos.y.toFixed(2)}, ${worldPos.z.toFixed(2)}`;
+    holoEl.classList.remove('show');
+    void holoEl.offsetWidth;
+    holoEl.classList.add('show');
+    holoEl._anchor = worldPos.clone();
+  }
+
+  function processRipples(dt) {
+    const SPEED = 7, DECAY = 1.6, MAX_GEN = 5;
+    while (rippleQueue.length) {
+      const r = rippleQueue[0];
+      if (state.time - r.birthTime < r.gen / SPEED) break;
+      rippleQueue.shift();
+      adjacency[r.node].forEach(neighbor => {
+        const heat = r.heat * 0.72;
+        if (heat < 0.06) return;
+        const key = r.node < neighbor ? `${r.node}-${neighbor}` : `${neighbor}-${r.node}`;
+        const eid = edgeByPair.get(key);
+        if (eid !== undefined) edgeRipple[eid] = Math.max(edgeRipple[eid], heat);
+        if (r.gen < MAX_GEN && nodeRipple[neighbor] < heat) {
+          nodeRipple[neighbor] = heat;
+          nodeHeats[neighbor] = Math.max(nodeHeats[neighbor], heat * 0.85);
+          rippleQueue.push({ node: neighbor, heat, gen: r.gen + 1, birthTime: state.time });
+        }
+      });
+    }
+    for (let i = 0; i < edges.length; i++) edgeRipple[i] = Math.max(0, edgeRipple[i] - dt * DECAY);
+    for (let i = 0; i < nodeCount; i++) {
+      nodeRipple[i] = Math.max(0, nodeRipple[i] - dt * DECAY);
+      nodeHeats[i] = Math.max(nodeRipple[i], state.nodePulse[i]);
+    }
+    edges.forEach(([a, b], i) => {
+      const r = edgeRipple[i];
+      edgeRippleAttr[i*2] = r;
+      edgeRippleAttr[i*2+1] = r;
+    });
+    edgeGeo.attributes.edgeRipple.needsUpdate = true;
+    const haloHeat = haloMesh.geometry.attributes.nodeHeat;
+    for (let i = 0; i < nodeCount; i++) haloHeat.setX(i, nodeHeats[i]);
+    nodeMesh.geometry.attributes.nodeHeat.needsUpdate = true;
+    haloHeat.needsUpdate = true;
+  }
+
   function engageNode(idx) {
     if (idx < 0 || idx >= nodeCount) return;
     state.engagementNodes.add(idx);
     state.nodePulse[idx] = 1.0;
+    nodeRipple[idx] = 1.0;
     nodeHeats[idx] = 1.0;
-    nodeMesh.geometry.attributes.nodeHeat.needsUpdate = true;
+    rippleQueue.push({ node: idx, heat: 1.0, gen: 0, birthTime: state.time });
 
     const fragIdx = state.engagementNodes.size % FRAGMENTS.length;
-    showFragment(FRAGMENTS[fragIdx]);
-    playChime(180 + idx * 8 + Math.random() * 40);
-
+    showHolographicFragment(FRAGMENTS[fragIdx], nodes[idx].pos);
+    playChime(180 + idx * 5 + Math.random() * 50);
     checkClimax();
-  }
-
-  function showFragment(text) {
-    fragmentEl.textContent = text;
-    fragmentEl.classList.remove('show');
-    void fragmentEl.offsetWidth;
-    fragmentEl.classList.add('show');
   }
 
   function showDeepMessage() {
@@ -895,14 +1346,18 @@
   // Climax
   // ═══════════════════════════════════════════════════════════════════════════
 
+  function climaxEase(t) { return 1 - Math.pow(1 - t, 3); }
+
   function checkClimax() {
     if (state.climaxPlayed) return;
     const deepZoom = state.radius < 3.2;
     const enoughNodes = state.engagementNodes.size >= 5;
+    const rippleEnergy = edgeRipple.reduce((a, b) => a + b, 0) / edges.length;
     const enoughDwell = state.symmetryHighFor >= 18 || state.graceContinueTime >= 45;
-    if (deepZoom && enoughNodes && enoughDwell && state.climaxPhase === 'idle') {
+    if (deepZoom && enoughNodes && enoughDwell && rippleEnergy > 0.08 && state.climaxPhase === 'idle') {
       state.climaxPhase = 'converging';
       state.climaxTimer = 0;
+      state.targetRadius = 2.5;
       playClimaxBloom();
     }
   }
@@ -935,7 +1390,11 @@
     state.theta = 0.4;
     state.phi = 1.1;
     nodeHeats.fill(0);
+    nodeRipple.fill(0);
+    edgeRipple.fill(0);
+    rippleQueue.length = 0;
     nodeMesh.geometry.attributes.nodeHeat.needsUpdate = true;
+    holoEl.classList.remove('show');
     deepEl.classList.remove('show');
     climaxEl.classList.remove('show');
     subtitleEl.textContent = 'The unseen geometry that holds the turning and the light.';
@@ -957,11 +1416,11 @@
     lastTime = now;
     state.time += dt;
 
-    // Intro
     if (!state.introDone) {
-      state.introPhase = Math.min(1, state.introPhase + dt * 0.1);
+      state.introPhase = Math.min(1, state.introPhase + dt * 0.11);
       if (state.introPhase >= 1) state.introDone = true;
     }
+    processRipples(dt);
 
     // Blend preset
     const target = PRESETS[state.preset];
@@ -984,28 +1443,33 @@
       state.graceContinueTime += dt;
     }
 
-    // Climax phases
     if (state.climaxPhase === 'converging') {
       state.climaxTimer += dt;
-      state.climax = Math.min(1, state.climaxTimer / 6);
-      climaxLight.intensity = state.climax * 4;
+      state.climax = climaxEase(Math.min(1, state.climaxTimer / 8));
+      climaxLight.intensity = state.climax * 8;
+      singularityMat.uniforms.uClimax.value = state.climax;
       if (state.climax >= 1) {
         state.climaxPhase = 'hold';
         state.climaxTimer = 0;
+        climaxFlash.classList.add('active');
+        setTimeout(() => climaxFlash.classList.remove('active'), 1200);
         showClimaxRevelation();
         state.climaxPlayed = true;
       }
     } else if (state.climaxPhase === 'hold') {
       state.climaxTimer += dt;
-      climaxLight.intensity = 4;
-      if (state.climaxTimer >= 8) {
+      climaxLight.intensity = 10;
+      state.targetTheta += dt * 0.03;
+      if (state.climaxTimer >= 10) {
         state.climaxPhase = 'expanding';
         state.climaxTimer = 0;
+        edges.forEach((_, i) => edgeRipple[i] = 1.0);
       }
     } else if (state.climaxPhase === 'expanding') {
       state.climaxTimer += dt;
-      state.climax = Math.max(0, 1 - state.climaxTimer / 10);
-      climaxLight.intensity = state.climax * 4;
+      state.climax = Math.max(0, 1 - state.climaxTimer / 12);
+      climaxLight.intensity = state.climax * 8;
+      singularityMat.uniforms.uClimax.value = state.climax;
       if (state.climax <= 0) state.climaxPhase = 'idle';
     }
 
@@ -1020,18 +1484,40 @@
     const breathScale = 1 + Math.sin(state.time * 0.4) * 0.018 * breath;
     latticeGroup.scale.setScalar(breathScale);
 
-    // Update shader uniforms
-    edgeMat.uniforms.uTime.value = state.time;
-    edgeMat.uniforms.uBreath.value = breath;
-    edgeMat.uniforms.uWarmth.value = state.presetBlend.warmth;
-    edgeMat.uniforms.uSymmetry.value = state.symmetry;
-    edgeMat.uniforms.uClimax.value = state.climax;
-    nodeMat.uniforms.uTime.value = state.time;
+    scene.fog.density = 0.016 + state.symmetry * 0.024 + state.climax * 0.01;
+    fogUniforms.uFogDensity.value = scene.fog.density;
+    bloomPass.strength = 0.65 + state.presetBlend.warmth * 0.55 + state.climax * 0.75;
+    bloomPass.threshold = 0.18 - state.climax * 0.1;
+    vignettePass.uniforms.uStrength.value = 0.42 + state.symmetry * 0.28;
+    if (!reducedMotion) filmGrainPass.uniforms.uTime.value = state.time;
+
+    const uTime = state.time;
+    [edgeMat, edgeGlowMat].forEach(m => {
+      m.uniforms.uTime.value = uTime;
+      m.uniforms.uBreath.value = breath;
+      m.uniforms.uWarmth.value = state.presetBlend.warmth;
+      m.uniforms.uSymmetry.value = state.symmetry;
+      m.uniforms.uClimax.value = state.climax;
+      m.uniforms.uFogDensity.value = fogUniforms.uFogDensity.value;
+    });
+    nodeMat.uniforms.uTime.value = uTime;
     nodeMat.uniforms.uBreath.value = breath;
     nodeMat.uniforms.uWarmth.value = state.presetBlend.warmth;
     nodeMat.uniforms.uClimax.value = state.climax;
-    dustMat.uniforms.uTime.value = state.time;
-    dustMat.uniforms.uParticleSpeed.value = state.presetBlend.particleSpeed;
+    nodeMat.uniforms.uFogDensity.value = fogUniforms.uFogDensity.value;
+    haloMat.uniforms.uTime.value = uTime;
+    haloMat.uniforms.uWarmth.value = state.presetBlend.warmth;
+    haloMat.uniforms.uClimax.value = state.climax;
+    singularityMat.uniforms.uTime.value = uTime;
+    singularity.rotation.y += dt * 0.15;
+    singularity.rotation.x = Math.sin(state.time * 0.3) * 0.2;
+    voidSky.material.uniforms.uTime.value = uTime;
+    dustLayers.forEach(d => {
+      d.material.uniforms.uTime.value = uTime;
+      d.material.uniforms.uParticleSpeed.value = state.presetBlend.particleSpeed;
+      d.material.uniforms.uWarmth.value = state.presetBlend.warmth;
+      d.material.uniforms.uFogDensity.value = fogUniforms.uFogDensity.value;
+    });
 
     // Lights respond to preset
     lightGold.intensity = 1.8 * state.presetBlend.gold;
@@ -1063,13 +1549,15 @@
       }
     }
 
-    // Compute live node positions (convergence + breathing displacement)
     function livePos(n) {
-      const scale = (1 - state.climax * 0.65) * breathScale;
-      const wave = Math.sin(state.time * 0.6 + n.phase) * 0.03 * breath;
-      return n.home.clone().multiplyScalar(scale).add(
-        n.home.clone().normalize().multiplyScalar(wave)
-      );
+      const layerDelay = Math.max(0, n.layer) * 0.06;
+      const t = Math.max(0, Math.min(1, (state.climax - layerDelay) / (1 - layerDelay + 0.001)));
+      const pull = climaxEase(t) * 0.92;
+      const scale = (1 - pull) * breathScale;
+      const wave = Math.sin(state.time * 0.6 + n.phase) * 0.035 * breath * (1 - pull);
+      const target = n.home.clone().multiplyScalar(scale);
+      target.lerp(new THREE.Vector3(0, 0, 0), pull);
+      return target.add(n.home.clone().normalize().multiplyScalar(wave));
     }
 
     nodes.forEach((n, i) => {
@@ -1078,16 +1566,28 @@
       dummy.position.copy(target);
       dummy.updateMatrix();
       nodeMesh.setMatrixAt(i, dummy.matrix);
+      haloMesh.setMatrixAt(i, dummy.matrix);
     });
     nodeMesh.instanceMatrix.needsUpdate = true;
+    haloMesh.instanceMatrix.needsUpdate = true;
 
-    // Sync edge positions to live node positions
-    const posAttr = edgeGeo.attributes.position;
-    edges.forEach(([a, b], i) => {
-      posAttr.setXYZ(i * 2, nodes[a].pos.x, nodes[a].pos.y, nodes[a].pos.z);
-      posAttr.setXYZ(i * 2 + 1, nodes[b].pos.x, nodes[b].pos.y, nodes[b].pos.z);
-    });
-    posAttr.needsUpdate = true;
+    if (raycastFrame % 2 === 0 || state.climax > 0) {
+      const posAttr = edgeGeo.attributes.position;
+      edges.forEach(([a, b], i) => {
+        posAttr.setXYZ(i * 2, nodes[a].pos.x, nodes[a].pos.y, nodes[a].pos.z);
+        posAttr.setXYZ(i * 2 + 1, nodes[b].pos.x, nodes[b].pos.y, nodes[b].pos.z);
+      });
+      posAttr.needsUpdate = true;
+    }
+
+    if (holoEl.classList.contains('show') && holoEl._anchor) {
+      holoWorld.copy(holoEl._anchor).project(camera);
+      const x = (holoWorld.x * 0.5 + 0.5) * window.innerWidth;
+      const y = (-holoWorld.y * 0.5 + 0.5) * window.innerHeight;
+      holoEl.style.left = `${x}px`;
+      holoEl.style.top = `${y - 90}px`;
+      holoEl.style.transform = 'translate(-50%, -50%)';
+    }
 
     // God-ray motes
     moteGroup.children.forEach(mote => {
@@ -1102,19 +1602,22 @@
     });
 
     // Drone
-    updateDrone(state.presetBlend.warmth, state.preset === 'grace' || state.climaxPhase !== 'idle');
+    updateDrone(state.presetBlend.warmth, state.preset === 'grace' || state.climax > 0.1);
 
-    updateCamera();
-    renderer.render(scene, camera);
+    updateCamera(dt);
+    composer.render();
   }
 
   requestAnimationFrame(animate);
 
   // Resize
   window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
+    const w = window.innerWidth, h = window.innerHeight;
+    camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(w, h);
+    composer.setSize(w, h);
+    bloomPass.resolution.set(w * (isMobile ? 0.5 : 1), h * (isMobile ? 0.5 : 1));
   });
 
   // Cleanup
@@ -1124,8 +1627,8 @@
     edgeMat.dispose();
     mergedNodeGeo.dispose();
     nodeMat.dispose();
-    dustGeo.dispose();
-    dustMat.dispose();
+    dustLayers.forEach(d => { d.geometry.dispose(); d.material.dispose(); });
+    composer.dispose();
     if (audioCtx) audioCtx.close();
   });
   </script>
