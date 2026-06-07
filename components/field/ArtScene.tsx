@@ -2,7 +2,7 @@
 
 import { CameraDirector } from '@/components/canvas/CameraDirector';
 import { PostPipeline } from '@/components/canvas/PostPipeline';
-import { TensionLattice } from '@/components/field/TensionLattice';
+import { TensionField } from '@/components/field/TensionField';
 import type { MouseState, PulseState } from '@/lib/tension/types';
 
 type Props = {
@@ -29,7 +29,7 @@ export function ArtScene({
   return (
     <>
       <CameraDirector tension={tension} mouse={mouse} reducedDamp={reducedDamp} />
-      <TensionLattice
+      <TensionField
         tension={tension}
         speed={speed}
         mouse={mouse}

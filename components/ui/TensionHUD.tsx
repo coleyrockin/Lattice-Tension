@@ -39,7 +39,11 @@ export function TensionHUD({ simParams, audioOn, onPreset, onToggleAudio }: Prop
         </motion.div>
       </div>
 
-      <div className="pointer-events-auto absolute bottom-7 left-1/2 -translate-x-1/2 flex gap-1.5">
+      <div
+        data-tension-ui
+        className="pointer-events-auto absolute bottom-7 left-1/2 -translate-x-1/2 flex gap-1.5"
+        onClick={(e) => e.stopPropagation()}
+      >
         {(Object.keys(PRESETS) as TensionPreset[]).map((k) => (
           <button key={k} onClick={() => onPreset(k)} className="tension-control">
             {k}
@@ -51,7 +55,7 @@ export function TensionHUD({ simParams, audioOn, onPreset, onToggleAudio }: Prop
       </div>
 
       <div className="pointer-events-none absolute bottom-2.5 left-1/2 -translate-x-1/2 mono text-[8px] tracking-[2.5px] text-white/20">
-        MOUSE • SCROLL • STATES
+        MOUSE • WHEEL • STATES
       </div>
     </>
   );

@@ -6,7 +6,7 @@
 
 ---
 
-## Phase 1 — Foundation (current)
+## Phase 1 — Foundation (complete)
 
 **Goal:** Modular architecture with zero visual regression.
 
@@ -29,7 +29,7 @@
 
 ---
 
-## Phase 2 — Scale
+## Phase 2 — Scale (complete)
 
 **Goal:** Scene feels vast — multiple organisms, GPU particles, volumetric depth.
 

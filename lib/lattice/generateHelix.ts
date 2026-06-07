@@ -42,8 +42,8 @@ export function generateHelixLattice(): LatticeGeometry {
           edgePhases.push(base + t * twist);
         }
         if (s > 0 && p % 2 === 0) {
-          const prevBase = (l * STRANDS + (s - 1)) * PER;
-          edges.push(prevBase + p, idx);
+          const prevIdx = 1 + (l * STRANDS + (s - 1)) * PER + p;
+          edges.push(prevIdx, idx);
           edgePhases.push(base);
         }
       }
