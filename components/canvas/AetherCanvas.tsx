@@ -5,9 +5,7 @@ import { Canvas } from '@react-three/fiber';
 import { CanvasErrorBoundary } from '@/components/canvas/CanvasErrorBoundary';
 import { ArtScene } from '@/components/field/ArtScene';
 import { BackgroundStars } from '@/components/environment/BackgroundStars';
-import { NebulaVolume } from '@/components/environment/NebulaVolume';
 import { AtmosphereController } from '@/components/canvas/AtmosphereController';
-import { TSLPostPipeline } from '@/components/canvas/TSLPostPipeline';
 import { createAetherRenderer } from '@/engine/renderer/createRenderer';
 import { detectRendererInfo } from '@/engine/renderer/capability';
 import { getPerfProfile } from '@/lib/constants/perfTiers';
@@ -37,19 +35,18 @@ export function AetherCanvas({
   const rendererInfo = useMemo(() => detectRendererInfo(), []);
   const perf = useMemo(() => getPerfProfile(rendererInfo.tier), [rendererInfo.tier]);
   const coreLight = useRef<PointLight>(null!);
-  const accentLight = useRef<PointLight>(null!);
 
   return (
     <>
       <div
-        className={`pointer-events-none absolute inset-0 z-10 bg-black transition-opacity duration-[2800ms] ease-out ${
+        className={`pointer-events-none absolute inset-0 z-10 bg-black transition-opacity duration-[3200ms] ease-out ${
           revealed ? 'opacity-0' : 'opacity-100'
         }`}
       />
       <CanvasErrorBoundary>
         <Canvas
-          camera={{ position: [0, 0.2, 8.2], fov: 44 }}
-          style={{ background: '#010108' }}
+          camera={{ position: [0, 0, 5.8], fov: 38 }}
+          style={{ background: 'transparent' }}
           dpr={dpr}
           gl={async (props) => {
             const renderer = await createAetherRenderer(
@@ -61,41 +58,31 @@ export function AetherCanvas({
           }}
           onCreated={() => {
             onReady(rendererInfo.label);
-            window.setTimeout(() => setRevealed(true), 400);
+            window.setTimeout(() => setRevealed(true), 600);
           }}
         >
-          <TSLPostPipeline tension={simParams.tension} tier={rendererInfo.tier} />
           <AtmosphereController
             tension={simParams.tension}
             accentRef={coreLight}
-            emissiveRef={accentLight}
+            emissiveRef={coreLight}
           />
-          <ambientLight intensity={0.06} />
+          <ambientLight intensity={0.04} />
           <pointLight
             ref={coreLight}
-            position={[0, 0, 0]}
-            intensity={1.1 + simParams.tension * 1.4}
+            position={[2.5, 1.5, 4]}
+            intensity={1.4}
             color="#5eead4"
-            distance={28}
+            distance={20}
           />
-          <pointLight
-            ref={accentLight}
-            position={[4, 2, 5]}
-            intensity={0.65 + simParams.tension * 0.5}
-            color="#a78bfa"
-            distance={32}
-          />
-          <BackgroundStars count={perf.starCount} />
-          <NebulaVolume tension={simParams.tension} segments={perf.nebulaSegments} />
+          <pointLight position={[-3, -1, 2]} intensity={0.5} color="#818cf8" distance={18} />
+          <BackgroundStars count={Math.min(perf.starCount, 600)} />
           <ArtScene
             tension={simParams.tension}
             speed={simParams.speed}
-            pullStrength={simParams.pullStrength}
             mouse={mouse}
             burst={burst}
             reducedDamp={visualDamp}
             pulse={pulse}
-            perf={perf}
           />
         </Canvas>
       </CanvasErrorBoundary>

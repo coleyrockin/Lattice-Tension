@@ -12,6 +12,10 @@
   --lavender: #c084fc;
 }
 
+.aether-stage {
+  background: radial-gradient(ellipse 70% 55% at 50% 42%, #0c1220 0%, #04040a 45%, #000 100%);
+}
+
 html, body {
   font-family: var(--font-geist-sans);
   background: var(--void);

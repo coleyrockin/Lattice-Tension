@@ -11,32 +11,20 @@ type Props = {
   emissiveRef: React.RefObject<THREE.PointLight | null>;
 };
 
-export function AtmosphereController({ tension, accentRef, emissiveRef }: Props) {
+export function AtmosphereController({ tension, accentRef }: Props) {
   const { scene } = useThree();
-  const fogRef = useRef<THREE.Fog | null>(null);
-  const bgRef = useRef(new THREE.Color('#0a0618'));
+  const bgRef = useRef(new THREE.Color('#010108'));
 
+  // eslint-disable-next-line react-hooks/immutability -- R3F useFrame drives scene atmosphere
   useFrame(() => {
     const atm = getAtmosphere(tension);
-    bgRef.current.set(atm.bg);
-    // eslint-disable-next-line react-hooks/immutability
-    scene.background = bgRef.current;
-
-    if (!fogRef.current) {
-      fogRef.current = new THREE.Fog(atm.bg, atm.fogNear, atm.fogFar);
-      scene.fog = fogRef.current;
-    } else {
-      fogRef.current.color.set(atm.bg);
-      fogRef.current.near = atm.fogNear;
-      fogRef.current.far = atm.fogFar;
-    }
+    bgRef.current.set('#000000');
+    scene.background = null;
+    scene.fog = null;
 
     if (accentRef.current) {
       accentRef.current.color.set(atm.accent);
-      accentRef.current.intensity = 0.65 + tension * 0.9;
-    }
-    if (emissiveRef.current) {
-      emissiveRef.current.color.set(atm.secondary);
+      accentRef.current.intensity = 1.1 + tension * 0.6;
     }
   });
 

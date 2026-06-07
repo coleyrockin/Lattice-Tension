@@ -22,7 +22,7 @@ export function BackgroundStars({ count = 1400 }: Props) {
 
   return (
     <points ref={pointsRef} geometry={geo}>
-      <pointsMaterial size={0.9} color="#f4f0ff" transparent opacity={0.38} sizeAttenuation />
+      <pointsMaterial size={0.55} color="#c8d0e8" transparent opacity={0.22} sizeAttenuation />
     </points>
   );
 }
