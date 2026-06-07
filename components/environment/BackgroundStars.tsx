@@ -1,13 +1,15 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { createStarField } from '@/lib/lattice/particles';
 
-export function BackgroundStars() {
+type Props = { count?: number };
+
+export function BackgroundStars({ count = 1400 }: Props) {
   const pointsRef = useRef<THREE.Points>(null!);
-  const [geo] = useState(() => createStarField());
+  const geo = useMemo(() => createStarField(count), [count]);
 
   useFrame((state) => {
     if (!pointsRef.current) return;

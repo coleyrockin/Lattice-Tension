@@ -74,6 +74,24 @@ html, body {
   color: var(--gold);
 }
 
+.hud-glass {
+  border: 1px solid rgba(248, 244, 255, 0.1);
+  background: rgba(10, 6, 24, 0.42);
+  backdrop-filter: blur(10px);
+  border-radius: 6px;
+}
+
+.hud-state-flash {
+  animation: state-flash 2.4s ease-out forwards;
+}
+
+@keyframes state-flash {
+  0% { opacity: 0; transform: translate(-50%, 8px); }
+  12% { opacity: 1; transform: translate(-50%, 0); }
+  72% { opacity: 0.85; }
+  100% { opacity: 0; transform: translate(-50%, -6px); }
+}
+
 /* Title treatment for the art */
 .art-title {
   font-family: var(--font-space-grotesk);

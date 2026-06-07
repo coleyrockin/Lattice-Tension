@@ -7,9 +7,10 @@ import { ArtScene } from '@/components/field/ArtScene';
 import { BackgroundStars } from '@/components/environment/BackgroundStars';
 import { NebulaVolume } from '@/components/environment/NebulaVolume';
 import { AtmosphereController } from '@/components/canvas/AtmosphereController';
-
+import { TSLPostPipeline } from '@/components/canvas/TSLPostPipeline';
 import { createAetherRenderer } from '@/engine/renderer/createRenderer';
 import { detectRendererInfo } from '@/engine/renderer/capability';
+import { getPerfProfile } from '@/lib/constants/perfTiers';
 import type { SimParams, MouseState, PulseState } from '@/lib/tension/types';
 import type { PointLight } from 'three';
 
@@ -34,6 +35,7 @@ export function AetherCanvas({
 }: Props) {
   const [revealed, setRevealed] = useState(false);
   const rendererInfo = useMemo(() => detectRendererInfo(), []);
+  const perf = useMemo(() => getPerfProfile(rendererInfo.tier), [rendererInfo.tier]);
   const coreLight = useRef<PointLight>(null!);
   const accentLight = useRef<PointLight>(null!);
 
@@ -62,6 +64,7 @@ export function AetherCanvas({
             window.setTimeout(() => setRevealed(true), 120);
           }}
         >
+          <TSLPostPipeline tension={simParams.tension} tier={rendererInfo.tier} />
           <AtmosphereController
             tension={simParams.tension}
             accentRef={coreLight}
@@ -75,8 +78,8 @@ export function AetherCanvas({
             color="#7dd3fc"
           />
           <pointLight ref={accentLight} position={[2, 1.5, 3]} intensity={0.55} color="#c084fc" />
-          <BackgroundStars />
-          <NebulaVolume tension={simParams.tension} />
+          <BackgroundStars count={perf.starCount} />
+          <NebulaVolume tension={simParams.tension} segments={perf.nebulaSegments} />
           <ArtScene
             tension={simParams.tension}
             speed={simParams.speed}
@@ -85,6 +88,7 @@ export function AetherCanvas({
             burst={burst}
             reducedDamp={visualDamp}
             pulse={pulse}
+            perf={perf}
           />
         </Canvas>
       </CanvasErrorBoundary>

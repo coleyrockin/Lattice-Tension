@@ -4,11 +4,18 @@ import { useRef, useMemo, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { createSparkGeometry } from '@/lib/lattice/particles';
-import { applyLatticeGroupMotion, updateShaderUniforms } from '@/lib/lattice/latticeMotion';
-import { nodeVertexShader, nodeFragmentShader } from '@/components/shaders';
-import { FlowParticles } from '@/components/field/FlowParticles';
+import { applyLatticeGroupMotion } from '@/lib/lattice/latticeMotion';
 import { FilamentEdges } from '@/components/field/FilamentEdges';
+import { TSLFlowParticles } from '@/components/field/TSLFlowParticles';
+import { createNodeMaterial, syncNodeMaterial } from '@/engine/tsl/nodeMaterial';
+import {
+  createStressBuffer,
+  injectPulseStress,
+  maxStress,
+  stepStressPropagation,
+} from '@/lib/tension/propagation';
 import type { LatticeGeometry, MouseState, PulseState } from '@/lib/tension/types';
+import type { PerfProfile } from '@/lib/constants/perfTiers';
 
 type Props = {
   geometry: LatticeGeometry;
@@ -18,6 +25,7 @@ type Props = {
   mousePull: number;
   burst?: number;
   pulse?: PulseState;
+  perf: PerfProfile;
 };
 
 export function LatticeOrganism({
@@ -28,16 +36,18 @@ export function LatticeOrganism({
   mousePull,
   burst = 0,
   pulse = { x: 0, y: 0, strength: 0 },
+  perf,
 }: Props) {
   const group = useRef<THREE.Group>(null!);
   const nodesRef = useRef<THREE.InstancedMesh>(null!);
-
   const sparkMat = useRef<THREE.PointsMaterial>(null!);
   const nodesInitialized = useRef(false);
+  const pulseRef = useRef(pulse);
+  const stressBuf = useRef(createStressBuffer(edges.length / 2));
+  const peakStressRef = useRef(0);
 
   const nodeCount = nodes.length;
   const dummy = useMemo(() => new THREE.Object3D(), []);
-
   const [sparkGeo] = useState(() => createSparkGeometry());
 
   const nodeGeo = useMemo(() => {
@@ -49,37 +59,25 @@ export function LatticeOrganism({
     return g;
   }, [nodePhases]);
 
-  const nodeMat = useMemo(
-    () =>
-      new THREE.ShaderMaterial({
-        vertexShader: nodeVertexShader,
-        fragmentShader: nodeFragmentShader,
-        uniforms: {
-          uTime: { value: 0 },
-          uTension: { value: 0.6 },
-          uMouse: { value: new THREE.Vector2(0, 0) },
-          uPull: { value: 0 },
-          uPulseX: { value: 0 },
-          uPulseY: { value: 0 },
-          uPulseStrength: { value: 0 },
-        },
-        transparent: true,
-      }),
-    [],
-  );
+  const nodeHandles = useMemo(() => createNodeMaterial(), []);
 
   const lattice = useMemo(
     () => ({ nodes, edges, edgePhases, nodePhases }),
     [nodes, edges, edgePhases, nodePhases],
   );
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     const t = state.clock.elapsedTime;
-    const pull = mousePull * 0.8 + tension * 0.6;
+    const stress = stressBuf.current;
 
-    if (nodesRef.current) {
-      updateShaderUniforms(nodesRef.current.material as THREE.ShaderMaterial, t, tension, mouse, pull, pulse);
+    if (pulse.strength > pulseRef.current.strength) {
+      injectPulseStress(stress, nodes, edges, pulse);
     }
+    pulseRef.current = pulse;
+    stepStressPropagation(stress, edges, nodeCount, Math.min(delta, 0.05));
+
+    peakStressRef.current = maxStress(stress);
+    syncNodeMaterial(nodeHandles, tension, peakStressRef.current);
 
     if (!nodesInitialized.current && nodesRef.current) {
       for (let i = 0; i < nodeCount; i++) {
@@ -104,7 +102,10 @@ export function LatticeOrganism({
 
   return (
     <group ref={group}>
-      <instancedMesh ref={nodesRef} args={[nodeGeo, nodeMat, nodeCount]} />
+      <instancedMesh
+        ref={nodesRef}
+        args={[nodeGeo, nodeHandles.material, nodeCount]}
+      />
       <FilamentEdges
         nodes={nodes}
         edges={edges}
@@ -113,9 +114,16 @@ export function LatticeOrganism({
         mouse={mouse}
         mousePull={mousePull}
         pulse={pulse}
-        lineWidth={3.2}
+        stressRef={peakStressRef}
+        lineWidth={perf.lineWidth}
       />
-      <FlowParticles lattice={lattice} tension={tension} speed={speed} burst={burst} />
+      <TSLFlowParticles
+        lattice={lattice}
+        tension={tension}
+        speed={speed}
+        burst={burst}
+        count={perf.flowCount}
+      />
       <points geometry={sparkGeo}>
         <pointsMaterial
           ref={sparkMat}

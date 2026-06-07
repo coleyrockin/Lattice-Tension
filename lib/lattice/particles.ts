@@ -2,8 +2,7 @@ import * as THREE from 'three';
 import { LATTICE_CONFIG } from '@/lib/constants/motion';
 type FlowLattice = Pick<import('@/lib/tension/types').LatticeGeometry, 'nodes' | 'edges'>;
 
-export function createStarField() {
-  const count = LATTICE_CONFIG.starCount;
+export function createStarField(count: number = LATTICE_CONFIG.starCount) {
   const positions = new Float32Array(count * 3);
   const sizes = new Float32Array(count);
   const phases = new Float32Array(count);

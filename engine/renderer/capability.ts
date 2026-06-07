@@ -8,6 +8,10 @@ export type RendererInfo = {
 export function detectRenderTier(): RenderTier {
   if (typeof window === 'undefined') return 'B';
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return 'C';
+  const mobile =
+    /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+    window.innerWidth < 768;
+  if (mobile) return 'B';
   if ('gpu' in navigator) return 'A';
   return 'B';
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback, type RefObject } from 'react';
+import { useEffect, useRef, useCallback, useState, type RefObject } from 'react';
 import { AUTO_DEMO } from '@/lib/constants/motion';
 import { PRESETS, PRESET_ORDER } from '@/lib/constants/presets';
 import { animateToPreset, killAllAnimations } from '@/lib/tension/animatePreset';
@@ -12,6 +12,7 @@ export function useAutoDemo(
 ) {
   const cancelledRef = useRef(false);
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const [runId, setRunId] = useState(0);
 
   const cancelDemo = useCallback(() => {
     if (cancelledRef.current) return;
@@ -19,6 +20,14 @@ export function useAutoDemo(
     timeoutsRef.current.forEach(clearTimeout);
     timeoutsRef.current = [];
     killAllAnimations();
+  }, []);
+
+  const restartDemo = useCallback(() => {
+    cancelledRef.current = false;
+    timeoutsRef.current.forEach(clearTimeout);
+    timeoutsRef.current = [];
+    killAllAnimations();
+    setRunId((id) => id + 1);
   }, []);
 
   useEffect(() => {
@@ -52,7 +61,7 @@ export function useAutoDemo(
       timeoutsRef.current.forEach(clearTimeout);
       killAllAnimations();
     };
-  }, [setSimParams, simRef]);
+  }, [setSimParams, simRef, runId]);
 
-  return { cancelDemo };
+  return { cancelDemo, restartDemo };
 }

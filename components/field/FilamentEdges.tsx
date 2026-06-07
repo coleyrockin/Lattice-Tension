@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, type RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Vector3 } from 'three';
 import { LineSegments2 } from 'three/examples/jsm/lines/webgpu/LineSegments2.js';
@@ -18,6 +18,7 @@ type Props = {
   mouse: { x: number; y: number };
   mousePull: number;
   pulse: PulseState;
+  stressRef?: RefObject<number>;
   lineWidth?: number;
 };
 
@@ -29,6 +30,7 @@ export function FilamentEdges({
   mouse,
   mousePull,
   pulse,
+  stressRef,
   lineWidth = 3.5,
 }: Props) {
   const meshRef = useRef<LineSegments2>(null!);
@@ -50,14 +52,15 @@ export function FilamentEdges({
     return arr;
   }, [nodes, edges, edgeCount]);
 
-  const { mesh, geometry, tensionUniform, accentUniform } = useMemo(() => {
+  const { mesh, geometry, tensionUniform, stressUniform, accentUniform } = useMemo(() => {
     const geo = new LineSegmentsGeometry();
     geo.setPositions(basePositions);
-    const { material, tensionUniform, accentUniform } = createFilamentMaterial(lineWidth);
+    const { material, tensionUniform, stressUniform, accentUniform } = createFilamentMaterial(lineWidth);
     return {
       mesh: new LineSegments2(geo, material),
       geometry: geo,
       tensionUniform,
+      stressUniform,
       accentUniform,
     };
   }, [basePositions, lineWidth]);
@@ -70,8 +73,10 @@ export function FilamentEdges({
   useFrame((state) => {
     const t = state.clock.elapsedTime;
     tensionUniform.value = tension;
+    const stress = stressRef?.current ?? 0;
+    stressUniform.value = stress;
     accentUniform.value.set(getAtmosphere(tension).accent);
-    mesh.material.linewidth = lineWidth;
+    mesh.material.linewidth = lineWidth + stress * 2.2;
 
     for (let i = 0; i < edgeCount; i++) {
       const a = edges[i * 2];

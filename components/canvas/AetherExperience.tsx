@@ -1,15 +1,18 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { AetherCanvas } from '@/components/canvas/AetherCanvas';
 import { AetherHUD } from '@/components/ui/AetherHUD';
 import { DEFAULT_SIM, PRESETS } from '@/lib/constants/presets';
 import { animateToPreset } from '@/lib/tension/animatePreset';
+import { detectRendererInfo } from '@/engine/renderer/capability';
+import { getPerfProfile } from '@/lib/constants/perfTiers';
 import type { SimParams, TensionPreset } from '@/lib/tension/types';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
-import { useTensionAudio } from '@/hooks/useTensionAudio';
+import { useTensionSonifier } from '@/hooks/useTensionSonifier';
 import { useTensionInput } from '@/hooks/useTensionInput';
 import { useAutoDemo } from '@/hooks/useAutoDemo';
+import { useIdleOrbit } from '@/hooks/useIdleOrbit';
 
 export function AetherExperience() {
   const [simParams, setSimParams] = useState<SimParams>(DEFAULT_SIM);
@@ -20,14 +23,18 @@ export function AetherExperience() {
   }, [simParams]);
 
   const reduced = useReducedMotion();
+  const tier = useMemo(() => detectRendererInfo().tier, []);
+  const perf = useMemo(() => getPerfProfile(tier), [tier]);
   const dpr =
     reduced || typeof window === 'undefined'
       ? 1
-      : Math.min(window.devicePixelRatio, 2);
+      : Math.min(window.devicePixelRatio, perf.maxDpr);
   const visualDamp = reduced ? 0.4 : 1;
-  const { audioOn, toggleAudio } = useTensionAudio(simParams.tension);
-  const { cancelDemo } = useAutoDemo(simRef, setSimParams);
+  const { audioOn, toggleAudio } = useTensionSonifier(simParams.tension);
+  const { cancelDemo, restartDemo } = useAutoDemo(simRef, setSimParams);
   const { mouse, burst, pulse, handlePluck } = useTensionInput(setSimParams, cancelDemo);
+
+  useIdleOrbit(restartDemo, 30000);
 
   const applyPreset = useCallback(
     (name: TensionPreset) => {
