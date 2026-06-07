@@ -1,35 +1,25 @@
-# Lattice Tension
+# Aether
 
-A pure, single 3D artistic experience exploring tension, structure, and release through a dense counter-rotating helical lattice.
+Procedural volumetric tension field. WebGPU raymarched cloud — single-page, zero assets.
 
-Filaments strain and bow under procedural forces. Particles flow like energy along the tense connections. The entire form breathes, locks, and releases.
+## Stack
 
-Mouse applies directional strain. Scroll modulates global tension. Presets shift the character of the stress. A minimal reactive tone underscores the state.
+- Next.js 16
+- React Three Fiber
+- Three.js WebGPU + TSL raymarching
 
-## Run Locally
+## Run
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open http://localhost:3000
+Open [http://localhost:3000](http://localhost:3000).
 
-Move your mouse. Scroll. Click the states. Toggle the tone.
+## Controls
 
-## Build & Deploy
-
-```bash
-npm run build
-npm start
-```
-
-Push to main → Vercel auto-deploys (GitHub integration).
-
-## Notes
-
-- Everything is procedural. No external assets.
-- Built with Next.js + React Three Fiber + three.js + postprocessing.
-- Focused entirely on the beauty and mechanics of tension in a single immersive artwork.
-
-This is the art. Nothing else.
+- **Mouse** — drift
+- **Wheel** — tension
+- **Click** — pulse
+- **Bottom bar (hover)** — presets + tone
