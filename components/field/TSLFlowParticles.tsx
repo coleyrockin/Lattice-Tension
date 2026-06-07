@@ -38,9 +38,9 @@ export function TSLFlowParticles({ lattice, tension, speed, burst = 0, count }: 
     geo.setAttribute('position', new BufferAttribute(positions, 3));
 
     const tensionUniform = uniform(0.6);
-    const sizeUniform = uniform(4.5);
+    const sizeUniform = uniform(2.2);
     const mat = new PointsNodeMaterial();
-    mat.colorNode = mix(vec3(0.98, 0.8, 0.08), vec3(1.0, 0.95, 0.65), tensionUniform);
+    mat.colorNode = mix(vec3(0.55, 0.92, 1.0), vec3(1.0, 0.88, 0.45), tensionUniform).mul(0.65);
     mat.sizeNode = sizeUniform;
     mat.transparent = true;
     mat.depthWrite = false;
@@ -56,7 +56,7 @@ export function TSLFlowParticles({ lattice, tension, speed, burst = 0, count }: 
   useFrame((state) => {
     const t = state.clock.elapsedTime;
     tensionUniform.value = tension;
-    sizeUniform.value = 3.2 + tension * 2.8 + burst * 3.5;
+    sizeUniform.value = 1.4 + tension * 1.6 + burst * 1.8;
 
     const { nodes, edges } = lattice;
     const spd = (0.7 + tension * 1.5) * speed + burst * 2.5;

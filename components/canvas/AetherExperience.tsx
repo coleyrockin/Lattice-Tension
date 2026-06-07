@@ -55,7 +55,7 @@ export function AetherExperience() {
   return (
     <div
       id="lattice-container"
-      className="relative h-[100dvh] w-full overflow-hidden bg-[#0a0618] text-[#f8f4ff]"
+      className="relative h-[100dvh] w-full overflow-hidden bg-[#010108] text-[#f8f4ff]"
       onClick={handleCanvasPluck}
     >
       <AetherCanvas

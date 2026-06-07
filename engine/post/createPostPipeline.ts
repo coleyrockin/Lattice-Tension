@@ -22,10 +22,10 @@ export function createPostPipeline(
   const color = scenePass.getTextureNode('output');
   const tensionUniform = uniform(float(0.6));
 
-  const bloomPass = bloom(color, tier === 'A' ? 1.6 : 1.1, 0.35, 0.08);
+  const bloomPass = bloom(color, tier === 'A' ? 2.4 : 1.6, 0.48, 0.04);
   const output = film(
     color.add(bloomPass),
-    tensionUniform.mul(tier === 'A' ? 0.035 : 0.02).add(0.018),
+    tensionUniform.mul(tier === 'A' ? 0.028 : 0.018).add(0.012),
   );
   pipeline.outputNode = output;
 

@@ -20,19 +20,18 @@ export type TensionFieldData = {
   bridges: FieldBridge[];
 };
 
-const ORGANISM_LAYOUT: {
+/** One monumental helix + two distant echoes — clarity over clutter. */
+const FIELD_LAYOUT: {
   position: [number, number, number];
   rotation: [number, number, number];
   scale: number;
 }[] = [
-  { position: [0, 0, 0], rotation: [0, 0, 0], scale: 1.05 },
-  { position: [-6.2, 1.2, -3.0], rotation: [0.15, 0.95, 0.05], scale: 0.82 },
-  { position: [5.8, -0.9, 2.6], rotation: [-0.1, -1.15, 0], scale: 0.88 },
-  { position: [-2.4, -2.1, 4.2], rotation: [0.2, 0.4, -0.12], scale: 0.68 },
-  { position: [3.1, 2.3, -4.8], rotation: [-0.18, -0.55, 0.1], scale: 0.74 },
+  { position: [0, 0, 0], rotation: [0, 0, 0], scale: 1.85 },
+  { position: [-14, 2.5, -8], rotation: [0.12, 0.7, 0.04], scale: 0.42 },
+  { position: [12, -1.8, 9], rotation: [-0.08, -0.9, 0], scale: 0.38 },
 ];
 
-function outerNodeIndex(strand: number, period: number): number {
+function outerNodeIndex(strand: number, period: number) {
   const { layers, strands, periods } = LATTICE_CONFIG;
   return 1 + (layers - 1) * strands * periods + strand * periods + period;
 }
@@ -50,7 +49,7 @@ function worldNode(
 }
 
 export function generateTensionField(): TensionFieldData {
-  const organisms = ORGANISM_LAYOUT.map((layout) => ({
+  const organisms = FIELD_LAYOUT.map((layout) => ({
     geometry: generateHelixLattice(),
     placement: {
       position: new THREE.Vector3(...layout.position),
@@ -60,24 +59,19 @@ export function generateTensionField(): TensionFieldData {
   }));
 
   const bridges: FieldBridge[] = [];
-  const pairs: [number, number, number, number, number, number][] = [
-    [0, 1, 2, 4, 3, 5],
-    [0, 2, 5, 3, 2, 6],
-    [0, 3, 1, 6, 4, 2],
-    [0, 4, 7, 4, 6, 3],
-    [1, 2, 7, 1, 5, 4],
-    [1, 3, 4, 5, 8, 2],
-    [2, 4, 3, 6, 9, 5],
-    [3, 4, 6, 3, 1, 7],
-  ];
+  const hero = organisms[0];
+  const echoes = organisms.slice(1);
 
-  for (const [orgA, orgB, strandA, periodA, strandB, periodB] of pairs) {
-    const idxA = outerNodeIndex(strandA, periodA);
-    const idxB = outerNodeIndex(strandB, periodB);
+  for (const echo of echoes) {
     bridges.push({
-      from: worldNode(organisms[orgA].geometry, organisms[orgA].placement, idxA),
-      to: worldNode(organisms[orgB].geometry, organisms[orgB].placement, idxB),
-      phase: strandA * 0.5 + strandB * 0.5,
+      from: worldNode(hero.geometry, hero.placement, outerNodeIndex(2, 4)),
+      to: worldNode(echo.geometry, echo.placement, outerNodeIndex(5, 3)),
+      phase: Math.random() * Math.PI * 2,
+    });
+    bridges.push({
+      from: worldNode(hero.geometry, hero.placement, outerNodeIndex(7, 6)),
+      to: worldNode(echo.geometry, echo.placement, outerNodeIndex(1, 2)),
+      phase: Math.random() * Math.PI * 2,
     });
   }
 

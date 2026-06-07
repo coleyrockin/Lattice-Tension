@@ -76,7 +76,7 @@ export function FilamentEdges({
     const stress = stressRef?.current ?? 0;
     stressUniform.value = stress;
     accentUniform.value.set(getAtmosphere(tension).accent);
-    mesh.material.linewidth = lineWidth + stress * 2.2;
+    mesh.material.linewidth = lineWidth * (1 + stress * 0.85 + tension * 0.15);
 
     for (let i = 0; i < edgeCount; i++) {
       const a = edges[i * 2];

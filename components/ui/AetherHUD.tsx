@@ -22,13 +22,13 @@ export function AetherHUD({
   onToggleAudio,
   onInteract,
 }: Props) {
-  const [visible, setVisible] = useState(true);
+  const [showChrome, setShowChrome] = useState(true);
   const [flash, setFlash] = useState<TensionPreset | null>(null);
   const active = nearestPreset(simParams.tension);
   const prevActive = useRef(active);
 
   useEffect(() => {
-    const t = setTimeout(() => setVisible(false), 3200);
+    const t = setTimeout(() => setShowChrome(false), 4500);
     return () => clearTimeout(t);
   }, []);
 
@@ -36,65 +36,56 @@ export function AetherHUD({
     if (active !== prevActive.current) {
       setFlash(active);
       prevActive.current = active;
-      const t = setTimeout(() => setFlash(null), 2400);
+      const t = setTimeout(() => setFlash(null), 2200);
       return () => clearTimeout(t);
     }
   }, [active]);
 
-  const dismiss = () => {
-    onInteract?.();
-    setVisible(false);
-  };
-
   return (
     <>
       <div
-        className={`pointer-events-none absolute top-6 left-6 transition-opacity duration-[1400ms] ${
-          visible ? 'opacity-100' : 'opacity-0'
+        className={`pointer-events-none absolute top-5 left-5 transition-opacity duration-[2000ms] ${
+          showChrome ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        <div className="hud-glass inline-block px-4 py-2.5">
-          <div className="mono text-[11px] tracking-[0.38em] text-white/75">AETHER</div>
-          <div className="mt-1 text-[10px] tracking-[0.22em] text-white/35 uppercase">
-            tension field
-          </div>
-        </div>
+        <div className="mono text-[10px] tracking-[0.42em] text-white/50">AETHER</div>
       </div>
 
-      <div className="pointer-events-none absolute top-6 right-6 mono text-[9px] tracking-[0.2em] text-white/25 uppercase">
+      <div className="pointer-events-none absolute top-5 right-5 mono text-[8px] tracking-[0.18em] text-white/15 uppercase">
         {rendererLabel}
       </div>
 
       {flash && (
-        <div className="pointer-events-none absolute left-1/2 top-[18%] -translate-x-1/2 hud-state-flash mono text-[10px] tracking-[0.42em] uppercase text-[#facc15]/90">
+        <div className="pointer-events-none absolute left-1/2 top-[20%] -translate-x-1/2 hud-state-flash mono text-[9px] tracking-[0.48em] uppercase text-[#5eead4]/80">
           {flash}
         </div>
       )}
 
       <div
         data-tension-ui
-        className="pointer-events-auto absolute bottom-7 left-1/2 -translate-x-1/2 hud-glass flex gap-1.5 px-2 py-1.5"
+        className="group pointer-events-auto absolute bottom-0 left-0 right-0 flex justify-center pb-6 opacity-0 transition-opacity duration-700 hover:opacity-100 focus-within:opacity-100"
+        style={{ opacity: showChrome ? 1 : undefined }}
+        onPointerEnter={() => setShowChrome(true)}
+        onPointerLeave={() => setShowChrome(false)}
         onClick={(e) => {
           e.stopPropagation();
-          dismiss();
+          onInteract?.();
         }}
       >
-        {(Object.keys(PRESETS) as TensionPreset[]).map((k) => (
-          <button
-            key={k}
-            onClick={() => onPreset(k)}
-            className={`tension-control${active === k ? ' active' : ''}`}
-          >
-            {k}
+        <div className="hud-glass flex gap-1 px-2 py-1.5">
+          {(Object.keys(PRESETS) as TensionPreset[]).map((k) => (
+            <button
+              key={k}
+              onClick={() => onPreset(k)}
+              className={`tension-control${active === k ? ' active' : ''}`}
+            >
+              {k}
+            </button>
+          ))}
+          <button onClick={onToggleAudio} className="audio-toggle">
+            {audioOn ? 'MUTE' : 'TONE'}
           </button>
-        ))}
-        <button onClick={onToggleAudio} className="audio-toggle">
-          {audioOn ? 'MUTE' : 'TONE'}
-        </button>
-      </div>
-
-      <div className="pointer-events-none absolute bottom-2.5 left-1/2 -translate-x-1/2 mono text-[8px] tracking-[2.5px] text-white/20">
-        MOUSE • WHEEL • STATES
+        </div>
       </div>
     </>
   );

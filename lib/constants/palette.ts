@@ -1,13 +1,14 @@
 export const PALETTE = {
-  void: '#000000',
+  void: '#010108',
   light: '#f8f4ff',
-  gold: '#facc15',
-  lavender: '#c084fc',
+  gold: '#ffd54a',
+  lavender: '#a78bfa',
+  cyan: '#5eead4',
 } as const;
 
 export const ATMOSPHERE = {
-  coherent: { bg: '#0a0618', accent: '#7dd3fc', emissive: '#7dd3fc' },
-  strain: { bg: '#1a0f1e', accent: '#f59e0b', emissive: '#facc15' },
-  peak: { bg: '#0d0008', accent: '#fef08a', emissive: '#fef08a' },
-  release: { bg: '#120a14', accent: '#fda4af', emissive: '#fda4af' },
+  coherent: { bg: '#010108', accent: '#5eead4', emissive: '#67e8f9' },
+  strain: { bg: '#08040f', accent: '#fbbf24', emissive: '#fcd34d' },
+  peak: { bg: '#050208', accent: '#fef3c7', emissive: '#fffbeb' },
+  release: { bg: '#06040c', accent: '#f9a8d4', emissive: '#fbcfe8' },
 } as const;

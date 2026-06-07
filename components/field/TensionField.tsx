@@ -4,7 +4,6 @@ import { useMemo } from 'react';
 import { generateTensionField } from '@/lib/lattice/generateField';
 import { LatticeOrganism } from '@/components/field/LatticeOrganism';
 import { FilamentBridge } from '@/components/field/FilamentBridge';
-import { MacroArcs } from '@/components/field/MacroArcs';
 import type { PerfProfile } from '@/lib/constants/perfTiers';
 import type { MouseState, PulseState } from '@/lib/tension/types';
 
@@ -31,8 +30,7 @@ export function TensionField({
 
   return (
     <group>
-      {perf.macroArcs && <MacroArcs tension={tension} />}
-      <FilamentBridge bridges={field.bridges} tension={tension} />
+      <FilamentBridge bridges={field.bridges} tension={tension} lineWidth={perf.lineWidth * 0.55} />
       {field.organisms.map(({ geometry, placement }, i) => (
         <group
           key={i}
@@ -49,6 +47,7 @@ export function TensionField({
             burst={burst}
             pulse={pulse}
             perf={perf}
+            lineWidth={perf.lineWidth * (placement.scale < 0.6 ? 0.85 : 1)}
           />
         </group>
       ))}

@@ -42,14 +42,14 @@ export function AetherCanvas({
   return (
     <>
       <div
-        className={`pointer-events-none absolute inset-0 z-10 bg-black transition-opacity duration-[2000ms] ease-out ${
+        className={`pointer-events-none absolute inset-0 z-10 bg-black transition-opacity duration-[2800ms] ease-out ${
           revealed ? 'opacity-0' : 'opacity-100'
         }`}
       />
       <CanvasErrorBoundary>
         <Canvas
-          camera={{ position: [0, 0.8, 11.5], fov: 52 }}
-          style={{ background: '#0a0618' }}
+          camera={{ position: [0, 0.2, 8.2], fov: 44 }}
+          style={{ background: '#010108' }}
           dpr={dpr}
           gl={async (props) => {
             const renderer = await createAetherRenderer(
@@ -61,7 +61,7 @@ export function AetherCanvas({
           }}
           onCreated={() => {
             onReady(rendererInfo.label);
-            window.setTimeout(() => setRevealed(true), 120);
+            window.setTimeout(() => setRevealed(true), 400);
           }}
         >
           <TSLPostPipeline tension={simParams.tension} tier={rendererInfo.tier} />
@@ -70,14 +70,21 @@ export function AetherCanvas({
             accentRef={coreLight}
             emissiveRef={accentLight}
           />
-          <ambientLight intensity={0.12} />
+          <ambientLight intensity={0.06} />
           <pointLight
             ref={coreLight}
             position={[0, 0, 0]}
-            intensity={0.75 + simParams.tension}
-            color="#7dd3fc"
+            intensity={1.1 + simParams.tension * 1.4}
+            color="#5eead4"
+            distance={28}
           />
-          <pointLight ref={accentLight} position={[2, 1.5, 3]} intensity={0.55} color="#c084fc" />
+          <pointLight
+            ref={accentLight}
+            position={[4, 2, 5]}
+            intensity={0.65 + simParams.tension * 0.5}
+            color="#a78bfa"
+            distance={32}
+          />
           <BackgroundStars count={perf.starCount} />
           <NebulaVolume tension={simParams.tension} segments={perf.nebulaSegments} />
           <ArtScene

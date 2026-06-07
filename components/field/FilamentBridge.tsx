@@ -11,9 +11,10 @@ import type { FieldBridge } from '@/lib/lattice/generateField';
 type Props = {
   bridges: FieldBridge[];
   tension: number;
+  lineWidth?: number;
 };
 
-export function FilamentBridge({ bridges, tension }: Props) {
+export function FilamentBridge({ bridges, tension, lineWidth = 0.04 }: Props) {
   const meshRef = useRef<LineSegments2>(null!);
 
   const { mesh, tensionUniform, accentUniform } = useMemo(() => {
@@ -28,16 +29,17 @@ export function FilamentBridge({ bridges, tension }: Props) {
     });
     const geo = new LineSegmentsGeometry();
     geo.setPositions(positions);
-    const { material, tensionUniform, accentUniform } = createFilamentMaterial(2.2);
+    const { material, tensionUniform, accentUniform } = createFilamentMaterial(lineWidth);
+    material.opacity = 0.55;
     return { mesh: new LineSegments2(geo, material), tensionUniform, accentUniform };
-  }, [bridges]);
+  }, [bridges, lineWidth]);
 
-  // eslint-disable-next-line react-hooks/immutability -- R3F useFrame mutates Three.js objects by design
+  // eslint-disable-next-line react-hooks/immutability -- R3F useFrame mutates Three.js objects
   useFrame(() => {
-    tensionUniform.value = tension;
+    tensionUniform.value = tension * 0.85;
     accentUniform.value.set(getAtmosphere(tension).accent);
-    mesh.material.linewidth = 1.8 + tension * 1.2;
-    mesh.material.opacity = 0.55 + tension * 0.35;
+    mesh.material.linewidth = lineWidth * (0.85 + tension * 0.25);
+    mesh.material.opacity = 0.35 + tension * 0.35;
   });
 
   return <primitive ref={meshRef} object={mesh} />;
