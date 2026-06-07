@@ -5,40 +5,22 @@
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-space-grotesk);
 
-  /* Cosmic Void Palette — neon lavender cyber-mystical */
+  /* Minimal cosmic palette for Lattice Tension art */
   --void: #000000;
-  --indigo: #050818;
-  --deep-purple: #1a0f2e;
-  --nebula-purple: #3b2a5e;
-  --lavender: #c084fc;
-  --neon-lavender: #a78bfa;
-  --electric-teal: #67e8f9;
-  --cosmic-gold: #facc15;
-  --rose-gold: #e8a0a0;
   --light: #f8f4ff;
-  --text-dim: rgba(248, 244, 255, 0.55);
-  --text-faint: rgba(248, 244, 255, 0.18);
-
-  /* Effects */
-  --glow-lavender: 0 0 20px rgba(167, 139, 250, 0.5);
-  --glow-gold: 0 0 24px rgba(250, 204, 21, 0.35);
-  --holo-border: rgba(167, 139, 250, 0.35);
+  --gold: #facc15;
+  --lavender: #c084fc;
 }
 
-/* Base cosmic reset */
-html {
-  scroll-behavior: smooth;
-}
-
-body {
+html, body {
   font-family: var(--font-geist-sans);
   background: var(--void);
   color: var(--light);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  overflow: hidden;
 }
 
-/* Display / mystical typography */
 .font-display {
   font-family: var(--font-space-grotesk);
   font-feature-settings: "tnum" "ss01";
@@ -48,128 +30,52 @@ body {
   font-family: var(--font-geist-mono);
 }
 
-/* Section rhythm — cinematic vertical space */
-.section {
-  position: relative;
-  min-height: 100dvh;
-  padding-top: 6rem;
-  padding-bottom: 6rem;
-}
-
-/* Holographic / ancient-tech UI primitives */
-.holo-card {
-  position: relative;
-  background: linear-gradient(145deg, rgba(26,15,46,0.92), rgba(5,8,24,0.96));
-  border: 1px solid var(--holo-border);
-  box-shadow: 0 0 0 1px rgba(167,139,250,0.1) inset,
-              0 20px 60px -15px rgba(0,0,0,0.6);
-  backdrop-filter: blur(20px) saturate(1.2);
-  transition: transform 0.4s cubic-bezier(0.23, 1, 0.32, 1), 
-              box-shadow 0.4s cubic-bezier(0.23, 1, 0.32, 1),
-              border-color 0.3s ease;
-}
-
-.holo-card:hover {
-  border-color: var(--neon-lavender);
-  box-shadow: 0 0 0 1px rgba(167,139,250,0.3) inset,
-              0 30px 80px -20px rgba(0,0,0,0.7),
-              var(--glow-lavender);
-  transform: translateY(-2px);
-}
-
-.holo-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(103,232,249,0.06) 0%,
-    transparent 40%,
-    rgba(250,204,21,0.04) 100%
-  );
-  pointer-events: none;
-  z-index: 1;
-}
-
-.glass {
-  background: rgba(5, 8, 24, 0.65);
-  border: 1px solid rgba(167, 139, 250, 0.2);
-  backdrop-filter: blur(24px) saturate(1.6);
-}
-
-/* Cosmic buttons */
-.cosmic-btn {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.875rem 2rem;
+/* Minimal elegant controls for the pure art piece */
+.tension-control {
   font-family: var(--font-geist-mono);
-  font-size: 0.75rem;
-  letter-spacing: 0.2em;
+  font-size: 9px;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   background: transparent;
-  border: 1px solid var(--neon-lavender);
-  color: var(--light);
-  transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
-  overflow: hidden;
+  border: 1px solid rgba(248, 244, 255, 0.15);
+  color: rgba(248, 244, 255, 0.55);
+  padding: 0.35rem 0.7rem;
+  transition: all 0.2s ease;
   cursor: pointer;
 }
 
-.cosmic-btn::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(167,139,250,0.3), transparent);
-  transform: translateX(-120%);
-  transition: transform 0.7s;
+.tension-control:hover {
+  border-color: var(--gold);
+  color: var(--gold);
 }
 
-.cosmic-btn:hover {
-  background: var(--neon-lavender);
-  color: #000;
-  border-color: var(--neon-lavender);
-  box-shadow: var(--glow-lavender);
+.tension-control.active {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: rgba(250, 204, 21, 0.08);
 }
 
-.cosmic-btn:hover::before {
-  transform: translateX(300%);
-}
-
-.cosmic-btn:active {
-  transform: scale(0.985);
-}
-
-/* Portal / enter button special */
-.portal-btn {
-  font-size: 0.875rem;
-  letter-spacing: 0.35em;
-  padding: 1.1rem 3rem;
-  border-width: 1.5px;
-}
-
-/* Scroll progress + section labels */
-.scroll-progress {
-  position: fixed;
-  top: 0;
-  left: 0;
-  height: 1px;
-  background: linear-gradient(to right, var(--neon-lavender), var(--cosmic-gold));
-  z-index: 100;
-  pointer-events: none;
-}
-
-.section-label {
+.audio-toggle {
   font-family: var(--font-geist-mono);
-  font-size: 10px;
-  letter-spacing: 0.3em;
+  font-size: 9px;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--text-faint);
+  background: transparent;
+  border: 1px solid rgba(248, 244, 255, 0.15);
+  color: rgba(248, 244, 255, 0.55);
+  padding: 0.35rem 0.7rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  margin-left: 0.5rem;
 }
 
-/* Text treatments */
-.title-hero {
+.audio-toggle:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+/* Title treatment for the art */
+.art-title {
   font-family: var(--font-space-grotesk);
   font-weight: 600;
   letter-spacing: -0.04em;
@@ -179,100 +85,5 @@ body {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 2px 30px rgba(0,0,0,0.9)) drop-shadow(0 0 60px rgba(250, 204, 21, 0.25));
-  text-shadow: 0 0 80px rgba(167, 139, 250, 0.3);
-}
-
-.cosmic-text {
-  font-style: italic;
-  letter-spacing: 0.02em;
-  color: #f8f4ff;
-  text-shadow: 0 0 20px rgba(0,0,0,0.8);
-}
-
-/* Fragment / revelation overlays like old LATTICE */
-.revelation {
-  font-style: italic;
-  font-weight: 300;
-  letter-spacing: 0.04em;
-  text-shadow: 0 0 30px rgba(167, 139, 250, 0.4);
-}
-
-/* Data viz elements */
-.constellation {
-  position: relative;
-}
-
-.data-node {
-  transition: all 0.2s ease;
-}
-
-.data-node:hover {
-  transform: scale(1.1);
-  filter: brightness(1.3) saturate(1.4);
-}
-
-/* The Infinite explorer container */
-.infinite-canvas {
-  touch-action: none;
-  background: #000;
-}
-
-/* Mobile optimizations + accessibility */
-@media (max-width: 768px) {
-  .section {
-    padding-top: 4rem;
-    padding-bottom: 4rem;
-  }
-  
-  .title-hero {
-    font-size: clamp(2.8rem, 13vw, 4.8rem) !important;
-  }
-}
-
-/* Reduced motion — respect user preference, keep beauty but calm */
-@media (prefers-reduced-motion: reduce) {
-  .holo-card,
-  .cosmic-btn,
-  .portal-btn {
-    transition: none;
-  }
-  
-  .cosmic-btn::before {
-    display: none;
-  }
-}
-
-/* Sonner cosmic toast styling */
-.sonner-cosmic [data-sonner-toast] {
-  background: rgba(5,8,24,0.95) !important;
-  border: 1px solid var(--holo-border) !important;
-  color: var(--light) !important;
-  backdrop-filter: blur(16px);
-}
-
-.sonner-cosmic [data-sonner-toast][data-type="success"] {
-  border-color: var(--cosmic-gold) !important;
-}
-
-/* Subtle scanlines on holographic elements (optional depth) */
-.scanlines {
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(255,255,255,0.015) 2px,
-    rgba(255,255,255,0.015) 3px
-  );
-  pointer-events: none;
-  z-index: 2;
-  mix-blend-mode: screen;
-}
-
-/* Elegant dividers */
-.cosmic-divider {
-  height: 1px;
-  background: linear-gradient(to right, transparent, var(--holo-border), transparent);
+  filter: drop-shadow(0 2px 30px rgba(0,0,0,0.6));
 }

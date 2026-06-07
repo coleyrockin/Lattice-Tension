@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,7 +30,6 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Lattice Tension",
     description: "Beautiful 3D art of tense, counter-rotating helical lattices under procedural stress and release.",
-    images: [{ url: "/og.png" }],
   },
 };
 
@@ -47,12 +45,6 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-[#000000] text-[#f8f4ff] overflow-x-hidden">
         {children}
-        <Toaster 
-          position="top-center" 
-          richColors 
-          closeButton 
-          className="sonner-cosmic"
-        />
       </body>
     </html>
   );
