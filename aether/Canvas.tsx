@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { Field } from '@/aether/visuals/Field';
+import { Shell } from '@/aether/visuals/Shell';
+import { Void } from '@/aether/visuals/Void';
 import { CameraRig } from '@/aether/visuals/CameraRig';
 import { createRenderer } from '@/aether/renderer/create';
 import { detectTier, maxDpr, tierLabel } from '@/aether/renderer/tier';
@@ -17,9 +18,9 @@ type Props = {
 function Scene({ sim, pulse, tier }: { sim: Sim; pulse: Pulse; tier: ReturnType<typeof detectTier> }) {
   return (
     <>
-      <color attach="background" args={['#000000']} />
+      <Void />
       <CameraRig tension={sim.tension} speed={sim.speed} />
-      <Field tension={sim.tension} speed={sim.speed} pulse={pulse} tier={tier} />
+      <Shell tension={sim.tension} speed={sim.speed} pulse={pulse} tier={tier} />
     </>
   );
 }

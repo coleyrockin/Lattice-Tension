@@ -6,7 +6,7 @@ const mono = Geist_Mono({ subsets: ['latin'], variable: '--font-mono' });
 
 export const metadata: Metadata = {
   title: 'Aether',
-  description: 'Procedural volumetric tension — a living cloud of light.',
+  description: 'Procedural tension membrane — sculpted light in the void.',
   metadataBase: new URL('https://aether.vercel.app'),
 };
 

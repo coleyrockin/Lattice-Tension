@@ -15,7 +15,7 @@ export async function createRenderer(canvas: HTMLCanvasElement, tier: Tier, dpr:
   renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 1.18;
 
   return renderer;
 }

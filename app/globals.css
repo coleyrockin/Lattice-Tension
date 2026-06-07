@@ -3,7 +3,7 @@
 html,
 body {
   margin: 0;
-  background: #000;
+  background: #020408;
   color: #e8e4f0;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
@@ -13,4 +13,8 @@ button {
   cursor: pointer;
   background: transparent;
   border: none;
+}
+
+#aether canvas {
+  display: block;
 }

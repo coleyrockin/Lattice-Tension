@@ -1,6 +1,7 @@
 'use client';
 
 import { PRESETS } from '@/aether/core/presets';
+import { STATE_COLOR } from '@/aether/core/palette';
 import type { Preset, Sim } from '@/aether/core/types';
 
 type Props = {
@@ -20,36 +21,44 @@ function activePreset(tension: number): Preset {
 
 export function HUD({ sim, label, audioOn, onPreset, onAudio }: Props) {
   const active = activePreset(sim.tension);
+  const accent = STATE_COLOR[active];
 
   return (
     <>
-      <div className="pointer-events-none absolute left-5 top-5 font-mono text-[9px] tracking-[0.45em] text-white/40">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,#000_72%)]" />
+      <div
+        className="pointer-events-none absolute left-6 top-6 font-mono text-[10px] tracking-[0.55em] text-white/50"
+        style={{ textShadow: `0 0 24px ${accent}40` }}
+      >
         AETHER
       </div>
-      <div className="pointer-events-none absolute right-5 top-5 font-mono text-[8px] tracking-[0.2em] text-white/20 uppercase">
+      <div className="pointer-events-none absolute right-6 top-6 font-mono text-[8px] tracking-[0.25em] text-white/25 uppercase">
         {label}
       </div>
       <div
         data-ui
-        className="absolute inset-x-0 bottom-0 flex justify-center pb-6 opacity-0 transition-opacity duration-500 hover:opacity-100 focus-within:opacity-100"
+        className="absolute inset-x-0 bottom-0 flex justify-center pb-8 opacity-0 transition-opacity duration-700 hover:opacity-100 focus-within:opacity-100"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex gap-1 rounded-md border border-white/10 bg-black/50 px-2 py-1.5 backdrop-blur-md">
+        <div className="flex items-center gap-0.5 rounded-full border border-white/[0.08] bg-black/40 px-3 py-2 backdrop-blur-xl">
           {(Object.keys(PRESETS) as Preset[]).map((k) => (
             <button
               key={k}
               type="button"
-              className={`px-2.5 py-1 font-mono text-[8px] uppercase tracking-[0.2em] transition-colors ${
-                active === k ? 'text-cyan-300' : 'text-white/40 hover:text-white/70'
-              }`}
+              className="rounded-full px-3 py-1 font-mono text-[8px] uppercase tracking-[0.22em] transition-all duration-300"
+              style={{
+                color: active === k ? STATE_COLOR[k] : 'rgba(255,255,255,0.35)',
+                background: active === k ? `${STATE_COLOR[k]}18` : 'transparent',
+              }}
               onClick={() => onPreset(k)}
             >
               {k}
             </button>
           ))}
+          <span className="mx-1 h-3 w-px bg-white/10" />
           <button
             type="button"
-            className="ml-1 border-l border-white/10 px-2.5 py-1 font-mono text-[8px] uppercase tracking-[0.2em] text-white/40 hover:text-white/70"
+            className="rounded-full px-3 py-1 font-mono text-[8px] uppercase tracking-[0.22em] text-white/35 transition-colors hover:text-white/60"
             onClick={onAudio}
           >
             {audioOn ? 'mute' : 'tone'}
