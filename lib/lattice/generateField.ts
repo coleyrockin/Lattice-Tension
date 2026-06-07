@@ -25,14 +25,28 @@ const ORGANISM_LAYOUT: {
   rotation: [number, number, number];
   scale: number;
 }[] = [
-  { position: [0, 0, 0], rotation: [0, 0, 0], scale: 1 },
-  { position: [-4.6, 0.9, -2.4], rotation: [0.12, 0.85, 0], scale: 0.72 },
-  { position: [4.4, -0.7, 2.0], rotation: [-0.08, -1.05, 0.04], scale: 0.78 },
+  { position: [0, 0, 0], rotation: [0, 0, 0], scale: 1.05 },
+  { position: [-6.2, 1.2, -3.0], rotation: [0.15, 0.95, 0.05], scale: 0.82 },
+  { position: [5.8, -0.9, 2.6], rotation: [-0.1, -1.15, 0], scale: 0.88 },
+  { position: [-2.4, -2.1, 4.2], rotation: [0.2, 0.4, -0.12], scale: 0.68 },
+  { position: [3.1, 2.3, -4.8], rotation: [-0.18, -0.55, 0.1], scale: 0.74 },
 ];
 
 function outerNodeIndex(strand: number, period: number): number {
   const { layers, strands, periods } = LATTICE_CONFIG;
   return 1 + (layers - 1) * strands * periods + strand * periods + period;
+}
+
+function worldNode(
+  geo: LatticeGeometry,
+  placement: OrganismPlacement,
+  nodeIdx: number,
+): THREE.Vector3 {
+  return geo.nodes[nodeIdx]
+    .clone()
+    .multiplyScalar(placement.scale)
+    .applyEuler(placement.rotation)
+    .add(placement.position);
 }
 
 export function generateTensionField(): TensionFieldData {
@@ -46,24 +60,25 @@ export function generateTensionField(): TensionFieldData {
   }));
 
   const bridges: FieldBridge[] = [];
-  const pairs: [number, number, number, number][] = [
-    [0, 1, 2, 6],
-    [0, 2, 5, 3],
-    [1, 2, 7, 1],
+  const pairs: [number, number, number, number, number, number][] = [
+    [0, 1, 2, 4, 3, 5],
+    [0, 2, 5, 3, 2, 6],
+    [0, 3, 1, 6, 4, 2],
+    [0, 4, 7, 4, 6, 3],
+    [1, 2, 7, 1, 5, 4],
+    [1, 3, 4, 5, 8, 2],
+    [2, 4, 3, 6, 9, 5],
+    [3, 4, 6, 3, 1, 7],
   ];
 
-  for (const [orgA, orgB, strandA, strandB] of pairs) {
-    const geoA = organisms[orgA].geometry;
-    const geoB = organisms[orgB].geometry;
-    const idxA = outerNodeIndex(strandA, 4);
-    const idxB = outerNodeIndex(strandB, 4);
-    const placeA = organisms[orgA].placement;
-    const placeB = organisms[orgB].placement;
-
-    const from = geoA.nodes[idxA].clone().multiplyScalar(placeA.scale).applyEuler(placeA.rotation).add(placeA.position);
-    const to = geoB.nodes[idxB].clone().multiplyScalar(placeB.scale).applyEuler(placeB.rotation).add(placeB.position);
-
-    bridges.push({ from, to, phase: strandA * 0.7 + strandB * 0.3 });
+  for (const [orgA, orgB, strandA, periodA, strandB, periodB] of pairs) {
+    const idxA = outerNodeIndex(strandA, periodA);
+    const idxB = outerNodeIndex(strandB, periodB);
+    bridges.push({
+      from: worldNode(organisms[orgA].geometry, organisms[orgA].placement, idxA),
+      to: worldNode(organisms[orgB].geometry, organisms[orgB].placement, idxB),
+      phase: strandA * 0.5 + strandB * 0.5,
+    });
   }
 
   return { organisms, bridges };

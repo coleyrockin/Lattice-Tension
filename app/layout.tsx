@@ -21,15 +21,15 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Lattice Tension",
-  description: "A pure 3D artistic exploration of tension, structure, and release. Counter-rotating helical lattices strain toward coherence under procedural forces.",
+  title: "Aether",
+  description: "A WebGPU tension field — luminous filament architectures under procedural strain and release.",
   metadataBase: new URL("https://aether.vercel.app"),
   icons: {
     icon: "/favicon.ico",
   },
   openGraph: {
-    title: "Lattice Tension",
-    description: "Beautiful 3D art of tense, counter-rotating helical lattices under procedural stress and release.",
+    title: "Aether",
+    description: "Immersive procedural art — a vast field of counter-rotating helical filaments under tension.",
   },
 };
 

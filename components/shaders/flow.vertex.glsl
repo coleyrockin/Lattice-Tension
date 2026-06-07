@@ -36,20 +36,20 @@ void main() {
   float tHigh = max(0.0, (uTension - 0.55) * 2.4);
   vec3 radialDir = normalize(pos + vec3(0.0001));
 
-  pos.x += sin(uTime * 2.2 * uSpeed + aParticleId * 0.5) * 0.042 * tLow * uTension;
-  pos.y += cos(uTime * 1.9 * uSpeed + aParticleId * 0.35) * 0.032 * tLow * uTension;
-  pos.z += sin(uTime * 2.5 * uSpeed + aParticleId * 0.7) * 0.038 * tLow * uTension;
+  pos.x += sin(uTime * 2.2 * uSpeed + aParticleId * 0.5) * 0.055 * tLow * uTension;
+  pos.y += cos(uTime * 1.9 * uSpeed + aParticleId * 0.35) * 0.042 * tLow * uTension;
+  pos.z += sin(uTime * 2.5 * uSpeed + aParticleId * 0.7) * 0.048 * tLow * uTension;
 
-  float swirl = sin(uTime * 3.2 + aParticleId * 0.85) * tMid * 0.078;
-  pos.x += -pos.z * swirl * 0.6 + radialDir.x * tMid * 0.035;
-  pos.z += pos.x * swirl * 0.6 + radialDir.z * tMid * 0.035;
+  float swirl = sin(uTime * 3.2 + aParticleId * 0.85) * tMid * 0.095;
+  pos.x += -pos.z * swirl * 0.6 + radialDir.x * tMid * 0.045;
+  pos.z += pos.x * swirl * 0.6 + radialDir.z * tMid * 0.045;
 
-  pos.x += sin(uTime * 17.0 + aParticleId * 1.6) * tHigh * 0.055 * uTension;
-  pos.y += cos(uTime * 14.0 + aParticleId * 2.0) * tHigh * 0.048 * uTension;
-  pos.z += sin(uTime * 16.0 + aParticleId * 1.3) * tHigh * 0.052 * uTension;
+  pos.x += sin(uTime * 17.0 + aParticleId * 1.6) * tHigh * 0.065 * uTension;
+  pos.y += cos(uTime * 14.0 + aParticleId * 2.0) * tHigh * 0.055 * uTension;
+  pos.z += sin(uTime * 16.0 + aParticleId * 1.3) * tHigh * 0.06 * uTension;
 
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mv;
-  gl_PointSize = 28.0 * (1.0 + uTension * 0.85 + uBurst * 1.35) * (300.0 / -mv.z);
-  vAlpha = 0.88;
+  gl_PointSize = 42.0 * (1.0 + uTension * 1.1 + uBurst * 1.5) * (320.0 / max(-mv.z, 1.0));
+  vAlpha = 0.95;
 }

@@ -40,20 +40,18 @@ float fbm(vec3 p) {
 }
 
 void main() {
-  vec3 p = vWorldPos * 0.04 + vec3(uTime * 0.008, uTime * 0.005, 0.0);
-  float n = fbm(p);
-  float n2 = fbm(p * 1.7 + vec3(0.0, uTime * 0.012, uTime * 0.006));
-  float density = mix(n, n2, 0.45);
-  density = pow(density, 1.8);
+  vec3 p = vWorldPos * 0.035 + vec3(uTime * 0.01, uTime * 0.006, 0.0);
+  float density = pow(mix(fbm(p), fbm(p * 1.7 + vec3(0.0, uTime * 0.015, 0.0)), 0.5), 1.5);
 
-  vec3 cool = vec3(0.08, 0.05, 0.18);
-  vec3 warm = vec3(0.22, 0.12, 0.08);
-  vec3 col = mix(cool, warm, uTension * 0.6 + density * 0.3);
-  col += vec3(0.15, 0.1, 0.02) * uTension * density;
+  vec3 cool = vec3(0.12, 0.18, 0.45);
+  vec3 warm = vec3(0.45, 0.22, 0.08);
+  vec3 hot = vec3(0.55, 0.48, 0.15);
+  vec3 col = mix(mix(cool, warm, uTension), hot, density * 0.6);
+  col += vec3(0.2, 0.14, 0.04) * uTension * density;
 
-  float alpha = density * (0.12 + uTension * 0.1);
-  float fres = pow(1.0 - max(dot(normalize(vViewDir), vec3(0.0, 0.0, 1.0)), 0.0), 2.0);
-  alpha *= 0.4 + fres * 0.6;
+  float alpha = density * (0.22 + uTension * 0.18);
+  float fres = pow(1.0 - max(dot(normalize(vViewDir), vec3(0.0, 0.0, 1.0)), 0.0), 1.5);
+  alpha *= 0.55 + fres * 0.55;
 
   gl_FragColor = vec4(col, alpha);
 }

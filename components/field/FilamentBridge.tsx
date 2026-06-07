@@ -2,7 +2,10 @@
 
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import * as THREE from 'three';
+import { LineSegments2 } from 'three/examples/jsm/lines/webgpu/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
+import { createFilamentMaterial } from '@/engine/tsl/filamentMaterial';
+import { getAtmosphere } from '@/lib/atmosphere/interpolate';
 import type { FieldBridge } from '@/lib/lattice/generateField';
 
 type Props = {
@@ -11,9 +14,9 @@ type Props = {
 };
 
 export function FilamentBridge({ bridges, tension }: Props) {
-  const ref = useRef<THREE.LineSegments>(null!);
+  const meshRef = useRef<LineSegments2>(null!);
 
-  const geometry = useMemo(() => {
+  const { mesh, tensionUniform, accentUniform } = useMemo(() => {
     const positions = new Float32Array(bridges.length * 6);
     bridges.forEach((b, i) => {
       positions[i * 6] = b.from.x;
@@ -23,26 +26,19 @@ export function FilamentBridge({ bridges, tension }: Props) {
       positions[i * 6 + 4] = b.to.y;
       positions[i * 6 + 5] = b.to.z;
     });
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    return geo;
+    const geo = new LineSegmentsGeometry();
+    geo.setPositions(positions);
+    const { material, tensionUniform, accentUniform } = createFilamentMaterial(2.2);
+    return { mesh: new LineSegments2(geo, material), tensionUniform, accentUniform };
   }, [bridges]);
 
-  useFrame((state) => {
-    if (!ref.current) return;
-    const t = state.clock.elapsedTime;
-    const mat = ref.current.material as THREE.LineBasicMaterial;
-    mat.opacity = 0.2 + tension * 0.45 + Math.sin(t * 2.0) * 0.05 * tension;
+  // eslint-disable-next-line react-hooks/immutability -- R3F useFrame mutates Three.js objects by design
+  useFrame(() => {
+    tensionUniform.value = tension;
+    accentUniform.value.set(getAtmosphere(tension).accent);
+    mesh.material.linewidth = 1.8 + tension * 1.2;
+    mesh.material.opacity = 0.55 + tension * 0.35;
   });
 
-  return (
-    <lineSegments ref={ref} geometry={geometry}>
-      <lineBasicMaterial
-        color="#facc15"
-        transparent
-        opacity={0.2 + tension * 0.4}
-        blending={THREE.AdditiveBlending}
-      />
-    </lineSegments>
-  );
+  return <primitive ref={meshRef} object={mesh} />;
 }

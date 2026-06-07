@@ -5,13 +5,9 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { createSparkGeometry } from '@/lib/lattice/particles';
 import { applyLatticeGroupMotion, updateShaderUniforms } from '@/lib/lattice/latticeMotion';
-import {
-  edgeVertexShader,
-  edgeFragmentShader,
-  nodeVertexShader,
-  nodeFragmentShader,
-} from '@/components/shaders';
+import { nodeVertexShader, nodeFragmentShader } from '@/components/shaders';
 import { FlowParticles } from '@/components/field/FlowParticles';
+import { FilamentEdges } from '@/components/field/FilamentEdges';
 import type { LatticeGeometry, MouseState, PulseState } from '@/lib/tension/types';
 
 type Props = {
@@ -35,35 +31,12 @@ export function LatticeOrganism({
 }: Props) {
   const group = useRef<THREE.Group>(null!);
   const nodesRef = useRef<THREE.InstancedMesh>(null!);
-  const edgesRef = useRef<THREE.LineSegments>(null!);
+
   const sparkMat = useRef<THREE.PointsMaterial>(null!);
   const nodesInitialized = useRef(false);
 
   const nodeCount = nodes.length;
-  const edgeCount = edges.length / 2;
   const dummy = useMemo(() => new THREE.Object3D(), []);
-
-  const edgePos = useMemo(() => {
-    const arr = new Float32Array(edgeCount * 6);
-    for (let i = 0; i < edgeCount; i++) {
-      const a = edges[i * 2];
-      const b = edges[i * 2 + 1];
-      arr[i * 6] = nodes[a].x;
-      arr[i * 6 + 1] = nodes[a].y;
-      arr[i * 6 + 2] = nodes[a].z;
-      arr[i * 6 + 3] = nodes[b].x;
-      arr[i * 6 + 4] = nodes[b].y;
-      arr[i * 6 + 5] = nodes[b].z;
-    }
-    return arr;
-  }, [nodes, edges, edgeCount]);
-
-  const edgeGeo = useMemo(() => {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(edgePos, 3));
-    g.setAttribute('phase', new THREE.BufferAttribute(new Float32Array(edgePhases), 1));
-    return g;
-  }, [edgePos, edgePhases]);
 
   const [sparkGeo] = useState(() => createSparkGeometry());
 
@@ -75,26 +48,6 @@ export function LatticeOrganism({
     );
     return g;
   }, [nodePhases]);
-
-  const edgeMat = useMemo(
-    () =>
-      new THREE.ShaderMaterial({
-        vertexShader: edgeVertexShader,
-        fragmentShader: edgeFragmentShader,
-        uniforms: {
-          uTime: { value: 0 },
-          uTension: { value: 0.6 },
-          uMouse: { value: new THREE.Vector2(0, 0) },
-          uPull: { value: 0 },
-          uPulseX: { value: 0 },
-          uPulseY: { value: 0 },
-          uPulseStrength: { value: 0 },
-        },
-        transparent: true,
-        depthWrite: false,
-      }),
-    [],
-  );
 
   const nodeMat = useMemo(
     () =>
@@ -124,9 +77,6 @@ export function LatticeOrganism({
     const t = state.clock.elapsedTime;
     const pull = mousePull * 0.8 + tension * 0.6;
 
-    if (edgesRef.current) {
-      updateShaderUniforms(edgesRef.current.material as THREE.ShaderMaterial, t, tension, mouse, pull, pulse);
-    }
     if (nodesRef.current) {
       updateShaderUniforms(nodesRef.current.material as THREE.ShaderMaterial, t, tension, mouse, pull, pulse);
     }
@@ -155,7 +105,16 @@ export function LatticeOrganism({
   return (
     <group ref={group}>
       <instancedMesh ref={nodesRef} args={[nodeGeo, nodeMat, nodeCount]} />
-      <lineSegments ref={edgesRef} geometry={edgeGeo} material={edgeMat} />
+      <FilamentEdges
+        nodes={nodes}
+        edges={edges}
+        edgePhases={edgePhases}
+        tension={tension}
+        mouse={mouse}
+        mousePull={mousePull}
+        pulse={pulse}
+        lineWidth={3.2}
+      />
       <FlowParticles lattice={lattice} tension={tension} speed={speed} burst={burst} />
       <points geometry={sparkGeo}>
         <pointsMaterial

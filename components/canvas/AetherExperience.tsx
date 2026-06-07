@@ -1,12 +1,8 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { CanvasErrorBoundary } from '@/components/canvas/CanvasErrorBoundary';
-import { ArtScene } from '@/components/field/ArtScene';
-import { BackgroundStars } from '@/components/environment/BackgroundStars';
-import { NebulaVolume } from '@/components/environment/NebulaVolume';
-import { TensionHUD } from '@/components/ui/TensionHUD';
+import { AetherCanvas } from '@/components/canvas/AetherCanvas';
+import { AetherHUD } from '@/components/ui/AetherHUD';
 import { DEFAULT_SIM, PRESETS } from '@/lib/constants/presets';
 import { animateToPreset } from '@/lib/tension/animatePreset';
 import type { SimParams, TensionPreset } from '@/lib/tension/types';
@@ -17,6 +13,7 @@ import { useAutoDemo } from '@/hooks/useAutoDemo';
 
 export function AetherExperience() {
   const [simParams, setSimParams] = useState<SimParams>(DEFAULT_SIM);
+  const [rendererLabel, setRendererLabel] = useState('…');
   const simRef = useRef(simParams);
   useEffect(() => {
     simRef.current = simParams;
@@ -32,10 +29,13 @@ export function AetherExperience() {
   const { cancelDemo } = useAutoDemo(simRef, setSimParams);
   const { mouse, burst, pulse, handlePluck } = useTensionInput(setSimParams, cancelDemo);
 
-  const applyPreset = useCallback((name: TensionPreset) => {
-    cancelDemo();
-    animateToPreset(simRef.current, PRESETS[name], setSimParams);
-  }, [cancelDemo]);
+  const applyPreset = useCallback(
+    (name: TensionPreset) => {
+      cancelDemo();
+      animateToPreset(simRef.current, PRESETS[name], setSimParams);
+    },
+    [cancelDemo],
+  );
 
   const handleCanvasPluck = useCallback(
     (e: React.MouseEvent) => {
@@ -48,42 +48,26 @@ export function AetherExperience() {
   return (
     <div
       id="lattice-container"
-      className="relative h-[100dvh] w-full overflow-hidden bg-black text-[#f8f4ff]"
+      className="relative h-[100dvh] w-full overflow-hidden bg-[#0a0618] text-[#f8f4ff]"
       onClick={handleCanvasPluck}
     >
-      <CanvasErrorBoundary>
-        <Canvas
-          camera={{ position: [0, 0.6, 8.2], fov: 45 }}
-          style={{ background: '#000' }}
-          gl={{ alpha: false, antialias: true, powerPreference: 'high-performance' }}
-          dpr={dpr}
-        >
-          <ambientLight intensity={0.08} />
-          <pointLight
-            position={[0, 0, 0]}
-            intensity={0.6 + simParams.tension * 0.8}
-            color="#facc15"
-          />
-          <pointLight position={[1.5, 1, 2]} intensity={0.4} color="#c084fc" />
-          <BackgroundStars />
-          <NebulaVolume tension={simParams.tension} />
-          <ArtScene
-            tension={simParams.tension}
-            speed={simParams.speed}
-            pullStrength={simParams.pullStrength}
-            mouse={mouse}
-            burst={burst * visualDamp}
-            reducedDamp={visualDamp}
-            pulse={pulse}
-          />
-        </Canvas>
-      </CanvasErrorBoundary>
+      <AetherCanvas
+        simParams={simParams}
+        mouse={mouse}
+        burst={burst * visualDamp}
+        pulse={pulse}
+        visualDamp={visualDamp}
+        dpr={dpr}
+        onReady={setRendererLabel}
+      />
 
-      <TensionHUD
+      <AetherHUD
         simParams={simParams}
         audioOn={audioOn}
+        rendererLabel={rendererLabel}
         onPreset={applyPreset}
         onToggleAudio={toggleAudio}
+        onInteract={cancelDemo}
       />
     </div>
   );

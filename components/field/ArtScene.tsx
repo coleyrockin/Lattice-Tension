@@ -1,8 +1,8 @@
 'use client';
 
 import { CameraDirector } from '@/components/canvas/CameraDirector';
-import { PostPipeline } from '@/components/canvas/PostPipeline';
 import { TensionField } from '@/components/field/TensionField';
+
 import type { MouseState, PulseState } from '@/lib/tension/types';
 
 type Props = {
@@ -37,7 +37,7 @@ export function ArtScene({
         burst={burst}
         pulse={pulse}
       />
-      <PostPipeline tension={tension} reducedDamp={reducedDamp} />
+
     </>
   );
 }
