@@ -30,7 +30,7 @@ export function InterfaceOverlay() {
   return (
     <div className="interface" data-aether-ui>
       <header className="brand">
-        <span>AETHER</span>
+        <span>TENSION&nbsp;LATTICE</span>
       </header>
 
       <button
@@ -99,7 +99,7 @@ export function InterfaceOverlay() {
           <i />
           <i />
         </div>
-        <span>AETHER</span>
+        <span>TENSION&nbsp;LATTICE</span>
       </div>
 
       {selectedFragment ? (

@@ -9,7 +9,7 @@ export const CHAPTERS: ChapterDefinition[] = [
     title: "Origin",
     statement: "Aether is the space between all things.",
     fragment:
-      "Before structure, there is relation: a point defined by everything it might touch.",
+      "In the beginning was the word, and the word was a pattern — a point defined by everything it might touch.",
     range: [0, sixth],
     camera: { position: [0.25, 0.28, 11.9], target: [0.15, 0, -0.45], fov: 42 },
     palette: {
@@ -189,7 +189,7 @@ export const CHAPTERS: ChapterDefinition[] = [
     title: "Aether",
     statement: "The answer is not a number. It is a pattern.",
     fragment:
-      "Reality may be less a collection of things than an agreement to keep becoming.",
+      "The answer was never a thing to be held — it is blowing in the wind, an agreement to keep becoming.",
     range: [sixth * 5, 1],
     camera: { position: [0.15, 0.42, 12.4], target: [0.05, 0.05, -0.8], fov: 48 },
     palette: {
