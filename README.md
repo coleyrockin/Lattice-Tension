@@ -1,25 +1,18 @@
 # Aether
 
-Procedural volumetric tension field. WebGPU raymarched cloud — single-page, zero assets.
+Aether is a real-time 3D visual essay about the hidden pressure of connection.
 
-## Stack
-
-- Next.js 16
-- React Three Fiber
-- Three.js WebGPU + TSL raymarching
-
-## Run
+## Development
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+## Validation
 
-## Controls
-
-- **Mouse** — drift
-- **Wheel** — tension
-- **Click** — pulse
-- **Bottom bar (hover)** — presets + tone
+```bash
+npm run test
+npm run lint
+npm run build
+```
