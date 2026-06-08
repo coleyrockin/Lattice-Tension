@@ -2,30 +2,10 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Vector3 } from "three";
 import {
-  GYROID_FREQ,
   GYROID_HEADING,
   createGyroidLatticeMaterial,
 } from "./gyroidLatticeMaterial";
 import { useExperienceStore } from "../experience/store";
-
-/** gyroid value + gradient at a world point (field coords = p·FREQ). */
-function gyroidFG(x: number, y: number, z: number) {
-  const fx = x * GYROID_FREQ;
-  const fy = y * GYROID_FREQ;
-  const fz = z * GYROID_FREQ;
-  const sx = Math.sin(fx);
-  const sy = Math.sin(fy);
-  const sz = Math.sin(fz);
-  const cx = Math.cos(fx);
-  const cy = Math.cos(fy);
-  const cz = Math.cos(fz);
-  return {
-    f: sx * cy + sy * cz + sz * cx,
-    gx: cx * cy - sz * sx,
-    gy: -sx * sy + cy * cz,
-    gz: -sy * sz + cz * cx,
-  };
-}
 
 const STEPS: Record<string, number> = { high: 150, medium: 96, low: 52 };
 
@@ -34,9 +14,14 @@ const WORLD_UP = new Vector3(0, 1, 0);
 const RIGHT = new Vector3().crossVectors(HEADING, WORLD_UP).normalize();
 const UP = new Vector3().crossVectors(RIGHT, HEADING).normalize();
 
-type Props = { reveal?: number; tension?: number };
+function smoothstep(a: number, b: number, x: number) {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
 
-export function GyroidLattice({ reveal = 1, tension = 0.16 }: Props) {
+type Props = { standalone?: boolean };
+
+export function GyroidLattice({ standalone = false }: Props) {
   const tier = useExperienceStore((s) => s.profile?.tier ?? "high");
   const reducedMotion = useExperienceStore((s) => s.reducedMotion);
   const u = useMemo(() => createGyroidLatticeMaterial(STEPS[tier] ?? 150), [tier]);
@@ -50,9 +35,14 @@ export function GyroidLattice({ reveal = 1, tension = 0.16 }: Props) {
   useFrame((state, delta) => {
     const dt = Math.min(delta, 1 / 30);
     const time = state.clock.elapsedTime;
-    const { pointer } = useExperienceStore.getState();
+    const { pointer, scrollProgress } = useExperienceStore.getState();
     const motion = reducedMotion ? 0.25 : 1;
     const p = pos.current;
+
+    // descent (scroll) drives the crossfade-in and the tension/morph ramp
+    const descent = standalone ? 1 : scrollProgress;
+    const reveal = standalone ? 1 : smoothstep(0.36, 0.56, descent);
+    const tension = 0.12 + descent * 0.72;
 
     // slow meditative drift down the screw axis + a gentle sway for life
     p.copy(HEADING)
@@ -78,7 +68,7 @@ export function GyroidLattice({ reveal = 1, tension = 0.16 }: Props) {
   });
 
   return (
-    <mesh frustumCulled={false} renderOrder={-1}>
+    <mesh frustumCulled={false} renderOrder={10}>
       <planeGeometry args={[2, 2]} />
       <primitive object={u.material} attach="material" />
     </mesh>

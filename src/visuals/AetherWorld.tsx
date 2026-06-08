@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useThree } from "@react-three/fiber";
 import { Color } from "three";
+import { JellyOrb } from "./JellyOrb";
 import { GyroidLattice } from "./GyroidLattice";
 
 export function AetherWorld() {
@@ -11,6 +12,12 @@ export function AetherWorld() {
     scene.fog = null;
   }, [scene]);
 
-  // Phase 2: gyroid centerpiece in isolation (orb + crossfade compose in Phase 3)
-  return <GyroidLattice tension={0.16} />;
+  // The journey: the orb floats on black, the camera falls into it, and the
+  // gyroid lattice crossfades in (renderOrder 10, alpha = descent reveal).
+  return (
+    <>
+      <JellyOrb />
+      <GyroidLattice />
+    </>
+  );
 }

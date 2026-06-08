@@ -1,0 +1,26 @@
+- generic [ref=e4]:
+  - generic:
+    - banner: AETHER
+    - button "Enable sound" [ref=e8] [cursor=pointer]:
+      - generic [ref=e9]: Sound off
+    - generic:
+      - generic: "01"
+      - heading "Origin" [level=1]
+      - paragraph: Aether is the space between all things.
+    - navigation "Aether chapters":
+      - button "Go to Origin" [ref=e18] [cursor=pointer]:
+        - generic [ref=e19]: "01"
+      - button "Go to Tension" [ref=e21] [cursor=pointer]:
+        - generic [ref=e22]: "02"
+      - button "Go to Pattern" [ref=e24] [cursor=pointer]:
+        - generic [ref=e25]: "03"
+      - button "Go to Collapse" [ref=e27] [cursor=pointer]:
+        - generic [ref=e28]: "04"
+      - button "Go to Emergence" [ref=e30] [cursor=pointer]:
+        - generic [ref=e31]: "05"
+      - button "Go to Aether" [ref=e33] [cursor=pointer]:
+        - generic [ref=e34]: "06"
+    - generic:
+      - generic: Scroll to enter
+    - generic:
+      - generic: AETHER

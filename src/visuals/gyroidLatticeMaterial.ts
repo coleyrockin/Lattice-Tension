@@ -114,7 +114,8 @@ export function createGyroidLatticeMaterial(steps: number) {
       t.addAssign(STEP);
     });
 
-    return vec4(glow.mul(reveal), 1);
+    // alpha = reveal → crossfades the lattice in over the orb during the descent
+    return vec4(glow, reveal);
   });
 
   const material = new NodeMaterial();
@@ -122,7 +123,7 @@ export function createGyroidLatticeMaterial(steps: number) {
   material.vertexNode = vec4(positionGeometry.xy, 0.0, 1.0);
   material.depthTest = false;
   material.depthWrite = false;
-  material.transparent = false;
+  material.transparent = true;
 
   return { material, ro, fwd, aspect, tension, pulse, reveal, pointer, tint, accent, stepCount };
 }

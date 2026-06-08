@@ -21,7 +21,13 @@ export function JellyOrb() {
   useFrame((state, delta) => {
     const dt = Math.min(delta, 1 / 30);
     const t = state.clock.elapsedTime;
-    const { pointer, impulse } = useExperienceStore.getState();
+    const { pointer, impulse, scrollProgress } = useExperienceStore.getState();
+
+    // FALL INTO THE ORB: dolly the camera inward as descent rises, so the orb
+    // grows to fill the frame and we pass through the glass into the lattice.
+    const enter = Math.min(1, Math.max(0, scrollProgress / 0.46));
+    const eased = enter * enter * (3 - 2 * enter);
+    state.camera.position.z = 2.35 - eased * 2.1;
 
     // click / impulse → exp-decaying pulse (inflate + warm)
     if (impulse && impulse.startedAt !== lastImpulse.current) {
