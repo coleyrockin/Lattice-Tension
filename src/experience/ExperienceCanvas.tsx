@@ -26,7 +26,7 @@ export function ExperienceCanvas() {
         await renderer.init();
         renderer.outputColorSpace = SRGBColorSpace;
         renderer.toneMapping = ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.18;
+        renderer.toneMappingExposure = 0.72;
         return renderer;
       }}
       onCreated={({ gl }) => {

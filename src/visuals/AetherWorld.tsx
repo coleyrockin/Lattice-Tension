@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useThree } from "@react-three/fiber";
 import { Color } from "three";
-import { JellyOrb } from "./JellyOrb";
+import { GyroidLattice } from "./GyroidLattice";
 
 export function AetherWorld() {
   const scene = useThree((state) => state.scene);
@@ -11,5 +11,6 @@ export function AetherWorld() {
     scene.fog = null;
   }, [scene]);
 
-  return <JellyOrb />;
+  // Phase 2: gyroid centerpiece in isolation (orb + crossfade compose in Phase 3)
+  return <GyroidLattice tension={0.16} />;
 }

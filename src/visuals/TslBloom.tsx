@@ -19,7 +19,7 @@ export function TslBloom() {
   const post = useMemo(() => {
     const scenePass = pass(scene, camera);
     const color = scenePass.getTextureNode();
-    const bloomPass = bloom(color, 0.62, 0.7, 0.62);
+    const bloomPass = bloom(color, 0.3, 0.55, 0.82);
     const pipeline = new RenderPipeline(gl);
     pipeline.outputNode = color.add(bloomPass);
     return pipeline;
