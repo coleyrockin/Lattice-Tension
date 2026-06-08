@@ -1,4 +1,4 @@
-import { Color, DoubleSide, Vector2 } from 'three';
+import { Color, DoubleSide, Vector2, Vector3 } from 'three';
 import { NodeMaterial } from 'three/webgpu';
 import {
   Break,
@@ -41,6 +41,8 @@ export function createJellyOrbMaterial(steps: number) {
   const accent = uniform(new Color('#a78bfa')); // violet inner lattice / iridescence pole
   const lattice = uniform(0.7); // internal lattice brightness
   const pointer = uniform(new Vector2()); // set .value.set(x, y) per frame
+  const jiggle = uniform(new Vector3(0, 1, 0)); // wobble axis (spring-driven)
+  const squash = uniform(0); // spring displacement: + stretches along jiggle
   const stepCount = uniform(steps);
 
   // gyroid field — the hidden geometry suspended inside the jelly
@@ -48,7 +50,14 @@ export function createJellyOrbMaterial(steps: number) {
     sin(x.x).mul(cos(x.y)).add(sin(x.y).mul(cos(x.z))).add(sin(x.z).mul(cos(x.x)));
 
   const map = (p: ReturnType<typeof vec3>) => {
-    const pt = p;
+    // jiggle physics: squash-and-stretch the sample space along the wobble axis
+    // (inverse-deform the query point → the shape stretches with overshoot).
+    const ax = normalize(jiggle.add(vec3(0.0, 0.0001, 0.0)));
+    const al = dot(p, ax);
+    const perp = p.sub(ax.mul(al));
+    const pt = perp
+      .mul(float(1).add(squash.mul(0.4)))
+      .add(ax.mul(al.mul(float(1).sub(squash.mul(0.55)))));
     const t = time.mul(speed.mul(0.35));
     const amp = tension.mul(0.07).add(pulse.mul(0.14));
 
@@ -177,5 +186,5 @@ export function createJellyOrbMaterial(steps: number) {
   material.side = DoubleSide;
   material.depthWrite = true;
 
-  return { material, tension, speed, pulse, tint, accent, lattice, pointer, stepCount };
+  return { material, tension, speed, pulse, tint, accent, lattice, pointer, jiggle, squash, stepCount };
 }

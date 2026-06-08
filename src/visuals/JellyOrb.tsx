@@ -1,6 +1,6 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import type { Mesh } from "three";
+import { Vector3, type Mesh } from "three";
 import { createJellyOrbMaterial } from "./jellyOrbMaterial";
 import { useExperienceStore } from "../experience/store";
 
@@ -12,6 +12,13 @@ export function JellyOrb() {
   const lastImpulse = useRef(0);
   const px = useRef(0);
   const py = useRef(0);
+
+  // jiggle spring: displacement + velocity, with a wobble axis
+  const jp = useRef(0);
+  const jv = useRef(0);
+  const jaxis = useRef(new Vector3(0, 1, 0));
+  const ppx = useRef(0);
+  const ppy = useRef(0);
 
   const tier = useExperienceStore((s) => s.profile?.tier ?? "high");
   const reducedMotion = useExperienceStore((s) => s.reducedMotion);
@@ -29,13 +36,36 @@ export function JellyOrb() {
     const eased = enter * enter * (3 - 2 * enter);
     state.camera.position.z = 2.35 - eased * 2.1;
 
-    // click / impulse → exp-decaying pulse (inflate + warm)
+    const jig = reducedMotion ? 0.25 : 1;
+
+    // click / impulse → pulse + a hard jiggle kick (overshoot)
     if (impulse && impulse.startedAt !== lastImpulse.current) {
       lastImpulse.current = impulse.startedAt;
       pulseAmp.current = 1;
+      jv.current += 9 * jig; // sharp impulse → the orb lurches
+      jaxis.current.set(px.current, py.current, 0.5).normalize();
     }
     pulseAmp.current = Math.max(0, pulseAmp.current - dt * 1.8);
     u.pulse.value = pulseAmp.current;
+
+    // fast pointer flicks impart momentum into the jiggle (alive + a little dangerous)
+    const vx = pointer.x - ppx.current;
+    const vy = pointer.y - ppy.current;
+    ppx.current = pointer.x;
+    ppy.current = pointer.y;
+    const flick = Math.hypot(vx, vy);
+    if (flick > 0.04) {
+      jv.current += Math.min(flick * 22, 6) * jig;
+      jaxis.current.set(vx, vy, 0.35).normalize();
+    }
+
+    // spring–damper with real momentum + overshoot, then settle
+    const k = 46;
+    const damp = 4.6;
+    jv.current += (-k * jp.current - damp * jv.current) * dt;
+    jp.current += jv.current * dt;
+    u.squash.value = Math.max(-0.6, Math.min(0.6, jp.current));
+    u.jiggle.value.copy(jaxis.current);
 
     // eased pointer lean
     const lead = reducedMotion ? 0.12 : 1;
