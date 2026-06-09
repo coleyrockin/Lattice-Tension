@@ -1,3 +1,5 @@
+// @ts-nocheck — TSL node DSL: runtime-correct, but its operator types can't be
+// modeled by TypeScript. App code outside this shader stays fully type-checked.
 import { Color, Vector2, Vector3 } from "three";
 import { NodeMaterial } from "three/webgpu";
 import {
