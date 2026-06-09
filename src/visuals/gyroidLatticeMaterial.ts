@@ -52,8 +52,8 @@ export function createGyroidLatticeMaterial(steps: number) {
   const pulse = uniform(0);
   const reveal = uniform(1); // 0 = invisible (black), 1 = full (for the crossfade)
   const pointer = uniform(new Vector2());
-  const tint = uniform(new Color("#5eead4"));
-  const accent = uniform(new Color("#a78bfa"));
+  const tint = uniform(new Color("#16d9c8"));
+  const accent = uniform(new Color("#a855f7"));
   const stepCount = uniform(steps);
 
   const FREQ = float(GYROID_FREQ);
@@ -71,13 +71,14 @@ export function createGyroidLatticeMaterial(steps: number) {
     ).toVar();
 
     const morph = smoothstep(0.82, 0.97, tension).toVar();
-    // shell half-thickness in scaled space (must be > STEP*FREQ=0.184 to avoid aliasing)
-    const thickness = mix(float(0.28), float(0.48), tension).toVar();
+    // Pseudo-distance thickness after normalizing the implicit field by its
+    // analytic gradient. This keeps the glow confined to the actual surface.
+    const thickness = mix(float(0.045), float(0.075), tension).toVar();
 
     // EMISSIVE VOLUMETRIC: march straight through, accumulate glowing gyroid
     // shells with absorption. You see THROUGH layer after layer into infinite
     // depth — a luminous lattice cathedral that can never present a flat wall.
-    const STEP = float(0.04);
+    const STEP = float(0.032);
     const t = float(0.02).toVar();
     const glow = vec3(0).toVar();
     const trans = float(1).toVar(); // transmittance (1 → clear, 0 → fully absorbed)
@@ -91,37 +92,58 @@ export function createGyroidLatticeMaterial(steps: number) {
       const pulseRing = exp(length(p.sub(ro)).sub(pulse.mul(7)).pow(2).mul(-0.5)).mul(pulse);
 
       const fgg = fieldFG(p.mul(FREQ), morph);
-      const af = abs(fgg.f).toVar();
-      // density: peak=1 at surface (|f|=0), smooth falloff to zero at outer edge
-      // written as 1-smoothstep(0,t,af) to avoid TSL edge-normalization inverting the result
-      const dens = float(1).sub(smoothstep(float(0), thickness, af)).toVar();
+      const gradientLength = max(length(fgg.g), 0.35);
+      const distanceToSurface = abs(fgg.f).div(gradientLength).div(FREQ);
+      const surface = float(1)
+        .sub(smoothstep(float(0), thickness, distanceToSurface))
+        .toVar();
+      // Prevent the first few samples from becoming a luminous windshield.
+      const nearFade = smoothstep(0.08, 0.42, t);
+      const dens = surface.mul(nearFade).toVar();
 
       If(dens.greaterThan(0.001), () => {
         const n = normalize(fgg.g.mul(sign(fgg.f))).toVar();
         const ndl = max(dot(n, key), 0).mul(0.55).add(0.45);
         const ndv = max(dot(n, rd.negate()), 0).toVar();
 
-        // atmospheric depth grade: near shells teal, mid shells violet, deep shells indigo
-        const depth = smoothstep(0.0, 1.5, t);
-        const baseC = mix(tint, vec3(0.04, 0.08, 0.38), depth);
-        // violet accent only at the very grazing rim of each shell (not a wash)
+        // Spatial spectral bands keep neighboring layers distinguishable:
+        // near shells cyan, middle shells violet, remote shells deep indigo.
+        const depth = smoothstep(0.25, 4.2, t);
+        const spectralPhase = cos(
+          vec3(0.0, 0.34, 0.68)
+            .add(p.x.mul(0.13))
+            .add(p.y.mul(0.09))
+            .add(t.mul(0.055))
+            .mul(6.2831),
+        )
+          .mul(0.5)
+          .add(0.5);
+        const nearColor = mix(tint, accent, spectralPhase.mul(0.42)).mul(0.72);
+        const baseC = mix(nearColor, vec3(0.008, 0.012, 0.08), depth);
         const graze = float(1).sub(ndv).pow(3.0);
-        const rimC = mix(baseC, accent, graze.mul(0.45));
+        const rimC = mix(baseC, vec3(0.55, 0.28, 1.0), graze.mul(0.58));
         // slow iridescent shimmer over the whole field
         const iri = cos(
           vec3(0.0, 0.35, 0.72).add(ndv.mul(0.7)).add(t.mul(0.04)).add(tension.mul(0.3)).mul(6.2831),
         )
           .mul(0.5)
           .add(0.5);
-        const em = mix(rimC, accent, iri.mul(0.22)).mul(ndl).add(pulseRing.mul(0.7));
-        glow.addAssign(em.mul(dens).mul(trans).mul(STEP).mul(20.0));
-        // absorption dominates — one shell exhausts trans → void behind stays black
-        trans.mulAssign(exp(dens.mul(STEP).mul(-40.0)));
+        const em = mix(rimC, accent, iri.mul(0.16))
+          .mul(ndl)
+          .add(pulseRing.mul(0.75));
+        const surfaceCore = dens.pow(2.4);
+        const surfaceLight = em
+          .mul(dens.mul(6.7))
+          .add(vec3(0.08, 0.92, 1.0).mul(surfaceCore.mul(1.15)));
+        glow.addAssign(surfaceLight.mul(trans).mul(STEP));
+        // Enough absorption to establish silhouettes while preserving several
+        // receding layers and black void between them.
+        trans.mulAssign(exp(dens.mul(STEP).mul(-18.0)));
       });
 
       t.addAssign(STEP);
       // early exit when ray is fully absorbed — skip remaining steps
-      If(trans.lessThan(0.01), () => { Break(); });
+      If(trans.lessThan(0.025), () => { Break(); });
     });
     }); // end reveal guard
 

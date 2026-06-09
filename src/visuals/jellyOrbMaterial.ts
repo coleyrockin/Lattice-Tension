@@ -40,9 +40,9 @@ export function createJellyOrbMaterial(steps: number) {
   const tension = uniform(0.4);
   const speed = uniform(0.6);
   const pulse = uniform(0);
-  const tint = uniform(new Color('#5eead4')); // teal shell
-  const accent = uniform(new Color('#a78bfa')); // violet inner lattice / iridescence pole
-  const lattice = uniform(0.95); // internal lattice brightness
+  const tint = uniform(new Color('#07869b')); // deep cyan glass
+  const accent = uniform(new Color('#8b5cf6')); // violet inner lattice / iridescence pole
+  const lattice = uniform(1.35); // internal lattice brightness
   const pointer = uniform(new Vector2()); // set .value.set(x, y) per frame
   const jiggle = uniform(new Vector3(0, 1, 0)); // wobble axis (spring-driven)
   const squash = uniform(0); // spring displacement: + stretches along jiggle
@@ -128,7 +128,7 @@ export function createJellyOrbMaterial(steps: number) {
         ).toVar();
 
         const lightDir = normalize(vec3(0.35, 0.65, 0.55));
-        const diff = max(dot(n, lightDir), 0).mul(0.55).add(0.12);
+        const diff = max(dot(n, lightDir), 0).mul(0.48).add(0.08);
         const ndv = max(dot(n, rd.negate()), 0).toVar();
 
         // iridescent hue-shift fresnel — rim slides teal → violet → gold as it turns
@@ -142,18 +142,29 @@ export function createJellyOrbMaterial(steps: number) {
         const rimR = pow(float(1).sub(ndv.mul(0.97)), 3.2);
         const rimG = pow(float(1).sub(ndv), 3.2);
         const rimB = pow(float(1).sub(ndv.mul(1.03)), 3.2);
-        const rim = vec3(rimR, rimG, rimB).mul(0.5).mul(iriCol);
+        const rim = vec3(rimR, rimG, rimB).mul(0.72).mul(iriCol);
 
-        const fresnel = pow(float(1).sub(ndv), 1.6).mul(0.35);
+        const fresnel = pow(float(1).sub(ndv), 1.6).mul(0.24);
 
         // polished-glass specular hotspot (tight + bright → blooms as a glint)
         const half = normalize(lightDir.add(rd.negate()));
-        const spec = pow(max(dot(n, half), 0), 70.0).mul(0.5);
+        const spec = pow(max(dot(n, half), 0), 92.0).mul(0.72);
 
-        const warm = mix(tint, vec3(0.88, 0.94, 1.0), tension.mul(0.12).add(pulse.mul(0.1)));
-        // subsurface: a soft molten glow from within (keeps the teal saturated)
-        const sss = mix(tint, accent, 0.35).mul(pow(diff, 1.6)).mul(0.12);
-        const body = warm.mul(diff.add(fresnel)).add(spec).add(sss);
+        // Glass reads through contrast: a dark cyan body, colored subsurface
+        // scattering, and bright energy only at grazing angles and glints.
+        const centerDepth = pow(ndv, 0.7);
+        const glassBase = mix(
+          vec3(0.002, 0.008, 0.02),
+          tint.mul(0.16),
+          diff.mul(0.56).add(centerDepth.mul(0.08)),
+        );
+        const backLight = pow(max(dot(n, lightDir.negate()), 0), 2.0);
+        const sss = mix(tint, accent, 0.42)
+          .mul(backLight.mul(0.12).add(diff.mul(0.028)));
+        const body = glassBase
+          .mul(float(0.52).add(fresnel))
+          .add(spec)
+          .add(sss);
 
         // internal gyroid tension-lattice, seen through the translucent shell:
         // a short inward sub-march from the hit point accumulates the glowing web
@@ -166,9 +177,13 @@ export function createJellyOrbMaterial(steps: number) {
           const g = gyroid(lp.mul(gscale).add(gphase) as ReturnType<typeof vec3>);
           const band = smoothstep(0.14, 0.0, abs(g)); // bright on the gyroid surface
           const falloff = float(1).sub(float(i).mul(0.14));
-          latGlow.addAssign(band.mul(0.17).mul(falloff));
+          latGlow.addAssign(band.mul(0.29).mul(falloff));
         });
-        const latticeCol = accent.mul(latGlow).mul(lattice).mul(float(1).add(tension.mul(0.5)));
+        const latticeHue = mix(accent, vec3(0.15, 1.0, 0.98), latGlow.mul(0.4));
+        const latticeCol = latticeHue
+          .mul(latGlow)
+          .mul(lattice)
+          .mul(float(1).add(tension.mul(0.55)));
 
         const caustic = sin(p.x.mul(12).add(time.mul(0.4)))
           .mul(sin(p.y.mul(10).sub(time.mul(0.3))))
@@ -179,7 +194,7 @@ export function createJellyOrbMaterial(steps: number) {
 
         // soften silhouette into true black void
         const fog = smoothstep(float(0.2), float(1.1), length(p));
-        finalColor.assign(vec4(mix(col, vec3(0), fog.mul(0.45)), 1));
+        finalColor.assign(vec4(mix(col, vec3(0), fog.mul(0.32)), 1));
         Break();
       });
     });
