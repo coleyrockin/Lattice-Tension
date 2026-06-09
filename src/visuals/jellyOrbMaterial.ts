@@ -42,7 +42,7 @@ export function createJellyOrbMaterial(steps: number) {
   const pulse = uniform(0);
   const tint = uniform(new Color('#5eead4')); // teal shell
   const accent = uniform(new Color('#a78bfa')); // violet inner lattice / iridescence pole
-  const lattice = uniform(0.7); // internal lattice brightness
+  const lattice = uniform(0.95); // internal lattice brightness
   const pointer = uniform(new Vector2()); // set .value.set(x, y) per frame
   const jiggle = uniform(new Vector3(0, 1, 0)); // wobble axis (spring-driven)
   const squash = uniform(0); // spring displacement: + stretches along jiggle
@@ -94,7 +94,9 @@ export function createJellyOrbMaterial(steps: number) {
     const h12 = max(float(0.11).sub(abs(d1.sub(d2))), 0).div(0.11);
     const shell = min(d1, d2).sub(h12.mul(h12).mul(0.11).mul(0.25));
 
-    const d3 = length(q).sub(minor.mul(0.55).add(tension.mul(0.08)).add(morph.mul(0.05)));
+    // a substantial core sphere → the silhouette reads as a rounded orb, with
+    // the twin tori as molten surface detail rather than a flat ring.
+    const d3 = length(q).sub(float(0.34).add(morph.mul(0.07)).add(breathe).add(pulse.mul(0.04)));
 
     const blend = float(0.06).add(tension.mul(0.04));
     const hsc = max(blend.sub(abs(shell.sub(d3))), 0).div(blend);
@@ -144,12 +146,14 @@ export function createJellyOrbMaterial(steps: number) {
 
         const fresnel = pow(float(1).sub(ndv), 1.6).mul(0.35);
 
-        // polished-glass specular highlight
+        // polished-glass specular hotspot (tight + bright → blooms as a glint)
         const half = normalize(lightDir.add(rd.negate()));
-        const spec = pow(max(dot(n, half), 0), 48.0).mul(0.6);
+        const spec = pow(max(dot(n, half), 0), 70.0).mul(0.8);
 
-        const warm = mix(tint, vec3(1, 0.96, 0.88), tension.mul(0.5).add(pulse.mul(0.2)));
-        const body = warm.mul(diff.add(fresnel)).add(spec);
+        const warm = mix(tint, vec3(1, 0.96, 0.88), tension.mul(0.3).add(pulse.mul(0.2)));
+        // subsurface: a soft molten glow from within (keeps the teal saturated)
+        const sss = mix(tint, accent, 0.35).mul(pow(diff, 1.6)).mul(0.12);
+        const body = warm.mul(diff.add(fresnel)).add(spec).add(sss);
 
         // internal gyroid tension-lattice, seen through the translucent shell:
         // a short inward sub-march from the hit point accumulates the glowing web
@@ -162,7 +166,7 @@ export function createJellyOrbMaterial(steps: number) {
           const g = gyroid(lp.mul(gscale).add(gphase) as ReturnType<typeof vec3>);
           const band = smoothstep(0.14, 0.0, abs(g)); // bright on the gyroid surface
           const falloff = float(1).sub(float(i).mul(0.14));
-          latGlow.addAssign(band.mul(0.13).mul(falloff));
+          latGlow.addAssign(band.mul(0.17).mul(falloff));
         });
         const latticeCol = accent.mul(latGlow).mul(lattice).mul(float(1).add(tension.mul(0.5)));
 

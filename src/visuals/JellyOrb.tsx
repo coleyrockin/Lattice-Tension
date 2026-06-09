@@ -34,7 +34,7 @@ export function JellyOrb() {
     // grows to fill the frame and we pass through the glass into the lattice.
     const enter = Math.min(1, Math.max(0, scrollProgress / 0.46));
     const eased = enter * enter * (3 - 2 * enter);
-    state.camera.position.z = 2.35 - eased * 2.1;
+    state.camera.position.z = 1.78 - eased * 1.5; // closer at rest → the orb commands the frame
 
     const jig = reducedMotion ? 0.25 : 1;
 
