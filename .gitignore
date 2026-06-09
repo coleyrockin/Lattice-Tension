@@ -7,3 +7,9 @@ coverage
 playwright-report
 test-results
 
+
+# agent screenshots (kept out of the repo)
+*.jpeg
+*.jpg
+phase*.png
+.playwright-mcp/
