@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck — TSL node DSL: runtime-correct, but its operator types can't be
 // modeled by TypeScript. App code outside this shader stays fully type-checked.
 import { Color, DoubleSide, Vector2, Vector3 } from 'three';

@@ -1,14 +1,13 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck — TSL node DSL: runtime-correct, but its operator types can't be
 // modeled by TypeScript. App code outside this shader stays fully type-checked.
 import { Color, Vector2, Vector3 } from "three";
 import { NodeMaterial } from "three/webgpu";
 import {
-  Break,
   Fn,
   If,
   Loop,
   abs,
-  clamp,
   cross,
   dot,
   exp,
@@ -18,7 +17,6 @@ import {
   mix,
   normalize,
   positionGeometry,
-  pow,
   screenUV,
   sign,
   smoothstep,
@@ -58,10 +56,6 @@ export function createGyroidLatticeMaterial(steps: number) {
   const stepCount = uniform(steps);
 
   const FREQ = float(GYROID_FREQ);
-  const FAR = float(22);
-  const EPS = float(0.0015);
-  const MIN_STEP = float(0.005);
-  const BG = vec3(0.006, 0.012, 0.022);
 
   const raymarch = Fn(() => {
     // --- in-shader camera ---
