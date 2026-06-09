@@ -15,7 +15,7 @@ export function ExperienceCanvas() {
     <Canvas
       className="aether-canvas"
       dpr={[1, profile?.maxDpr ?? 1.25]}
-      camera={{ position: [0, 0, 2.35], fov: 50, near: 0.1, far: 20 }}
+      camera={{ position: [0, 0, 0.65], fov: 50, near: 0.1, far: 20 }}
       gl={async (props) => {
         const renderer = new WebGPURenderer({
           canvas: props.canvas as HTMLCanvasElement,
@@ -30,7 +30,7 @@ export function ExperienceCanvas() {
         await renderer.init();
         renderer.outputColorSpace = SRGBColorSpace;
         renderer.toneMapping = ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 0.72;
+        renderer.toneMappingExposure = 0.58;
         return renderer;
       }}
       onCreated={({ gl }) => {

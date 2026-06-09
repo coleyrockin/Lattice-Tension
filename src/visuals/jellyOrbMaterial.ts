@@ -142,15 +142,15 @@ export function createJellyOrbMaterial(steps: number) {
         const rimR = pow(float(1).sub(ndv.mul(0.97)), 3.2);
         const rimG = pow(float(1).sub(ndv), 3.2);
         const rimB = pow(float(1).sub(ndv.mul(1.03)), 3.2);
-        const rim = vec3(rimR, rimG, rimB).mul(0.85).mul(iriCol);
+        const rim = vec3(rimR, rimG, rimB).mul(0.5).mul(iriCol);
 
         const fresnel = pow(float(1).sub(ndv), 1.6).mul(0.35);
 
         // polished-glass specular hotspot (tight + bright → blooms as a glint)
         const half = normalize(lightDir.add(rd.negate()));
-        const spec = pow(max(dot(n, half), 0), 70.0).mul(0.8);
+        const spec = pow(max(dot(n, half), 0), 70.0).mul(0.5);
 
-        const warm = mix(tint, vec3(1, 0.96, 0.88), tension.mul(0.3).add(pulse.mul(0.2)));
+        const warm = mix(tint, vec3(0.88, 0.94, 1.0), tension.mul(0.12).add(pulse.mul(0.1)));
         // subsurface: a soft molten glow from within (keeps the teal saturated)
         const sss = mix(tint, accent, 0.35).mul(pow(diff, 1.6)).mul(0.12);
         const body = warm.mul(diff.add(fresnel)).add(spec).add(sss);

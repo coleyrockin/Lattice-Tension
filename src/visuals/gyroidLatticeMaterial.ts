@@ -4,6 +4,7 @@
 import { Color, Vector2, Vector3 } from "three";
 import { NodeMaterial } from "three/webgpu";
 import {
+  Break,
   Fn,
   If,
   Loop,
@@ -70,8 +71,8 @@ export function createGyroidLatticeMaterial(steps: number) {
     ).toVar();
 
     const morph = smoothstep(0.82, 0.97, tension).toVar();
-    // shell half-thickness for the glowing membrane (denser with tension)
-    const thickness = mix(float(0.16), float(0.5), tension).toVar();
+    // shell half-thickness in scaled space (must be > STEP*FREQ=0.184 to avoid aliasing)
+    const thickness = mix(float(0.28), float(0.48), tension).toVar();
 
     // EMISSIVE VOLUMETRIC: march straight through, accumulate glowing gyroid
     // shells with absorption. You see THROUGH layer after layer into infinite
@@ -82,6 +83,8 @@ export function createGyroidLatticeMaterial(steps: number) {
     const trans = float(1).toVar(); // transmittance (1 → clear, 0 → fully absorbed)
     const key = normalize(vec3(0.4, 0.7, 0.55));
 
+    // skip entirely when invisible (crossfade = 0) — saves all 150 march steps
+    If(reveal.greaterThan(0.01), () => {
     Loop(stepCount, () => {
       const p = ro.add(rd.mul(t)).toVar();
       // click pulse: a travelling brightening shell
@@ -89,17 +92,18 @@ export function createGyroidLatticeMaterial(steps: number) {
 
       const fgg = fieldFG(p.mul(FREQ), morph);
       const af = abs(fgg.f).toVar();
-      // density: bright on the gyroid surface (|f|→0), soft falloff to the shell edge
-      const dens = smoothstep(thickness, thickness.mul(0.08), af).toVar();
+      // density: peak=1 at surface (|f|=0), smooth falloff to zero at outer edge
+      // written as 1-smoothstep(0,t,af) to avoid TSL edge-normalization inverting the result
+      const dens = float(1).sub(smoothstep(float(0), thickness, af)).toVar();
 
       If(dens.greaterThan(0.001), () => {
         const n = normalize(fgg.g.mul(sign(fgg.f))).toVar();
         const ndl = max(dot(n, key), 0).mul(0.55).add(0.45);
         const ndv = max(dot(n, rd.negate()), 0).toVar();
 
-        // atmospheric depth grade: near shells teal, deep shells sink to indigo
-        const depth = smoothstep(0.0, 5.5, t);
-        const baseC = mix(tint, vec3(0.06, 0.12, 0.42), depth.mul(0.5));
+        // atmospheric depth grade: near shells teal, mid shells violet, deep shells indigo
+        const depth = smoothstep(0.0, 1.5, t);
+        const baseC = mix(tint, vec3(0.04, 0.08, 0.38), depth);
         // violet accent only at the very grazing rim of each shell (not a wash)
         const graze = float(1).sub(ndv).pow(3.0);
         const rimC = mix(baseC, accent, graze.mul(0.45));
@@ -110,17 +114,18 @@ export function createGyroidLatticeMaterial(steps: number) {
           .mul(0.5)
           .add(0.5);
         const em = mix(rimC, accent, iri.mul(0.22)).mul(ndl).add(pulseRing.mul(0.7));
-        glow.addAssign(em.mul(dens).mul(trans).mul(STEP).mul(8.0));
-        // stronger absorption → depth recedes to black, keeping deep contrast
-        trans.mulAssign(exp(dens.mul(STEP).mul(-8.5)));
+        glow.addAssign(em.mul(dens).mul(trans).mul(STEP).mul(20.0));
+        // absorption dominates — one shell exhausts trans → void behind stays black
+        trans.mulAssign(exp(dens.mul(STEP).mul(-40.0)));
       });
 
       t.addAssign(STEP);
+      // early exit when ray is fully absorbed — skip remaining steps
+      If(trans.lessThan(0.01), () => { Break(); });
     });
+    }); // end reveal guard
 
-    // focal core: only the most open rays (deep tunnel centers) glow cool-white,
-    // a luminous vanishing point — without washing the void.
-    glow.addAssign(trans.pow(3.0).mul(vec3(0.35, 0.66, 1.0)).mul(0.22));
+    // no focal core — void between shells is truly black for maximum depth contrast
 
     // alpha = reveal → crossfades the lattice in over the orb during the descent
     return vec4(glow, reveal);
