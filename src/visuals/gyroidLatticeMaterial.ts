@@ -96,19 +96,31 @@ export function createGyroidLatticeMaterial(steps: number) {
         const n = normalize(fgg.g.mul(sign(fgg.f))).toVar();
         const ndl = max(dot(n, key), 0).mul(0.55).add(0.45);
         const ndv = max(dot(n, rd.negate()), 0).toVar();
-        // iridescent emission sliding teal↔violet by facing angle + depth
+
+        // atmospheric depth grade: near shells teal, deep shells sink to indigo
+        const depth = smoothstep(0.0, 5.5, t);
+        const baseC = mix(tint, vec3(0.06, 0.12, 0.42), depth.mul(0.5));
+        // violet accent only at the very grazing rim of each shell (not a wash)
+        const graze = float(1).sub(ndv).pow(3.0);
+        const rimC = mix(baseC, accent, graze.mul(0.45));
+        // slow iridescent shimmer over the whole field
         const iri = cos(
-          vec3(0.0, 0.33, 0.67).add(ndv.mul(0.6)).add(t.mul(0.05)).add(tension.mul(0.3)).mul(6.2831),
+          vec3(0.0, 0.35, 0.72).add(ndv.mul(0.7)).add(t.mul(0.04)).add(tension.mul(0.3)).mul(6.2831),
         )
           .mul(0.5)
           .add(0.5);
-        const em = mix(tint, accent, iri.mul(0.55)).mul(ndl).add(pulseRing.mul(0.6));
-        glow.addAssign(em.mul(dens).mul(trans).mul(STEP).mul(9.0));
-        trans.mulAssign(exp(dens.mul(STEP).mul(-7.0)));
+        const em = mix(rimC, accent, iri.mul(0.22)).mul(ndl).add(pulseRing.mul(0.7));
+        glow.addAssign(em.mul(dens).mul(trans).mul(STEP).mul(8.0));
+        // stronger absorption → depth recedes to black, keeping deep contrast
+        trans.mulAssign(exp(dens.mul(STEP).mul(-8.5)));
       });
 
       t.addAssign(STEP);
     });
+
+    // focal core: only the most open rays (deep tunnel centers) glow cool-white,
+    // a luminous vanishing point — without washing the void.
+    glow.addAssign(trans.pow(3.0).mul(vec3(0.35, 0.66, 1.0)).mul(0.22));
 
     // alpha = reveal → crossfades the lattice in over the orb during the descent
     return vec4(glow, reveal);
