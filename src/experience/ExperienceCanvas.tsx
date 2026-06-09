@@ -22,6 +22,10 @@ export function ExperienceCanvas() {
           antialias: profile?.antialias ?? true,
           alpha: false,
           powerPreference: "high-performance",
+          // No native WebGPU → transpile the TSL graph to GLSL on WebGL2 (lossless)
+          forceWebGL:
+            typeof navigator !== "undefined" &&
+            !(navigator as unknown as { gpu?: unknown }).gpu,
         });
         await renderer.init();
         renderer.outputColorSpace = SRGBColorSpace;
