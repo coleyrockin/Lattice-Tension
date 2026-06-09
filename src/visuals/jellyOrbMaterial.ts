@@ -142,13 +142,13 @@ export function createJellyOrbMaterial(steps: number) {
         const rimR = pow(float(1).sub(ndv.mul(0.97)), 3.2);
         const rimG = pow(float(1).sub(ndv), 3.2);
         const rimB = pow(float(1).sub(ndv.mul(1.03)), 3.2);
-        const rim = vec3(rimR, rimG, rimB).mul(0.72).mul(iriCol);
+        const rim = vec3(rimR, rimG, rimB).mul(0.56).mul(iriCol);
 
         const fresnel = pow(float(1).sub(ndv), 1.6).mul(0.24);
 
         // polished-glass specular hotspot (tight + bright → blooms as a glint)
         const half = normalize(lightDir.add(rd.negate()));
-        const spec = pow(max(dot(n, half), 0), 92.0).mul(0.72);
+        const spec = pow(max(dot(n, half), 0), 105.0).mul(0.78);
 
         // Glass reads through contrast: a dark cyan body, colored subsurface
         // scattering, and bright energy only at grazing angles and glints.
@@ -160,7 +160,7 @@ export function createJellyOrbMaterial(steps: number) {
         );
         const backLight = pow(max(dot(n, lightDir.negate()), 0), 2.0);
         const sss = mix(tint, accent, 0.42)
-          .mul(backLight.mul(0.12).add(diff.mul(0.028)));
+          .mul(backLight.mul(0.16).add(diff.mul(0.034)));
         const body = glassBase
           .mul(float(0.52).add(fresnel))
           .add(spec)
@@ -177,7 +177,7 @@ export function createJellyOrbMaterial(steps: number) {
           const g = gyroid(lp.mul(gscale).add(gphase) as ReturnType<typeof vec3>);
           const band = smoothstep(0.14, 0.0, abs(g)); // bright on the gyroid surface
           const falloff = float(1).sub(float(i).mul(0.14));
-          latGlow.addAssign(band.mul(0.29).mul(falloff));
+          latGlow.addAssign(band.mul(0.34).mul(falloff));
         });
         const latticeHue = mix(accent, vec3(0.15, 1.0, 0.98), latGlow.mul(0.4));
         const latticeCol = latticeHue

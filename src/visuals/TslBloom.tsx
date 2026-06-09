@@ -19,7 +19,8 @@ export function TslBloom() {
   const post = useMemo(() => {
     const scenePass = pass(scene, camera);
     const color = scenePass.getTextureNode();
-    const bloomPass = bloom(color, 0.28, 0.38, 0.88);
+    // cleaner bloom: moderate strength, tighter radius, higher threshold for polished look
+    const bloomPass = bloom(color, 0.48, 0.52, 0.72);
     const pipeline = new RenderPipeline(gl);
     pipeline.outputNode = color.add(bloomPass);
     return pipeline;

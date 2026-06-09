@@ -118,7 +118,7 @@ export function createGyroidLatticeMaterial(steps: number) {
         )
           .mul(0.5)
           .add(0.5);
-        const nearColor = mix(tint, accent, spectralPhase.mul(0.42)).mul(0.72);
+        const nearColor = mix(tint, accent, spectralPhase.mul(0.42)).mul(0.64);
         const baseC = mix(nearColor, vec3(0.008, 0.012, 0.08), depth);
         const graze = float(1).sub(ndv).pow(3.0);
         const rimC = mix(baseC, vec3(0.55, 0.28, 1.0), graze.mul(0.58));
@@ -133,8 +133,8 @@ export function createGyroidLatticeMaterial(steps: number) {
           .add(pulseRing.mul(0.75));
         const surfaceCore = dens.pow(2.4);
         const surfaceLight = em
-          .mul(dens.mul(6.7))
-          .add(vec3(0.08, 0.92, 1.0).mul(surfaceCore.mul(1.15)));
+          .mul(dens.mul(7.4))
+          .add(vec3(0.08, 0.92, 1.0).mul(surfaceCore.mul(1.28)));
         glow.addAssign(surfaceLight.mul(trans).mul(STEP));
         // Enough absorption to establish silhouettes while preserving several
         // receding layers and black void between them.
