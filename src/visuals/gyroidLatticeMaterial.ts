@@ -22,6 +22,7 @@ import {
   sign,
   smoothstep,
   uniform,
+  vec2,
   vec3,
   vec4,
   cos,
@@ -52,8 +53,13 @@ export function createGyroidLatticeMaterial(steps: number) {
   const pulse = uniform(0);
   const reveal = uniform(1); // 0 = invisible (black), 1 = full (for the crossfade)
   const pointer = uniform(new Vector2());
+  const collapse = uniform(0);
+  const emergence = uniform(0);
+  const order = uniform(0);
+  const stress = uniform(0.5);
   const tint = uniform(new Color("#16d9c8"));
   const accent = uniform(new Color("#a855f7"));
+  const highlight = uniform(new Color("#ffc66d"));
   const stepCount = uniform(steps);
 
   const FREQ = float(GYROID_FREQ);
@@ -71,9 +77,16 @@ export function createGyroidLatticeMaterial(steps: number) {
     ).toVar();
 
     const morph = smoothstep(0.82, 0.97, tension).toVar();
-    // Pseudo-distance thickness after normalizing the implicit field by its
-    // analytic gradient. This keeps the glow confined to the actual surface.
-    const thickness = mix(float(0.045), float(0.075), tension).toVar();
+    // Normalize the implicit field by its analytic gradient so shell width
+    // remains stable as the gyroid morphs toward Schwarz-P.
+    const thickness = mix(float(0.026), float(0.048), tension)
+      .mul(float(1).add(order.mul(0.16)))
+      .toVar();
+
+    // skip all march work while invisible (crossfade = 0). NOTE: this must be
+    // a discard, NOT If(reveal>0)→Loop — a uniform-conditional wrapping the
+    // march loop silently compiles to a no-op on WebGPU (glow stays 0 forever).
+    reveal.lessThan(0.01).discard();
 
     // EMISSIVE VOLUMETRIC: march straight through, accumulate glowing gyroid
     // shells with absorption. You see THROUGH layer after layer into infinite
@@ -84,8 +97,6 @@ export function createGyroidLatticeMaterial(steps: number) {
     const trans = float(1).toVar(); // transmittance (1 → clear, 0 → fully absorbed)
     const key = normalize(vec3(0.4, 0.7, 0.55));
 
-    // skip entirely when invisible (crossfade = 0) — saves all 150 march steps
-    If(reveal.greaterThan(0.01), () => {
     Loop(stepCount, () => {
       const p = ro.add(rd.mul(t)).toVar();
       // click pulse: a travelling brightening shell
@@ -103,12 +114,11 @@ export function createGyroidLatticeMaterial(steps: number) {
 
       If(dens.greaterThan(0.001), () => {
         const n = normalize(fgg.g.mul(sign(fgg.f))).toVar();
-        const ndl = max(dot(n, key), 0).mul(0.55).add(0.45);
+        const ndl = max(dot(n, key), 0).mul(0.62).add(0.3);
         const ndv = max(dot(n, rd.negate()), 0).toVar();
 
-        // Spatial spectral bands keep neighboring layers distinguishable:
-        // near shells cyan, middle shells violet, remote shells deep indigo.
-        const depth = smoothstep(0.25, 4.2, t);
+        // Preserve several readable shells before they recede into indigo-black.
+        const depth = smoothstep(0.3, 4.5, t);
         const spectralPhase = cos(
           vec3(0.0, 0.34, 0.68)
             .add(p.x.mul(0.13))
@@ -118,36 +128,62 @@ export function createGyroidLatticeMaterial(steps: number) {
         )
           .mul(0.5)
           .add(0.5);
-        const nearColor = mix(tint, accent, spectralPhase.mul(0.42)).mul(0.64);
-        const baseC = mix(nearColor, vec3(0.008, 0.012, 0.08), depth);
+        const nearColor = mix(tint, accent, spectralPhase.mul(0.32));
+        const baseC = mix(nearColor, vec3(0.004, 0.008, 0.055), depth);
         const graze = float(1).sub(ndv).pow(3.0);
-        const rimC = mix(baseC, vec3(0.55, 0.28, 1.0), graze.mul(0.58));
+        const rimC = mix(baseC, vec3(0.55, 0.28, 1.0), graze.mul(0.5));
         // slow iridescent shimmer over the whole field
         const iri = cos(
           vec3(0.0, 0.35, 0.72).add(ndv.mul(0.7)).add(t.mul(0.04)).add(tension.mul(0.3)).mul(6.2831),
         )
           .mul(0.5)
           .add(0.5);
-        const em = mix(rimC, accent, iri.mul(0.16))
+        const em = mix(rimC, accent, iri.mul(0.18))
           .mul(ndl)
           .add(pulseRing.mul(0.75));
         const surfaceCore = dens.pow(2.4);
+        const stressPhase = cos(
+          p.x
+            .mul(1.7)
+            .add(p.y.mul(1.15))
+            .sub(p.z.mul(1.3))
+            .add(t.mul(0.16)),
+        )
+          .mul(0.5)
+          .add(0.5);
+        const stressLine = smoothstep(0.94, 1.0, stressPhase)
+          .mul(surfaceCore)
+          .mul(stress);
         const surfaceLight = em
-          .mul(dens.mul(7.4))
-          .add(vec3(0.08, 0.92, 1.0).mul(surfaceCore.mul(1.28)));
+          .mul(dens.mul(float(4.8).add(stress.mul(2.4))))
+          .add(vec3(0.08, 0.92, 1.0).mul(surfaceCore.mul(0.92)))
+          .add(highlight.mul(stressLine.mul(1.4)));
         glow.addAssign(surfaceLight.mul(trans).mul(STEP));
-        // Enough absorption to establish silhouettes while preserving several
-        // receding layers and black void between them.
-        trans.mulAssign(exp(dens.mul(STEP).mul(-18.0)));
+        trans.mulAssign(
+          exp(
+            dens
+              .mul(STEP)
+              .mul(float(-16).sub(collapse.mul(8))),
+          ),
+        );
       });
 
       t.addAssign(STEP);
       // early exit when ray is fully absorbed — skip remaining steps
-      If(trans.lessThan(0.025), () => { Break(); });
+      If(trans.lessThan(0.01), () => { Break(); });
     });
-    }); // end reveal guard
 
-    // no focal core — void between shells is truly black for maximum depth contrast
+    glow.mulAssign(0.62);
+    const focalPosition = uv.sub(vec2(0.42, -0.06));
+    const focalCore = exp(length(focalPosition).pow(2).mul(-28))
+      .mul(emergence.mul(0.28).add(order.mul(0.04)));
+    const focalSpark = exp(length(focalPosition).pow(2).mul(-180))
+      .mul(emergence.mul(0.2));
+    glow.addAssign(
+      mix(accent, tint, 0.42)
+        .mul(focalCore)
+        .add(highlight.mul(focalSpark)),
+    );
 
     // alpha = reveal → crossfades the lattice in over the orb during the descent
     return vec4(glow, reveal);
@@ -160,5 +196,22 @@ export function createGyroidLatticeMaterial(steps: number) {
   material.depthWrite = false;
   material.transparent = true;
 
-  return { material, ro, fwd, aspect, tension, pulse, reveal, pointer, tint, accent, stepCount };
+  return {
+    material,
+    ro,
+    fwd,
+    aspect,
+    tension,
+    pulse,
+    reveal,
+    pointer,
+    collapse,
+    emergence,
+    order,
+    stress,
+    tint,
+    accent,
+    highlight,
+    stepCount,
+  };
 }

@@ -85,10 +85,16 @@ export function AetherExperience() {
         }}
         onPointerUp={(event) => {
           dragOrigin.current = null;
-          setDrag({ ...dragValue.current, active: false });
+          dragValue.current = { x: 0, y: 0 };
+          setDrag({ x: 0, y: 0, active: false });
           (event.currentTarget as HTMLElement).releasePointerCapture(
             event.pointerId,
           );
+        }}
+        onPointerCancel={() => {
+          dragOrigin.current = null;
+          dragValue.current = { x: 0, y: 0 };
+          setDrag({ x: 0, y: 0, active: false });
         }}
       >
         <ExperienceCanvas />

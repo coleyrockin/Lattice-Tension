@@ -1,6 +1,8 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Vector3, type Mesh } from "three";
+import { sampleExperience } from "../chapters/interpolate";
+import { PHILOSOPHICAL_FRAGMENTS } from "../chapters/definitions";
 import { createJellyOrbMaterial } from "./jellyOrbMaterial";
 import { useExperienceStore } from "../experience/store";
 
@@ -19,6 +21,13 @@ export function JellyOrb() {
   const jaxis = useRef(new Vector3(0, 1, 0));
   const ppx = useRef(0);
   const ppy = useRef(0);
+  const dragX = useRef(0);
+  const dragY = useRef(0);
+  const slosh = useRef(new Vector3());
+  const sloshVelocity = useRef(new Vector3());
+  const sloshTarget = useRef(new Vector3());
+  const sloshDelta = useRef(new Vector3());
+  const flickImpulse = useRef(new Vector3());
 
   const tier = useExperienceStore((s) => s.profile?.tier ?? "high");
   const reducedMotion = useExperienceStore((s) => s.reducedMotion);
@@ -28,13 +37,16 @@ export function JellyOrb() {
   useFrame((state, delta) => {
     const dt = Math.min(delta, 1 / 30);
     const t = state.clock.elapsedTime;
-    const { pointer, impulse, scrollProgress } = useExperienceStore.getState();
+    const { pointer, drag, impulse, scrollProgress } =
+      useExperienceStore.getState();
+    const sample = sampleExperience(scrollProgress);
 
     // FALL INTO THE ORB: dolly the camera inward as descent rises, so the orb
     // grows to fill the frame and we pass through the glass into the lattice.
     const enter = Math.min(1, Math.max(0, scrollProgress / 0.46));
     const eased = enter * enter * (3 - 2 * enter);
-    state.camera.position.z = 0.65 - eased * 0.37; // rest z=0.65 → orb fills ~85% of frame; dollies to z=0.28
+    state.camera.position.z =
+      0.68 - eased * 0.39 - sample.visual.cameraProximity * 0.018;
 
     const jig = reducedMotion ? 0.25 : 1;
 
@@ -42,10 +54,11 @@ export function JellyOrb() {
     if (impulse && impulse.startedAt !== lastImpulse.current) {
       lastImpulse.current = impulse.startedAt;
       pulseAmp.current = 1;
-      jv.current += 9 * jig; // sharp impulse → the orb lurches
+      jv.current += 4.15 * jig;
       jaxis.current.set(px.current, py.current, 0.5).normalize();
+      sloshVelocity.current.addScaledVector(jaxis.current, -2.8 * jig);
     }
-    pulseAmp.current = Math.max(0, pulseAmp.current - dt * 1.8);
+    pulseAmp.current = Math.max(0, pulseAmp.current - dt * 1.05);
     u.pulse.value = pulseAmp.current;
 
     // fast pointer flicks impart momentum into the jiggle (alive + a little dangerous)
@@ -55,37 +68,87 @@ export function JellyOrb() {
     ppy.current = pointer.y;
     const flick = Math.hypot(vx, vy);
     if (flick > 0.04) {
-      jv.current += Math.min(flick * 22, 6) * jig;
+      jv.current += Math.min(flick * 15, 4.5) * jig;
       jaxis.current.set(vx, vy, 0.35).normalize();
+      flickImpulse.current
+        .set(vx, -vy, 0.18)
+        .multiplyScalar(Math.min(flick * 11, 2.4) * jig);
+      sloshVelocity.current.add(flickImpulse.current);
     }
 
-    // spring–damper with real momentum + overshoot, then settle
-    const k = 46;
-    const damp = 4.6;
-    jv.current += (-k * jp.current - damp * jv.current) * dt;
+    // The shell never fully rests: two slow, incommensurate compression waves
+    // keep the mass breathing while interaction adds larger overshoot.
+    const idleCompression =
+      (Math.sin(t * 0.72) * 0.026 + Math.sin(t * 0.29 + 1.4) * 0.014) * jig;
+    const k = 17;
+    const damp = 2.45;
+    jv.current += (-k * (jp.current - idleCompression) - damp * jv.current) * dt;
     jp.current += jv.current * dt;
-    u.squash.value = Math.max(-0.6, Math.min(0.6, jp.current));
+    u.squash.value = Math.max(-0.34, Math.min(0.34, jp.current));
     u.jiggle.value.copy(jaxis.current);
+
+    // The inner mass is a slower spring with less damping, so it visibly lags
+    // behind the outer shell and continues moving after a flick or click.
+    sloshTarget.current.set(
+      -dragX.current * 0.32 - vx * 1.8 + Math.sin(t * 0.41) * 0.045 * jig,
+      dragY.current * 0.32 + vy * 1.8 + Math.cos(t * 0.33) * 0.04 * jig,
+      -jp.current * 0.22 + Math.sin(t * 0.27 + 0.8) * 0.03 * jig,
+    );
+    sloshDelta.current.copy(slosh.current).sub(sloshTarget.current);
+    sloshVelocity.current.addScaledVector(sloshDelta.current, -8.2 * dt);
+    sloshVelocity.current.multiplyScalar(Math.exp(-1.35 * dt));
+    slosh.current.addScaledVector(sloshVelocity.current, dt);
+    slosh.current.clampLength(0, 0.42);
+    u.slosh.value.copy(slosh.current);
 
     // eased pointer lean
     const lead = reducedMotion ? 0.12 : 1;
+    dragX.current += (drag.x - dragX.current) * 0.08;
+    dragY.current += (drag.y - dragY.current) * 0.08;
     px.current += (pointer.x - px.current) * 0.05;
     py.current += (pointer.y - py.current) * 0.05;
-    u.pointer.value.set(px.current * lead, py.current * lead);
+    u.pointer.value.set(
+      (px.current + dragX.current * 2.1) * lead,
+      (py.current - dragY.current * 2.1) * lead,
+    );
 
     u.speed.value = reducedMotion ? 0.14 : 0.6;
+    u.tension.value = sample.simulation.tension;
+    u.tint.value.set("#064fae");
+    u.accent.value.set("#62c7ff");
+    u.highlight.value.set("#c4efff");
+    u.lattice.value =
+      0.75 + sample.visual.stressIntensity * 0.85 + sample.simulation.order * 0.2;
+
+    const scale = 0.82 + sample.visual.membraneScale * 0.1;
+    mesh.current.scale.setScalar(scale);
+    mesh.current.position.x = 0.095;
+    mesh.current.position.y = 0.015;
 
     // multi-axis incommensurate tumble — never repeats
     const rot = reducedMotion ? 0.2 : 1;
-    mesh.current.rotation.y = t * 0.06 * rot;
-    mesh.current.rotation.x = Math.sin(t * 0.11) * 0.14 * rot;
-    mesh.current.rotation.z = Math.cos(t * 0.083) * 0.08 * rot;
+    mesh.current.rotation.y =
+      t * 0.052 * rot + Math.sin(t * 0.19) * 0.07 * rot + dragX.current * 1.3;
+    mesh.current.rotation.x =
+      (Math.sin(t * 0.11) * 0.14 + Math.sin(t * 0.37) * 0.025) * rot +
+      dragY.current * 1.1;
+    mesh.current.rotation.z =
+      Math.cos(t * 0.083) * 0.08 * rot +
+      sample.simulation.collapse * Math.sin(t * 1.7) * 0.045;
   });
 
   return (
     <mesh
       ref={mesh}
-      onClick={() => useExperienceStore.getState().fireImpulse(0)}
+      onClick={() => {
+        const state = useExperienceStore.getState();
+        const sample = sampleExperience(state.scrollProgress);
+        state.fireImpulse(sample.chapterIndex);
+        state.setSelectedFragment({
+          nodeId: sample.chapterIndex,
+          text: PHILOSOPHICAL_FRAGMENTS[sample.chapterIndex],
+        });
+      }}
     >
       <boxGeometry args={[1, 1, 1]} />
       <primitive object={u.material} attach="material" />

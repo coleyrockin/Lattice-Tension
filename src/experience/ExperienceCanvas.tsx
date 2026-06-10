@@ -30,7 +30,7 @@ export function ExperienceCanvas() {
         await renderer.init();
         renderer.outputColorSpace = SRGBColorSpace;
         renderer.toneMapping = ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 0.68;
+        renderer.toneMappingExposure = 0.51;
         return renderer;
       }}
       onCreated={({ gl }) => {
@@ -40,7 +40,7 @@ export function ExperienceCanvas() {
     >
       <Suspense fallback={null}>
         <AetherWorld />
-        {!reducedMotion ? <TslBloom /> : null}
+        {!reducedMotion && profile?.postprocessing ? <TslBloom /> : null}
       </Suspense>
     </Canvas>
   );
