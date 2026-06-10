@@ -61,8 +61,10 @@ export function createGyroidLatticeMaterial(steps: number) {
   const accent = uniform(new Color("#a855f7"));
   const highlight = uniform(new Color("#ffc66d"));
   const stepCount = uniform(steps);
+  // per-chapter cell density — drives how tight or cathedral-wide the lattice reads
+  const freq = uniform(GYROID_FREQ);
 
-  const FREQ = float(GYROID_FREQ);
+  const FREQ = freq;
 
   const raymarch = Fn(() => {
     // --- in-shader camera ---
@@ -76,7 +78,12 @@ export function createGyroidLatticeMaterial(steps: number) {
       f.add(right.mul(uv.x.mul(tanFov))).add(up.mul(uv.y.mul(tanFov))),
     ).toVar();
 
-    const morph = smoothstep(0.82, 0.97, tension).toVar();
+    // peak tension OR high order both reshape the lattice toward Schwarz-P,
+    // so ordered chapters read structurally different, not just recoloured.
+    const morph = max(
+      smoothstep(0.82, 0.97, tension),
+      smoothstep(0.55, 0.95, order).mul(0.85),
+    ).toVar();
     // Normalize the implicit field by its analytic gradient so shell width
     // remains stable as the gyroid morphs toward Schwarz-P.
     const thickness = mix(float(0.026), float(0.048), tension)
@@ -114,11 +121,11 @@ export function createGyroidLatticeMaterial(steps: number) {
 
       If(dens.greaterThan(0.001), () => {
         const n = normalize(fgg.g.mul(sign(fgg.f))).toVar();
-        const ndl = max(dot(n, key), 0).mul(0.62).add(0.3);
+        const ndl = max(dot(n, key), 0).mul(0.58).add(0.44);
         const ndv = max(dot(n, rd.negate()), 0).toVar();
 
         // Preserve several readable shells before they recede into indigo-black.
-        const depth = smoothstep(0.3, 4.5, t);
+        const depth = smoothstep(0.3, 6.0, t);
         const spectralPhase = cos(
           vec3(0.0, 0.34, 0.68)
             .add(p.x.mul(0.13))
@@ -128,17 +135,17 @@ export function createGyroidLatticeMaterial(steps: number) {
         )
           .mul(0.5)
           .add(0.5);
-        const nearColor = mix(tint, accent, spectralPhase.mul(0.32));
-        const baseC = mix(nearColor, vec3(0.004, 0.008, 0.055), depth);
+        const nearColor = mix(tint, accent, spectralPhase.mul(0.5));
+        const baseC = mix(nearColor, tint.mul(0.12), depth);
         const graze = float(1).sub(ndv).pow(3.0);
-        const rimC = mix(baseC, vec3(0.55, 0.28, 1.0), graze.mul(0.5));
+        const rimC = mix(baseC, accent, graze.mul(0.55));
         // slow iridescent shimmer over the whole field
         const iri = cos(
           vec3(0.0, 0.35, 0.72).add(ndv.mul(0.7)).add(t.mul(0.04)).add(tension.mul(0.3)).mul(6.2831),
         )
           .mul(0.5)
           .add(0.5);
-        const em = mix(rimC, accent, iri.mul(0.18))
+        const em = mix(rimC, accent, iri.mul(0.28))
           .mul(ndl)
           .add(pulseRing.mul(0.75));
         const surfaceCore = dens.pow(2.4);
@@ -156,7 +163,7 @@ export function createGyroidLatticeMaterial(steps: number) {
           .mul(stress);
         const surfaceLight = em
           .mul(dens.mul(float(4.8).add(stress.mul(2.4))))
-          .add(vec3(0.08, 0.92, 1.0).mul(surfaceCore.mul(0.92)))
+          .add(mix(tint, highlight, 0.62).mul(surfaceCore.mul(0.95)))
           .add(highlight.mul(stressLine.mul(1.4)));
         glow.addAssign(surfaceLight.mul(trans).mul(STEP));
         trans.mulAssign(
@@ -173,7 +180,7 @@ export function createGyroidLatticeMaterial(steps: number) {
       If(trans.lessThan(0.01), () => { Break(); });
     });
 
-    glow.mulAssign(0.62);
+    glow.mulAssign(0.92);
     const focalPosition = uv.sub(vec2(0.42, -0.06));
     const focalCore = exp(length(focalPosition).pow(2).mul(-28))
       .mul(emergence.mul(0.28).add(order.mul(0.04)));
@@ -201,6 +208,7 @@ export function createGyroidLatticeMaterial(steps: number) {
     ro,
     fwd,
     aspect,
+    freq,
     tension,
     pulse,
     reveal,

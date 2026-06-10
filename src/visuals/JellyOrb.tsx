@@ -1,12 +1,20 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Vector3, type Mesh } from "three";
+import { Color, Vector3, type Mesh } from "three";
 import { sampleExperience } from "../chapters/interpolate";
 import { PHILOSOPHICAL_FRAGMENTS } from "../chapters/definitions";
 import { createJellyOrbMaterial } from "./jellyOrbMaterial";
 import { useExperienceStore } from "../experience/store";
 
 const STEPS: Record<string, number> = { high: 120, medium: 80, low: 44 };
+
+// scratch colors — avoid per-frame allocation
+const PRIMARY = new Color();
+const SECONDARY = new Color();
+const DEEP = new Color();
+const LIGHT = new Color();
+const DEEP_ANCHOR = new Color("#020d24");
+const WHITE = new Color("#ffffff");
 
 export function JellyOrb() {
   const mesh = useRef<Mesh>(null!);
@@ -114,11 +122,17 @@ export function JellyOrb() {
 
     u.speed.value = reducedMotion ? 0.14 : 0.6;
     u.tension.value = sample.simulation.tension;
-    u.tint.value.set("#064fae");
-    u.accent.value.set("#62c7ff");
-    u.highlight.value.set("#c4efff");
+    // chapter palette drives the glass: deep body absorbs toward a darkened
+    // primary, the rim catches the full primary, glints lift toward white.
+    PRIMARY.set(sample.palette.primary);
+    SECONDARY.set(sample.palette.secondary);
+    DEEP.copy(PRIMARY).multiplyScalar(0.24).lerp(DEEP_ANCHOR, 0.42);
+    LIGHT.copy(PRIMARY).lerp(WHITE, 0.72);
+    u.tint.value.copy(DEEP);
+    u.accent.value.copy(PRIMARY).lerp(SECONDARY, 0.18).multiplyScalar(0.78);
+    u.highlight.value.copy(LIGHT);
     u.lattice.value =
-      0.75 + sample.visual.stressIntensity * 0.85 + sample.simulation.order * 0.2;
+      0.42 + sample.visual.stressIntensity * 0.4 + sample.simulation.order * 0.12;
 
     const scale = 0.82 + sample.visual.membraneScale * 0.1;
     mesh.current.scale.setScalar(scale);

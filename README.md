@@ -1,49 +1,70 @@
 # Tension Lattice
 
-A real-time WebGPU art piece about the hidden geometry of the universe — a single
-descent from an object into the structure beneath it.
+<div align="center">
+  <a href="https://github.com/coleyrockin/Lattice-Tension/stargazers"><img src="https://img.shields.io/github/stars/coleyrockin/Lattice-Tension?style=flat-square" alt="Stars"></a>
+  <a href="https://github.com/coleyrockin/Lattice-Tension/issues"><img src="https://img.shields.io/github/issues/coleyrockin/Lattice-Tension?style=flat-square" alt="Issues"></a>
+</div>
 
-You begin on a molten glass orb floating in the void. Scroll, and the camera falls
-*into* it: the glass membrane gives way and you emerge inside an infinite, luminous
-**gyroid lattice** — a triply-periodic minimal surface rendered as glowing
-translucent shells you can see through, layer after layer, into a spiral vortex.
-The lattice **is** the level-set of one equation; tension is the wall thickness
-inside it; at peak tension it morphs toward the Schwarz-P surface.
+---
 
-## How it works
+## Overview
 
-- **Renderer:** Three.js r184 `WebGPURenderer` with TSL (Three Shading Language)
-  node materials, driven through React Three Fiber. Falls back losslessly to
-  WebGL2 (`forceWebGL`) where WebGPU is unavailable.
-- **The orb** (`src/visuals/jellyOrbMaterial.ts`) — a bounded raymarched SDF
-  membrane: twin tori + core, multi-octave domain-warp wobble, iridescent
-  fresnel, chromatic rim, an internal lattice seen through the glass, and a
-  spring-damper jiggle (click it / flick the cursor — it lurches with momentum).
-- **The lattice** (`src/visuals/gyroidLatticeMaterial.ts`) — a fullscreen
-  emissive volumetric march: glowing gyroid shells accumulated with absorption,
-  a self-contained shader camera (`ro`/`fwd`/`aspect`) descending the (1,1,1)
-  screw axis, depth-graded teal→indigo color, and a focal vortex core.
-- **The journey** — `scrollProgress` drives a camera dolly into the orb and an
-  alpha crossfade from orb to lattice (`src/visuals/AetherWorld.tsx`).
-- **Post** — a TSL `RenderPipeline` bloom pass over the output luminance, run by
-  taking over the R3F render loop with a priority `useFrame`
-  (`src/visuals/TslBloom.tsx`).
+_Tension Lattice_ is a **real‑time WebGPU art piece** that visualizes the hidden geometry of the universe. You start on a floating molten glass orb, then descend into an infinite, glowing **gyroid lattice**—a mathematically defined, triply‑periodic minimal surface rendered with luminous translucent shells.
 
-## Develop
+The lattice’s shape is the level‑set of a single equation; *tension* controls the wall thickness. At peak tension the form morphs toward the classic Schwarz‑P surface, creating a hypnotic vortex that feels both organic and crystalline.
+
+---
+
+## Features
+
+- ✨ **WebGPU first** – Powered by Three.js `WebGPURenderer` with TSL (Three Shading Language) node materials.
+- 📱 **Responsive fallback** – Seamlessly degrades to WebGL2 (`forceWebGL`) when WebGPU isn’t available.
+- 🎮 **Interactive physics** – Click‑drag the orb to impart momentum; the lattice reacts with spring‑damper dynamics.
+- 🎨 **Custom shaders** – Full‑screen emissive volumetric march, depth‑graded teal→indigo palette, and bloom post‑processing.
+- 🖱️ **Scroll‑driven narrative** – `scrollProgress` drives a camera dolly and a smooth cross‑fade from orb to lattice.
+
+---
+
+## Tech Stack
+
+- **Framework**: React with React‑Three‑Fiber (R3F)
+- **Graphics**: Three.js r184, WebGPU & WebGL2
+- **Shaders**: Three Shading Language (TSL) and custom GLSL
+- **Build**: Vite + TypeScript
+- **Deployment**: Vercel (auto‑deploy on `main` push)
+
+---
+
+## Getting Started
 
 ```bash
-npm install
-npm run dev      # http://127.0.0.1:5173
+# Install dependencies
+npm ci
+
+# Run the development server
+npm run dev      # → http://127.0.0.1:5173
 ```
 
-## Validate
+The app will automatically detect WebGPU support. If you want to force WebGL2 for testing, set the `forceWebGL` flag in `src/experience/ExperienceCanvas.tsx`.
 
-```bash
-npm run lint
-npm run build
-npm run test
-```
+---
+
+## Development
+
+- **Linting** – `npm run lint`
+- **Testing** – `npm run test`
+- **Building** – `npm run build` (runs `tsc -b` type-checking first)
+
+All scripts are defined in `package.json`. Code style is enforced via ESLint.
+
+---
 
 ## Deploy
 
-Push to `main` → Vercel builds and deploys automatically.
+Push to the `main` branch – Vercel will pick up the changes, run `npm run build`, and serve the production bundle.
+
+---
+
+## Contributing
+
+Contributions are welcome! Please open an issue before submitting a PR. Follow the existing code style, write tests for new features, and keep the documentation up‑to‑date.

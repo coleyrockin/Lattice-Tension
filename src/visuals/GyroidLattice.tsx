@@ -102,6 +102,9 @@ export function GyroidLattice({ standalone = false }: Props) {
     u.fwd.value.copy(fwd.current);
 
     u.aspect.value = state.size.width / Math.max(1, state.size.height);
+    // chapter contour density reframes the lattice: sparse cathedral cells in
+    // Origin/Collapse, a dense woven field in Pattern/Emergence.
+    u.freq.value = 3.3 + sample.visual.contourDensity * 2.8;
     u.tension.value = tension;
     u.reveal.value = reveal;
     u.pulse.value = pulseAmp.current;

@@ -50,9 +50,9 @@ export const CHAPTERS: ChapterDefinition[] = [
     camera: { position: [-1.35, 0.62, 7.8], target: [0.45, 0.05, -0.2], fov: 48 },
     palette: {
       void: "#020207",
-      primary: "#6c91ff",
-      secondary: "#b34fff",
-      accent: "#ffb44f",
+      primary: "#7b78ff",
+      secondary: "#ff4fd8",
+      accent: "#ff9a4f",
     },
     simulation: {
       birth: 0.8,
@@ -85,10 +85,10 @@ export const CHAPTERS: ChapterDefinition[] = [
     range: [sixth * 2, sixth * 3],
     camera: { position: [1.85, 1.15, 10.6], target: [0, 0.15, -1], fov: 45 },
     palette: {
-      void: "#020208",
-      primary: "#45dcff",
-      secondary: "#d754ff",
-      accent: "#dfff66",
+      void: "#010408",
+      primary: "#2fffc3",
+      secondary: "#00a8ff",
+      accent: "#eaff5e",
     },
     simulation: {
       birth: 1,
@@ -121,10 +121,10 @@ export const CHAPTERS: ChapterDefinition[] = [
     range: [sixth * 3, sixth * 4],
     camera: { position: [0.35, -0.25, 6.4], target: [0.15, 0.05, 0.2], fov: 52 },
     palette: {
-      void: "#030107",
-      primary: "#7d55ff",
-      secondary: "#ff429b",
-      accent: "#ff7848",
+      void: "#050108",
+      primary: "#ff3b5c",
+      secondary: "#ff7a2f",
+      accent: "#ffd166",
     },
     simulation: {
       birth: 1,
@@ -157,10 +157,10 @@ export const CHAPTERS: ChapterDefinition[] = [
     range: [sixth * 4, sixth * 5],
     camera: { position: [-1.9, 0.95, 9.15], target: [0.25, 0.1, -0.6], fov: 46 },
     palette: {
-      void: "#020208",
-      primary: "#45e2ff",
-      secondary: "#c94fff",
-      accent: "#dfff62",
+      void: "#010604",
+      primary: "#ffd75e",
+      secondary: "#36ffa0",
+      accent: "#b7ffe9",
     },
     simulation: {
       birth: 1,
@@ -193,10 +193,10 @@ export const CHAPTERS: ChapterDefinition[] = [
     range: [sixth * 5, 1],
     camera: { position: [0.15, 0.42, 12.4], target: [0.05, 0.05, -0.8], fov: 48 },
     palette: {
-      void: "#010106",
-      primary: "#59dbff",
-      secondary: "#d252ff",
-      accent: "#ffd16d",
+      void: "#030109",
+      primary: "#cfa9ff",
+      secondary: "#5ee4ff",
+      accent: "#fff6ff",
     },
     simulation: {
       birth: 1,
@@ -209,7 +209,7 @@ export const CHAPTERS: ChapterDefinition[] = [
     visual: {
       membraneOpacity: 1,
       membraneScale: 1.28,
-      contourDensity: 1,
+      contourDensity: 0.62,
       particleDensity: 1,
       stressIntensity: 0.92,
       collapseDistortion: 0,

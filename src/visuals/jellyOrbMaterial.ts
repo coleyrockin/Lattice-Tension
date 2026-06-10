@@ -40,10 +40,10 @@ export function createJellyOrbMaterial(steps: number) {
   const tension = uniform(0.4);
   const speed = uniform(0.6);
   const pulse = uniform(0);
-  const tint = uniform(new Color('#064fae')); // deep ocean glass
-  const accent = uniform(new Color('#62c7ff')); // baby-blue rim and caustics
-  const highlight = uniform(new Color('#d5f5ff')); // rare wet glints
-  const lattice = uniform(1.35); // internal lattice brightness
+  const tint = uniform(new Color('#003366')); // deeper ocean glass
+  const accent = uniform(new Color('#88e0ff')); // brighter rim and caustics
+  const highlight = uniform(new Color('#e0faff')); // enhanced wet glints
+  const lattice = uniform(1.8); // brighter internal lattice
   const pointer = uniform(new Vector2()); // set .value.set(x, y) per frame
   const jiggle = uniform(new Vector3(0, 1, 0)); // wobble axis (spring-driven)
   const squash = uniform(0); // spring displacement: + stretches along jiggle
@@ -174,12 +174,18 @@ export function createJellyOrbMaterial(steps: number) {
         const rimR = pow(float(1).sub(ndv.mul(0.97)), 3.2);
         const rimG = pow(float(1).sub(ndv), 3.2);
         const rimB = pow(float(1).sub(ndv.mul(1.03)), 3.2);
+        // Sculpt the fresnel flood with the key/fill lights. When the camera
+        // dollies inside the shell ndv→0 everywhere, so without this the whole
+        // face saturates to one flat accent colour and the volume disappears.
+        const rimShade = float(0.42).add(diff.mul(1.15)).add(fill.mul(0.8));
         const rim = vec3(rimR, rimG, rimB)
-          .mul(float(0.68).add(abs(squash).mul(0.32)))
-          .mul(iriCol);
+          .mul(float(0.85).add(abs(squash).mul(0.32)))
+          .mul(iriCol)
+          .mul(rimShade);
         const wetEdge = accent
           .mul(pow(float(1).sub(ndv), 0.82))
-          .mul(0.14);
+          .mul(0.14)
+          .mul(float(0.5).add(diff));
 
         const fresnel = pow(float(1).sub(ndv), 1.7);
 
@@ -216,7 +222,7 @@ export function createJellyOrbMaterial(steps: number) {
         const centerDepth = pow(ndv, 1.35);
         const edgeDepth = pow(float(1).sub(ndv), 2.2);
         const glassBase = mix(
-          vec3(0.001, 0.014, 0.044),
+          tint.mul(0.1),
           tint.mul(0.27),
           diff.mul(0.44).add(fill).add(edgeDepth.mul(0.16)),
         );
@@ -242,15 +248,18 @@ export function createJellyOrbMaterial(steps: number) {
         Loop(6, ({ i }) => {
           lp.subAssign(n.mul(0.085)); // step inward along -normal
           const g = gyroid(lp.mul(gscale).add(gphase) as ReturnType<typeof vec3>);
-          const band = smoothstep(0.072, 0.0, abs(g)); // bright on the gyroid surface
+          const band = smoothstep(0.05, 0.0, abs(g)); // bright on the gyroid surface
           const falloff = float(1).sub(float(i).mul(0.14));
-          latGlow.addAssign(band.mul(0.32).mul(falloff));
+          latGlow.addAssign(band.mul(0.22).mul(falloff));
         });
-        const latticeHue = mix(tint, accent, latGlow.mul(0.72).add(fresnel.mul(0.12)));
+        // soft-cap the accumulated glow so the web reads as filaments instead
+        // of flooding the body with a flat saturated fill at high tension
+        const latSoft = min(latGlow, float(1.25));
+        const latticeHue = mix(tint, accent, latSoft.mul(0.72).add(fresnel.mul(0.12)));
         const latticeCol = latticeHue
-          .mul(latGlow)
+          .mul(latSoft.mul(latSoft).mul(0.8))
           .mul(lattice)
-          .mul(float(0.95).add(tension.mul(0.62)));
+          .mul(float(0.95).add(tension.mul(0.45)));
 
         // Broad, drifting light bands travel at a different speed from the
         // lattice. This separated motion is what makes the interior feel liquid.
@@ -272,7 +281,7 @@ export function createJellyOrbMaterial(steps: number) {
           .add(0.5);
         const caustic = smoothstep(0.72, 1.0, causticA.mul(causticB))
           .mul(float(0.1).add(tension.mul(0.08)))
-          .mul(float(0.3).add(fresnel.mul(0.7)));
+          .mul(float(0.55).add(fresnel.mul(0.45)));
         const stressGlint = pow(max(dot(n, half), 0), 180.0)
           .mul(float(0.28).add(tension.mul(0.42)));
 
@@ -282,17 +291,13 @@ export function createJellyOrbMaterial(steps: number) {
           .add(latticeCol)
           .add(accent.mul(caustic))
           .add(highlight.mul(stressGlint));
-        // Preserve an ocean-blue spectrum even where several translucent
-        // layers overlap. This prevents low-blue intersections reading green.
-        const safeRed = max(col.r, 0);
-        const safeBlue = max(col.b, 0);
-        const safeGreen = min(max(col.g, 0), safeBlue.mul(0.68));
-        const oceanCol = vec3(safeRed, safeGreen, safeBlue)
-          .add(vec3(0.0, 0.003, 0.016));
+        // Hue-preserving floor: a faint tint-coloured ambient keeps overlap
+        // regions inside the chapter palette instead of clamping to blue.
+        const gradedCol = max(col, vec3(0)).add(tint.mul(0.05));
 
         // soften silhouette into true black void
         const fog = smoothstep(float(0.2), float(1.1), length(p));
-        finalColor.assign(vec4(mix(oceanCol, vec3(0), fog.mul(0.24)), 1));
+        finalColor.assign(vec4(mix(gradedCol, vec3(0), fog.mul(0.24)), 1));
         Break();
       });
     });
