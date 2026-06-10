@@ -62,6 +62,7 @@ export function GyroidLattice({ standalone = false }: Props) {
     travel.current =
       1.2 +
       descent * (5.5 + sample.visual.nestedScale * 3.2) +
+      sample.simulation.collapse * 2.2 + // Collapse pulls you in faster
       time * 0.12 * motion;
     p.copy(HEADING)
       .multiplyScalar(travel.current)
@@ -102,9 +103,23 @@ export function GyroidLattice({ standalone = false }: Props) {
     u.fwd.value.copy(fwd.current);
 
     u.aspect.value = state.size.width / Math.max(1, state.size.height);
-    // chapter contour density reframes the lattice: sparse cathedral cells in
-    // Origin/Collapse, a dense woven field in Pattern/Emergence.
-    u.freq.value = 3.3 + sample.visual.contourDensity * 2.8;
+    // Per-chapter structural signatures — each lattice chapter must read as
+    // its own place, not a recolor of the same tunnel:
+    //   Pattern   → Schwarz-P crystal, thin crisp walls (order, in-shader)
+    //   Collapse  → helical torque shearing the cells around the axis
+    //   Emergence → wide chambers whose cell size breathes along the path
+    //   Aether    → thin translucent veils, low absorption, layered depth
+    const aether = smoothstep(0.78, 0.92, sample.globalProgress);
+    u.twist.value = sample.simulation.collapse * 1.0;
+    u.swell.value = sample.simulation.emergence * (1 - aether);
+    u.veil.value = aether;
+    // chapter contour density reframes the lattice; Emergence opens into
+    // sparse cathedral chambers, Aether thins slightly for the veils.
+    u.freq.value =
+      3.3 +
+      sample.visual.contourDensity * 2.8 -
+      u.swell.value * 1.7 -
+      aether * 0.9;
     u.tension.value = tension;
     u.reveal.value = reveal;
     u.pulse.value = pulseAmp.current;

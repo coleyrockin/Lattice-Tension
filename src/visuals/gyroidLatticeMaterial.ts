@@ -20,6 +20,7 @@ import {
   positionGeometry,
   screenUV,
   sign,
+  sin,
   smoothstep,
   uniform,
   vec2,
@@ -57,6 +58,10 @@ export function createGyroidLatticeMaterial(steps: number) {
   const emergence = uniform(0);
   const order = uniform(0);
   const stress = uniform(0.5);
+  // per-chapter structural signatures (not just recolors):
+  const twist = uniform(0); // Collapse — helical shear of cells around the axis
+  const swell = uniform(0); // Emergence — cell size breathes along the path
+  const veil = uniform(0); // Aether — thin shells + low absorption → deep layers
   const tint = uniform(new Color("#16d9c8"));
   const accent = uniform(new Color("#a855f7"));
   const highlight = uniform(new Color("#ffc66d"));
@@ -85,10 +90,17 @@ export function createGyroidLatticeMaterial(steps: number) {
       smoothstep(0.55, 0.95, order).mul(0.85),
     ).toVar();
     // Normalize the implicit field by its analytic gradient so shell width
-    // remains stable as the gyroid morphs toward Schwarz-P.
+    // remains stable as the gyroid morphs toward Schwarz-P. Order THINS the
+    // walls (crisp crystal, Pattern); veil thins them further (Aether).
     const thickness = mix(float(0.026), float(0.048), tension)
-      .mul(float(1).add(order.mul(0.16)))
+      .mul(float(1).sub(order.mul(0.28)))
+      .mul(float(1).sub(veil.mul(0.45)))
       .toVar();
+
+    // fixed orthonormal frame around the descent axis, for the Collapse twist
+    const axisH = vec3(0.5774, 0.5774, 0.5774);
+    const axisR = vec3(-0.7071, 0.0, 0.7071);
+    const axisU = vec3(-0.4082, 0.8165, -0.4082);
 
     // skip all march work while invisible (crossfade = 0). NOTE: this must be
     // a discard, NOT If(reveal>0)→Loop — a uniform-conditional wrapping the
@@ -109,9 +121,30 @@ export function createGyroidLatticeMaterial(steps: number) {
       // click pulse: a travelling brightening shell
       const pulseRing = exp(length(p.sub(ro)).sub(pulse.mul(7)).pow(2).mul(-0.5)).mul(pulse);
 
-      const fgg = fieldFG(p.mul(FREQ), morph);
+      // COLLAPSE twist: shear the cells helically around the descent axis —
+      // the tunnel itself torques, structurally unlike any other chapter.
+      const axial = dot(p, axisH);
+      const theta = axial.mul(twist.mul(0.42));
+      const radial = p.sub(axisH.mul(axial));
+      const x1 = dot(radial, axisR);
+      const x2 = dot(radial, axisU);
+      const ct = cos(theta);
+      const st = sin(theta);
+      const pT = axisH
+        .mul(axial)
+        .add(axisR.mul(x1.mul(ct).sub(x2.mul(st))))
+        .add(axisU.mul(x1.mul(st).add(x2.mul(ct))))
+        .toVar();
+
+      // EMERGENCE swell: cell size breathes in slow waves along the path —
+      // chambers widen and contract like a living cathedral.
+      const localFreq = FREQ.mul(
+        float(1).sub(swell.mul(0.26).mul(sin(axial.mul(0.55)))),
+      ).toVar();
+
+      const fgg = fieldFG(pT.mul(localFreq), morph);
       const gradientLength = max(length(fgg.g), 0.35);
-      const distanceToSurface = abs(fgg.f).div(gradientLength).div(FREQ);
+      const distanceToSurface = abs(fgg.f).div(gradientLength).div(localFreq);
       const surface = float(1)
         .sub(smoothstep(float(0), thickness, distanceToSurface))
         .toVar();
@@ -162,15 +195,17 @@ export function createGyroidLatticeMaterial(steps: number) {
           .mul(surfaceCore)
           .mul(stress);
         const surfaceLight = em
-          .mul(dens.mul(float(4.8).add(stress.mul(2.4))))
+          .mul(dens.mul(float(4.8).add(stress.mul(2.4)).add(veil.mul(2.6))))
           .add(mix(tint, highlight, 0.62).mul(surfaceCore.mul(0.95)))
           .add(highlight.mul(stressLine.mul(1.4)));
         glow.addAssign(surfaceLight.mul(trans).mul(STEP));
+        // AETHER veil: absorption falls away so the ray survives through many
+        // thin shells — layer behind layer receding into transparent depth.
         trans.mulAssign(
           exp(
             dens
               .mul(STEP)
-              .mul(float(-16).sub(collapse.mul(8))),
+              .mul(mix(float(-16).sub(collapse.mul(8)), float(-6.0), veil)),
           ),
         );
       });
@@ -217,6 +252,9 @@ export function createGyroidLatticeMaterial(steps: number) {
     emergence,
     order,
     stress,
+    twist,
+    swell,
+    veil,
     tint,
     accent,
     highlight,
