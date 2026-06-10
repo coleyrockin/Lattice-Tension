@@ -10,7 +10,9 @@ import {
   Loop,
   abs,
   cos,
+  cross,
   dot,
+  exp,
   float,
   length,
   max,
@@ -18,8 +20,11 @@ import {
   mix,
   normalize,
   pow,
+  reflect,
+  refract,
   sin,
   smoothstep,
+  step,
   uniform,
   vec2,
   vec3,
@@ -64,9 +69,9 @@ export function createJellyOrbMaterial(steps: number) {
       .mul(float(1).add(squash.mul(0.4)))
       .add(ax.mul(al.mul(float(1).sub(squash.mul(0.55)))));
     const t = time.mul(speed.mul(0.35));
-    const amp = float(0.022)
-      .add(tension.mul(0.075))
-      .add(pulse.mul(0.12));
+    const amp = float(0.016)
+      .add(tension.mul(0.03))
+      .add(pulse.mul(0.08));
 
     // Delayed inner mass bends the membrane differently at opposite poles.
     // The shell begins settling before this term does, creating visible viscosity.
@@ -98,10 +103,12 @@ export function createJellyOrbMaterial(steps: number) {
     );
     const q = jellyPt.add(warpA).add(warpB);
 
-    // glacial silhouette morph between a ring-knot and a rounder blob (~125s)
+    // glacial silhouette morph between a tighter ring-knot and a rounder blob.
+    // Tori radii pulled in so they sit just under the core sphere → the
+    // silhouette stays a clean orb, with the tori as molten interior detail.
     const morph = sin(time.mul(0.05)).mul(0.5).add(0.5);
-    const major = mix(float(0.36), float(0.31), morph).sub(tension.mul(0.025)).add(breathe);
-    const minor = float(0.085).add(tension.mul(0.025)).add(pulse.mul(0.02));
+    const major = mix(float(0.28), float(0.25), morph).sub(tension.mul(0.02)).add(breathe);
+    const minor = float(0.05).add(tension.mul(0.015)).add(pulse.mul(0.015));
 
     const d1 = length(vec2(length(q.xz).sub(major), q.y)).sub(minor);
 
@@ -111,24 +118,26 @@ export function createJellyOrbMaterial(steps: number) {
     const h12 = max(float(0.11).sub(abs(d1.sub(d2))), 0).div(0.11);
     const shell = min(d1, d2).sub(h12.mul(h12).mul(0.11).mul(0.25));
 
-    // a substantial core sphere → the silhouette reads as a rounded orb, with
-    // the twin tori as molten surface detail rather than a flat ring.
-    const d3 = length(q).sub(float(0.42).add(morph.mul(0.045)).add(breathe).add(pulse.mul(0.04)));
+    // a DOMINANT core sphere → the silhouette reads as a rounded orb, with the
+    // twin tori kissing the surface as molten detail rather than a flat ring.
+    const d3 = length(q).sub(float(0.51).add(morph.mul(0.025)).add(breathe).add(pulse.mul(0.04)));
 
-    const blend = float(0.085).add(tension.mul(0.04));
+    const blend = float(0.16).add(tension.mul(0.04));
     const hsc = max(blend.sub(abs(shell.sub(d3))), 0).div(blend);
     const core = min(shell, d3).sub(hsc.mul(hsc).mul(blend).mul(0.25));
 
-    // twin travelling ripples crawling over the membrane (interference)
-    const r1 = sin(length(pt.xz).mul(9).sub(t.mul(2.2))).mul(sin(pt.y.mul(7).add(t))).mul(amp.mul(0.35));
-    const r2 = sin(length(pt.yz).mul(6).add(t.mul(1.4))).mul(sin(pt.x.mul(5).sub(t.mul(0.7)))).mul(amp.mul(0.22));
+    // twin travelling ripples crawling over the membrane (interference).
+    // Kept gentle so the surface reads as sleek wet glass, not corrugated —
+    // the concentric radial component especially must stay subtle.
+    const r1 = sin(length(pt.xz).mul(9).sub(t.mul(2.2))).mul(sin(pt.y.mul(7).add(t))).mul(amp.mul(0.15));
+    const r2 = sin(length(pt.yz).mul(6).add(t.mul(1.4))).mul(sin(pt.x.mul(5).sub(t.mul(0.7)))).mul(amp.mul(0.1));
 
     const surfaceQuiver = sin(q.x.mul(3.1).add(time.mul(0.58)))
       .mul(sin(q.y.mul(2.7).sub(time.mul(0.47))))
-      .mul(float(0.014).add(abs(squash).mul(0.024)));
+      .mul(float(0.006).add(abs(squash).mul(0.016)));
     const gelatinSwell = sin(q.y.mul(2.15).add(time.mul(0.46)))
       .add(sin(q.x.mul(1.8).sub(time.mul(0.37))))
-      .mul(0.009);
+      .mul(0.005);
 
     return core
       .sub(r1)
@@ -158,45 +167,122 @@ export function createJellyOrbMaterial(steps: number) {
           ),
         ).toVar();
 
+        // Wavelet wet skin: a screen-stable tangent frame (with pole guard)
+        // carries a detail-normal so light dances across a rippling water
+        // surface. The raymarch has no derivatives, so we build the basis here.
+        const upRef = mix(vec3(0, 1, 0), vec3(1, 0, 0), step(0.95, abs(n.y)));
+        const tangent = normalize(cross(upRef, n)).toVar();
+        const bitan = normalize(cross(n, tangent)).toVar();
+
+        // three Gerstner-style wavelet layers → a height gradient (dU, dV).
+        // time is pre-multiplied by speed, so reduced-motion auto-calms the sea.
+        const W = float(0.011).add(tension.mul(0.007));
+        const wt = time.mul(speed.mul(0.9));
+        const uu = dot(p, tangent);
+        const vv = dot(p, bitan);
+        // incommensurate, non-grid wave directions so the ripple reads as
+        // organic water rather than a regular checkerboard up close.
+        const aA = uu.mul(7.0).add(vv.mul(3.0)).add(wt.mul(1.7));
+        const aB = uu.mul(-5.0).add(vv.mul(9.0)).sub(wt.mul(1.3));
+        const aC = uu.mul(13.0).add(vv.mul(10.0)).add(wt.mul(2.6));
+        const dU = cos(aA)
+          .mul(3.5)
+          .add(cos(aB).mul(-1.6))
+          .add(cos(aC).mul(2.34))
+          .mul(W);
+        const dV = cos(aA)
+          .mul(1.5)
+          .add(cos(aB).mul(2.88))
+          .add(cos(aC).mul(1.8))
+          .mul(W);
+        // wet detail-normal — used ONLY for the lit terms. The geometric n is
+        // kept for ndv / rim / refraction so the silhouette stays clean.
+        const nW = normalize(n.sub(tangent.mul(dU)).sub(bitan.mul(dV))).toVar();
+
         const lightDir = normalize(vec3(-0.42, 0.72, 0.55));
         const fillDir = normalize(vec3(0.68, -0.18, 0.72));
-        const diff = max(dot(n, lightDir), 0).mul(0.42).add(0.04);
-        const fill = max(dot(n, fillDir), 0).mul(0.18);
+        // Strongly wrapped, high-ambient lighting: a translucent water orb is
+        // lit more by scattered ambient than by a hard key, so it glows evenly
+        // with only a gentle directional gradient. This keeps any hemisphere
+        // from crushing to black (no hard terminator for the march to stair-step).
+        const diff = dot(nW, lightDir).mul(0.5).add(0.5).mul(0.34).add(0.26);
+        const fill = dot(nW, fillDir).mul(0.5).add(0.5).mul(0.16);
         const ndv = max(dot(n, rd.negate()), 0).toVar();
+        const fresnel = pow(float(1).sub(ndv), 1.7).toVar();
 
-        // Wet fresnel: the body absorbs toward navy while grazing angles catch
-        // a clean baby-blue edge. Keeping the center dark creates perceived
-        // translucency even though the raymarch resolves one front surface.
-        const fresT = pow(float(1).sub(ndv), 1.5);
-        const iriCol = mix(tint, accent, fresT.mul(0.94));
+        // Straight-through path length Beer-Lambert needs. For a sphere the
+        // chord ∝ ndv (≈1 at centre, 0 at the rim). Deriving it from ndv (the
+        // smooth normal) rather than the depth-quantized hit position is what
+        // avoids concentric march-step contour banding in the absorption.
+        const thickness = smoothstep(0.0, 1.0, ndv).mul(0.98).toVar();
 
-        // chromatic-aberration rim: per-channel fresnel split → vibrating silhouette
-        const rimR = pow(float(1).sub(ndv.mul(0.97)), 3.2);
-        const rimG = pow(float(1).sub(ndv), 3.2);
-        const rimB = pow(float(1).sub(ndv.mul(1.03)), 3.2);
-        // Sculpt the fresnel flood with the key/fill lights. When the camera
-        // dollies inside the shell ndv→0 everywhere, so without this the whole
-        // face saturates to one flat accent colour and the volume disappears.
-        const rimShade = float(0.42).add(diff.mul(1.15)).add(fill.mul(0.8));
-        const rim = vec3(rimR, rimG, rimB)
+        // Snell-refract the view ray (IOR 1.33) so the interior is sampled along
+        // the bent ray → true lens parallax. step() guards total-internal-
+        // reflection (refract returns 0) against normalize(0)=NaN on WebGL2.
+        const eta = float(0.752);
+        const rr = refract(rd, n, eta);
+        const rrLen = length(rr);
+        const refrDir = normalize(
+          mix(rd, rr.add(vec3(0, 0, -0.0001)), step(0.001, rrLen)),
+        ).toVar();
+        const refl = reflect(rd, n).toVar();
+
+        // Fresnel-Schlick (F0 = 0.02, water) + a small 3-probe procedural
+        // environment sampled by the reflected ray → mirror-bright wet rim and a
+        // moving sun-glint sweep, while the centre stays clear deep water.
+        const sun = normalize(vec3(-0.35, 0.62, -0.7));
+        const sky = normalize(vec3(0.2, 0.9, -0.3));
+        const rim2 = normalize(vec3(0.7, -0.1, -0.6));
+        const env = min(
+          pow(max(dot(refl, sun), 0), 90.0)
+            .mul(1.0)
+            .add(pow(max(dot(refl, sky), 0), 8.0).mul(0.25))
+            .add(pow(max(dot(refl, rim2), 0), 26.0).mul(0.18)),
+          float(3.0),
+        ).toVar();
+        // ambient reflection floor → the grazing rim always reflects a faint
+        // sky instead of going black where no probe happens to align.
+        const envCol = highlight
+          .mul(env)
+          .add(accent.mul(pow(max(dot(refl, sky), 0), 6.0).mul(0.12)))
+          .add(mix(tint, accent, 0.6).mul(0.2));
+        // Schlick, but capped so the body always shows through the rim (a fully
+        // mirror rim against an empty environment reads as a black crescent).
+        const F0 = float(0.02);
+        const fres = F0.add(float(1).sub(F0).mul(pow(float(1).sub(ndv), 5.0)))
+          .mul(0.7)
+          .toVar();
+
+        // Zoned frosted glassmorphism rim: clear/refractive across the belly,
+        // milky-frosted only at the grazing silhouette (how real frosted-glass
+        // spheres behave). milkRim is gated by diff so dark back-rims stay black.
+        const grazeMask = smoothstep(0.55, 0.05, ndv).toVar();
+        const frostN = sin(n.x.mul(34.0).add(time.mul(0.4)))
+          .mul(sin(n.y.mul(31.0).sub(time.mul(0.3))))
+          .mul(0.5)
+          .add(0.5);
+        const iriCol = mix(tint, accent, pow(float(1).sub(ndv), 1.5).mul(0.94));
+        const rimSoft = pow(float(1).sub(ndv), 3.0);
+        const rim = iriCol
+          .mul(rimSoft)
+          .mul(float(0.42).add(diff.mul(1.15)).add(fill.mul(0.8)))
           .mul(float(0.85).add(abs(squash).mul(0.32)))
-          .mul(iriCol)
-          .mul(rimShade);
-        const wetEdge = accent
-          .mul(pow(float(1).sub(ndv), 0.82))
-          .mul(0.14)
-          .mul(float(0.5).add(diff));
-
-        const fresnel = pow(float(1).sub(ndv), 1.7);
+          .mul(mix(float(1.0), float(0.6).add(frostN.mul(0.5)), grazeMask));
+        const milkRim = mix(accent, highlight, 0.6)
+          .mul(grazeMask)
+          .mul(grazeMask)
+          .mul(0.16)
+          .mul(float(0.4).add(diff.mul(0.8)));
 
         // Two wet highlights make the membrane feel curved rather than painted.
+        // They ride the rippling detail-normal so the sheen dances like water.
         const half = normalize(lightDir.add(rd.negate()));
         const fillHalf = normalize(fillDir.add(rd.negate()));
         const spec = accent.mul(
-          pow(max(dot(n, half), 0), 118.0).mul(0.72),
+          pow(max(dot(nW, half), 0), 118.0).mul(0.72),
         );
         const softSpec = accent.mul(
-          pow(max(dot(n, fillHalf), 0), 24.0)
+          pow(max(dot(nW, fillHalf), 0), 24.0)
             .mul(0.18)
             .mul(float(1).add(abs(squash).mul(0.7))),
         );
@@ -204,7 +290,7 @@ export function createJellyOrbMaterial(steps: number) {
           pow(
             max(
               dot(
-                n,
+                nW,
                 normalize(
                   vec3(
                     sin(time.mul(0.17)).mul(0.18).sub(0.38),
@@ -219,39 +305,68 @@ export function createJellyOrbMaterial(steps: number) {
           ).mul(0.09),
         );
 
-        const centerDepth = pow(ndv, 1.35);
-        const edgeDepth = pow(float(1).sub(ndv), 2.2);
-        const glassBase = mix(
-          tint.mul(0.1),
-          tint.mul(0.27),
-          diff.mul(0.44).add(fill).add(edgeDepth.mul(0.16)),
-        );
-        const backLight = pow(max(dot(n, lightDir.negate()), 0), 2.0);
-        const sss = mix(tint, accent, 0.42)
-          .mul(backLight.mul(0.075).add(edgeDepth.mul(0.045)));
-        const body = glassBase
-          .mul(float(0.43).add(fresnel.mul(0.24)))
-          .mul(float(1).sub(centerDepth.mul(0.1)))
-          .add(tint.mul(0.028))
-          .add(spec)
-          .add(softSpec)
-          .add(movingSheen)
-          .add(sss);
+        // Beer-Lambert colored absorption: light is absorbed through real mass,
+        // so the deep centre saturates toward the palette body colour while the
+        // thin limbs glow clear. absorb = (1−tint) keeps each chapter its own hue
+        // in the deep. This is the change that turns a lit shell into a volume.
+        // Gentler absorption so light carries deep into the body → luminous,
+        // translucent tropical water rather than an opaque marble.
+        const absorb = vec3(1.0).sub(tint).mul(float(1.2).add(tension.mul(0.3)));
+        const transmit = vec3(
+          exp(absorb.x.mul(thickness).negate()),
+          exp(absorb.y.mul(thickness).negate()),
+          exp(absorb.z.mul(thickness).negate()),
+        ).toVar();
+        const clearInterior = mix(accent, tint, smoothstep(0.0, 1.2, thickness));
+        const deepBody = clearInterior
+          .mul(transmit)
+          .mul(float(0.62).add(diff.mul(0.5)).add(fill.mul(0.35)))
+          .add(accent.mul(0.05)) // faint color floor → shadows glow, never black
+          .toVar();
+        // subsurface scatter: a soft turquoise glow lit from within, peaking
+        // through the mid-body and backlit limbs → tropical-water translucency
+        // (this is what keeps it from reading as an opaque ceramic ball).
+        const backlit = pow(max(dot(nW, lightDir.negate()), 0), 1.4).add(0.4);
+        const sss = mix(accent, highlight, 0.4)
+          .mul(smoothstep(0.04, 0.85, thickness).mul(transmit))
+          .mul(backlit.mul(0.85))
+          .toVar();
 
         // internal gyroid tension-lattice, seen through the translucent shell:
         // a short inward sub-march from the hit point accumulates the glowing web
         const latGlow = float(0).toVar();
+        const causAccum = float(0).toVar();
         const lp = p.toVar();
-        const gscale = float(7.8).add(tension.mul(3.2));
+        // lower frequency + wider, softer bands so the suspended structure reads
+        // as smooth refracted veils of water, not an aliased hard wireframe.
+        const gscale = float(4.6).add(tension.mul(2.4));
         const gphase = vec3(time.mul(0.06), time.mul(-0.04), time.mul(0.05))
           .add(slosh.mul(1.8));
         Loop(6, ({ i }) => {
-          lp.subAssign(n.mul(0.085)); // step inward along -normal
+          lp.addAssign(refrDir.mul(0.092)); // march along the refracted ray
           const g = gyroid(lp.mul(gscale).add(gphase) as ReturnType<typeof vec3>);
-          const band = smoothstep(0.05, 0.0, abs(g)); // bright on the gyroid surface
+          const band = smoothstep(0.55, 0.0, abs(g)); // soft, wide gyroid veil
           const falloff = float(1).sub(float(i).mul(0.14));
-          latGlow.addAssign(band.mul(0.22).mul(falloff));
+          latGlow.addAssign(band.mul(0.2).mul(falloff));
+          // depth-stacked caustics: light shafts sampled at increasing depth so
+          // they parallax through the volume instead of sitting on the skin.
+          const cA = sin(
+            lp.x.mul(8.5).add(lp.y.mul(3.2)).add(time.mul(0.52)).add(slosh.x.mul(5.0)),
+          )
+            .mul(0.5)
+            .add(0.5);
+          const cB = sin(
+            lp.y.mul(7.0).sub(lp.z.mul(4.2)).sub(time.mul(0.36)).add(slosh.y.mul(4.0)),
+          )
+            .mul(0.5)
+            .add(0.5);
+          causAccum.addAssign(
+            smoothstep(0.5, 1.0, cA.mul(cB)).mul(0.12).mul(falloff),
+          );
         });
+        const caustic = min(causAccum, float(1.0))
+          .mul(float(0.18).add(tension.mul(0.1)))
+          .mul(float(0.55).add(fresnel.mul(0.45)));
         // soft-cap the accumulated glow so the web reads as filaments instead
         // of flooding the body with a flat saturated fill at high tension
         const latSoft = min(latGlow, float(1.25));
@@ -261,43 +376,54 @@ export function createJellyOrbMaterial(steps: number) {
           .mul(lattice)
           .mul(float(0.95).add(tension.mul(0.45)));
 
-        // Broad, drifting light bands travel at a different speed from the
-        // lattice. This separated motion is what makes the interior feel liquid.
-        const causticA = sin(
-          p.x.mul(8.5)
-            .add(p.y.mul(3.2))
-            .add(time.mul(0.52))
-            .add(slosh.x.mul(5.0)),
-        )
-          .mul(0.5)
-          .add(0.5);
-        const causticB = sin(
-          p.y.mul(7.0)
-            .sub(p.z.mul(4.2))
-            .sub(time.mul(0.36))
-            .add(slosh.y.mul(4.0)),
-        )
-          .mul(0.5)
-          .add(0.5);
-        const caustic = smoothstep(0.72, 1.0, causticA.mul(causticB))
-          .mul(float(0.1).add(tension.mul(0.08)))
-          .mul(float(0.55).add(fresnel.mul(0.45)));
-        const stressGlint = pow(max(dot(n, half), 0), 180.0)
-          .mul(float(0.28).add(tension.mul(0.42)));
+        // Tight sun-glint that twinkles on wave crests (gated by a wavelet mask)
+        // — sparkles like sun on water, additive on the light highlight colour.
+        const sparkMask = smoothstep(
+          0.6,
+          1.0,
+          sin(uu.mul(31.0).add(wt.mul(3.3)))
+            .mul(sin(vv.mul(27.0).sub(wt.mul(2.7))))
+            .mul(0.5)
+            .add(0.5),
+        );
+        const sunGlint = highlight.mul(
+          pow(max(dot(nW, half), 0), 180.0)
+            .mul(0.9)
+            .mul(float(0.35).add(sparkMask.mul(0.65))),
+        );
 
-        const col = body
-          .add(rim)
-          .add(wetEdge)
-          .add(latticeCol)
-          .add(accent.mul(caustic))
-          .add(highlight.mul(stressGlint));
-        // Hue-preserving floor: a faint tint-coloured ambient keeps overlap
-        // regions inside the chapter palette instead of clamping to blue.
-        const gradedCol = max(col, vec3(0)).add(tint.mul(0.05));
+        // Energy-conserving glass: Fresnel mixes the transmitted water body
+        // against the reflected environment (mix, not add → highlights stay
+        // tight). spec / sheen / sun-glint ride on top.
+        const glass = mix(
+          deepBody
+            .add(sss)
+            .add(latticeCol)
+            .add(accent.mul(caustic))
+            .add(rim)
+            .add(milkRim),
+          envCol,
+          fres,
+        ).toVar();
+        const col = glass
+          .add(spec)
+          .add(softSpec.mul(0.5))
+          .add(movingSheen.mul(0.6))
+          .add(sunGlint)
+          .toVar();
+        // Hue-preserving floor keeps overlaps inside the chapter palette; a
+        // Reinhard soft-knee then compresses only the brights, so mids and the
+        // pure-black void survive ACES + bloom untouched.
+        const graded = max(col, vec3(0)).add(tint.mul(0.05));
+        const rolled = graded
+          .mul(vec3(1).div(vec3(1).add(graded.mul(0.55))))
+          .mul(1.55)
+          .toVar();
 
-        // soften silhouette into true black void
+        // soften silhouette into true black void (0.24→0.22: absorption already
+        // darkens centres, so we avoid double-darkening)
         const fog = smoothstep(float(0.2), float(1.1), length(p));
-        finalColor.assign(vec4(mix(gradedCol, vec3(0), fog.mul(0.24)), 1));
+        finalColor.assign(vec4(mix(rolled, vec3(0), fog.mul(0.22)), 1));
         Break();
       });
     });
