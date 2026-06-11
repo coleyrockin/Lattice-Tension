@@ -43,6 +43,7 @@ import { RaymarchingBox } from 'three/examples/jsm/tsl/utils/Raymarching.js';
  */
 export function createJellyOrbMaterial(steps: number) {
   const tension = uniform(0.4);
+  const order = uniform(0); // Pattern → crystalline interior; Origin → soft web
   const speed = uniform(0.6);
   const pulse = uniform(0);
   const tint = uniform(new Color('#003366')); // deeper ocean glass
@@ -182,9 +183,9 @@ export function createJellyOrbMaterial(steps: number) {
         const vv = dot(p, bitan);
         // incommensurate, non-grid wave directions so the ripple reads as
         // organic water rather than a regular checkerboard up close.
-        const aA = uu.mul(7.0).add(vv.mul(3.0)).add(wt.mul(1.7));
-        const aB = uu.mul(-5.0).add(vv.mul(9.0)).sub(wt.mul(1.3));
-        const aC = uu.mul(13.0).add(vv.mul(10.0)).add(wt.mul(2.6));
+        const aA = uu.mul(7.31).add(vv.mul(2.69)).add(wt.mul(1.7));
+        const aB = uu.mul(-5.13).add(vv.mul(8.61)).sub(wt.mul(1.3));
+        const aC = uu.mul(12.73).add(vv.mul(9.41)).add(wt.mul(2.6));
         const dU = cos(aA)
           .mul(3.5)
           .add(cos(aB).mul(-1.6))
@@ -337,31 +338,35 @@ export function createJellyOrbMaterial(steps: number) {
         const latGlow = float(0).toVar();
         const causAccum = float(0).toVar();
         const lp = p.toVar();
-        // lower frequency + wider, softer bands so the suspended structure reads
-        // as smooth refracted veils of water, not an aliased hard wireframe.
-        const gscale = float(4.6).add(tension.mul(2.4));
+        // Soft wide veils by default; `order` (Pattern chapter) tightens them
+        // into a finer, crisper crystalline lattice — Origin's interior stays a
+        // diffuse glow, Pattern's reads as structured geometry.
+        const gscale = float(4.6).add(tension.mul(2.4)).add(order.mul(3.2));
+        const bandWidth = mix(float(0.55), float(0.2), order);
         const gphase = vec3(time.mul(0.06), time.mul(-0.04), time.mul(0.05))
           .add(slosh.mul(1.8));
         Loop(6, ({ i }) => {
           lp.addAssign(refrDir.mul(0.092)); // march along the refracted ray
           const g = gyroid(lp.mul(gscale).add(gphase) as ReturnType<typeof vec3>);
-          const band = smoothstep(0.55, 0.0, abs(g)); // soft, wide gyroid veil
+          const band = smoothstep(bandWidth, 0.0, abs(g));
           const falloff = float(1).sub(float(i).mul(0.14));
-          latGlow.addAssign(band.mul(0.2).mul(falloff));
-          // depth-stacked caustics: light shafts sampled at increasing depth so
-          // they parallax through the volume instead of sitting on the skin.
+          latGlow.addAssign(band.mul(float(0.2).add(order.mul(0.12))).mul(falloff));
+          // depth-stacked caustics: broad sweeping light bands at low,
+          // incommensurate frequencies. Two crossed high-frequency sines make a
+          // literal checkerboard — the golf-ball artifact — so keep these wide
+          // and let their PRODUCT only gate where both swells overlap.
           const cA = sin(
-            lp.x.mul(8.5).add(lp.y.mul(3.2)).add(time.mul(0.52)).add(slosh.x.mul(5.0)),
+            lp.x.mul(3.7).add(lp.y.mul(1.4)).add(time.mul(0.52)).add(slosh.x.mul(5.0)),
           )
             .mul(0.5)
             .add(0.5);
           const cB = sin(
-            lp.y.mul(7.0).sub(lp.z.mul(4.2)).sub(time.mul(0.36)).add(slosh.y.mul(4.0)),
+            lp.y.mul(2.9).sub(lp.z.mul(1.7)).sub(time.mul(0.36)).add(slosh.y.mul(4.0)),
           )
             .mul(0.5)
             .add(0.5);
           causAccum.addAssign(
-            smoothstep(0.5, 1.0, cA.mul(cB)).mul(0.12).mul(falloff),
+            smoothstep(0.45, 1.0, cA.mul(cB)).mul(0.12).mul(falloff),
           );
         });
         const caustic = min(causAccum, float(1.0))
@@ -381,8 +386,8 @@ export function createJellyOrbMaterial(steps: number) {
         const sparkMask = smoothstep(
           0.6,
           1.0,
-          sin(uu.mul(31.0).add(wt.mul(3.3)))
-            .mul(sin(vv.mul(27.0).sub(wt.mul(2.7))))
+          sin(uu.mul(31.7).add(wt.mul(3.3)))
+            .mul(sin(vv.mul(26.3).sub(wt.mul(2.7))))
             .mul(0.5)
             .add(0.5),
         );
@@ -440,6 +445,7 @@ export function createJellyOrbMaterial(steps: number) {
   return {
     material,
     tension,
+    order,
     speed,
     pulse,
     tint,

@@ -7,9 +7,13 @@ import {
   GYROID_HEADING,
   createGyroidLatticeMaterial,
 } from "./gyroidLatticeMaterial";
-import { useExperienceStore } from "../experience/store";
+import { descent, useExperienceStore } from "../experience/store";
 
 const STEPS: Record<string, number> = { high: 150, medium: 96, low: 52 };
+
+// frame-rate-independent damping decay rates (see JellyOrb.tsx)
+const K_STEER = 3.0776; // ≈ -60*ln(1-0.05)
+const K_DRAG = 4.3543; // ≈ -60*ln(1-0.07)
 
 const HEADING = new Vector3(...GYROID_HEADING).normalize();
 const WORLD_UP = new Vector3(0, 1, 0);
@@ -41,15 +45,14 @@ export function GyroidLattice({ standalone = false }: Props) {
   useFrame((state, delta) => {
     const dt = Math.min(delta, 1 / 30);
     const time = state.clock.elapsedTime;
-    const { pointer, drag, impulse, scrollProgress } =
-      useExperienceStore.getState();
-    const sample = sampleExperience(scrollProgress);
+    const { pointer, drag, impulse } = useExperienceStore.getState();
+    // smoothed descent → palette, structure, travel and crossfade glide as one
+    const d = standalone ? 1 : descent.value;
+    const sample = sampleExperience(d);
     const motion = reducedMotion ? 0.25 : 1;
     const p = pos.current;
 
-    // descent (scroll) drives the crossfade-in and the tension/morph ramp
-    const descent = standalone ? 1 : scrollProgress;
-    const reveal = standalone ? 1 : smoothstep(0.36, 0.56, descent);
+    const reveal = standalone ? 1 : smoothstep(0.36, 0.56, d);
     const tension = sample.simulation.tension;
 
     if (impulse && impulse.startedAt !== lastImpulse.current) {
@@ -61,7 +64,7 @@ export function GyroidLattice({ standalone = false }: Props) {
     // slow meditative drift down the screw axis + a gentle sway for life
     travel.current =
       1.2 +
-      descent * (5.5 + sample.visual.nestedScale * 3.2) +
+      d * (5.5 + sample.visual.nestedScale * 3.2) +
       sample.simulation.collapse * 2.2 + // Collapse pulls you in faster
       time * 0.12 * motion;
     p.copy(HEADING)
@@ -70,13 +73,18 @@ export function GyroidLattice({ standalone = false }: Props) {
       .addScaledVector(UP, Math.sin(time * 0.083) * 0.4 * motion);
     u.ro.value.copy(p);
 
-    // look down the axis + slow sway + pointer steer
-    px.current += (pointer.x - px.current) * 0.05;
-    py.current += (pointer.y - py.current) * 0.05;
-    dragX.current += (drag.x - dragX.current) * 0.07;
-    dragY.current += (drag.y - dragY.current) * 0.07;
-    const collapseJitter =
-      sample.simulation.collapse * Math.sin(time * 8.2) * 0.075 * motion;
+    // look down the axis + slow sway + pointer steer (frame-rate-independent)
+    const steerK = 1 - Math.exp(-K_STEER * dt);
+    const dragK = 1 - Math.exp(-K_DRAG * dt);
+    px.current += (pointer.x - px.current) * steerK;
+    py.current += (pointer.y - py.current) * steerK;
+    dragX.current += (drag.x - dragX.current) * dragK;
+    dragY.current += (drag.y - dragY.current) * dragK;
+    // Collapse lean: a slow controlled banking into the vortex (was an 8.2 Hz
+    // shake — that read as glitch). The torque comes from the in-shader twist;
+    // here we just sink and bank, no vibration.
+    const collapseLean =
+      sample.simulation.collapse * Math.sin(time * 0.7) * 0.06 * motion;
     const cameraYaw =
       (sample.camera.target[0] - sample.camera.position[0]) * 0.018;
     const cameraPitch =
@@ -89,7 +97,7 @@ export function GyroidLattice({ standalone = false }: Props) {
           px.current * 0.3 * sample.simulation.pointerForce * motion +
           dragX.current * 1.15 +
           cameraYaw +
-          collapseJitter,
+          collapseLean,
       )
       .addScaledVector(
         UP,
@@ -97,7 +105,7 @@ export function GyroidLattice({ standalone = false }: Props) {
           py.current * 0.26 * sample.simulation.pointerForce * motion -
           dragY.current * 1.05 +
           cameraPitch -
-          collapseJitter,
+          collapseLean,
       )
       .normalize();
     u.fwd.value.copy(fwd.current);

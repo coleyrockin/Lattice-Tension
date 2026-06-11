@@ -4,7 +4,14 @@ import { Color, Vector3, type Mesh } from "three";
 import { sampleExperience } from "../chapters/interpolate";
 import { PHILOSOPHICAL_FRAGMENTS } from "../chapters/definitions";
 import { createJellyOrbMaterial } from "./jellyOrbMaterial";
-import { useExperienceStore } from "../experience/store";
+import { descent, useExperienceStore } from "../experience/store";
+
+// frame-rate-independent damping decay rates: a per-frame lerp of `c` at 60fps
+// has decay k = -60*ln(1-c). Lerp factor each frame = 1 - exp(-k*dt), so the
+// feel matches the old constants at 60fps but stays stable when frames vary.
+// (Inlined as plain numbers — matches today's 0.05 / 0.08 per-frame eases.)
+const K_LEAN = 3.0776; // ≈ -60*ln(1-0.05)
+const K_DRAG = 5.0029; // ≈ -60*ln(1-0.08)
 
 const STEPS: Record<string, number> = { high: 120, medium: 80, low: 44 };
 
@@ -45,13 +52,15 @@ export function JellyOrb() {
   useFrame((state, delta) => {
     const dt = Math.min(delta, 1 / 30);
     const t = state.clock.elapsedTime;
-    const { pointer, drag, impulse, scrollProgress } =
-      useExperienceStore.getState();
-    const sample = sampleExperience(scrollProgress);
+    const { pointer, drag, impulse } = useExperienceStore.getState();
+    // read the smoothed descent so camera, palette, tension and structure all
+    // glide together (set once per frame by <DescentDriver/>)
+    const d = descent.value;
+    const sample = sampleExperience(d);
 
     // FALL INTO THE ORB: dolly the camera inward as descent rises, so the orb
     // grows to fill the frame and we pass through the glass into the lattice.
-    const enter = Math.min(1, Math.max(0, scrollProgress / 0.46));
+    const enter = Math.min(1, Math.max(0, d / 0.46));
     const eased = enter * enter * (3 - 2 * enter);
     state.camera.position.z =
       0.68 - eased * 0.39 - sample.visual.cameraProximity * 0.018;
@@ -109,12 +118,14 @@ export function JellyOrb() {
     slosh.current.clampLength(0, 0.42);
     u.slosh.value.copy(slosh.current);
 
-    // eased pointer lean
+    // eased pointer lean (frame-rate-independent)
     const lead = reducedMotion ? 0.12 : 1;
-    dragX.current += (drag.x - dragX.current) * 0.08;
-    dragY.current += (drag.y - dragY.current) * 0.08;
-    px.current += (pointer.x - px.current) * 0.05;
-    py.current += (pointer.y - py.current) * 0.05;
+    const dragK = 1 - Math.exp(-K_DRAG * dt);
+    const leanK = 1 - Math.exp(-K_LEAN * dt);
+    dragX.current += (drag.x - dragX.current) * dragK;
+    dragY.current += (drag.y - dragY.current) * dragK;
+    px.current += (pointer.x - px.current) * leanK;
+    py.current += (pointer.y - py.current) * leanK;
     u.pointer.value.set(
       (px.current + dragX.current * 2.1) * lead,
       (py.current - dragY.current * 2.1) * lead,
@@ -122,6 +133,9 @@ export function JellyOrb() {
 
     u.speed.value = reducedMotion ? 0.14 : 0.6;
     u.tension.value = sample.simulation.tension;
+    // order crisps the interior: Pattern (order→1) reads as a crystalline
+    // lattice; Origin (order→0) stays a soft serene web.
+    u.order.value = sample.simulation.order;
     // chapter palette drives the glass: deep body absorbs toward a darkened
     // primary, the rim catches the full primary, glints lift toward white.
     PRIMARY.set(sample.palette.primary);

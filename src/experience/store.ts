@@ -1,6 +1,14 @@
 import { create } from "zustand";
 import type { PerformanceProfile } from "../performance/profile";
 
+/**
+ * Smoothed descent — a single eased value the whole scene reads from so the
+ * camera dolly, lattice travel, crossfade, palette and structure all glide
+ * together instead of snapping per scroll tick. Updated once per frame by
+ * <DescentDriver/>; kept as a plain module ref to avoid per-frame re-renders.
+ */
+export const descent = { value: 0, target: 0 };
+
 export type PointerState = {
   x: number;
   y: number;
