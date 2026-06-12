@@ -2,7 +2,6 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Vector3 } from "three";
 import { sampleExperience } from "../chapters/interpolate";
-import { PHILOSOPHICAL_FRAGMENTS } from "../chapters/definitions";
 import {
   ECHO_HEADING,
   createEchoMaterial,
@@ -92,9 +91,9 @@ export function EchoLayer({ standalone = false }: Props) {
     // Final layer reveal gate: high progress (deep into echo chapter range)
     // + high resonance threshold. Uses raw descent for late-scroll depth.
     // When either gate is low, material discards (zero cost).
-    const echoRevealBase = smoothstep(1.62, 1.78, d);
-    const resGate = smoothstep(0.85, 1.55, effectiveRes);
-    const reveal = standalone ? 1 : echoRevealBase * resGate * 0.97;
+    const sig = sample.signature;
+    const resGate = smoothstep(0.55, 1.35, effectiveRes);
+    const reveal = standalone ? 1 : sig.echoLayer * resGate * (0.45 + sig.echo * 0.55);
 
     if (impulse && impulse.startedAt !== lastImpulse.current) {
       lastImpulse.current = impulse.startedAt;
@@ -161,15 +160,10 @@ export function EchoLayer({ standalone = false }: Props) {
     // Per-chapter signatures reused for seamless atlas continuity.
     // Echo inherits the late-aether language but the material's children
     // are the new structural signature: generative from user marks.
-    const aether = smoothstep(0.78, 0.92, sample.globalProgress);
-    u.twist.value = sample.simulation.collapse * 1.0;
-    u.swell.value = sample.simulation.emergence * (1 - aether);
-    u.veil.value = aether * 0.65 + 0.25;
-    u.freq.value =
-      3.0 +
-      sample.visual.contourDensity * 2.6 -
-      u.swell.value * 1.5 -
-      aether * 0.85;
+    u.twist.value = sig.twist * 0.25;
+    u.swell.value = sig.swell * 0.45;
+    u.veil.value = sig.veil * 0.75 + sig.echo * 0.2;
+    u.freq.value = 2.8 + sig.cellDensity * 1.8 + sig.echo * 0.6;
     u.tension.value = sample.simulation.tension;
     u.reveal.value = reveal;
     u.pulse.value = pulseAmp.current;
@@ -191,10 +185,6 @@ export function EchoLayer({ standalone = false }: Props) {
         const state = useExperienceStore.getState();
         const sample = sampleExperience(state.scrollProgress);
         state.fireImpulse(sample.chapterIndex);
-        state.setSelectedFragment({
-          nodeId: sample.chapterIndex,
-          text: PHILOSOPHICAL_FRAGMENTS[sample.chapterIndex],
-        });
       }}
     >
       <planeGeometry args={[2, 2]} />

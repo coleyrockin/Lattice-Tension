@@ -17,11 +17,7 @@ function closeAudioGraph(graph: AudioGraph) {
   cancelAnimationFrame(graph.raf);
 
   if (graph.context.state !== "closed") {
-    graph.gain.gain.setTargetAtTime(
-      0,
-      graph.context.currentTime,
-      0.05,
-    );
+    graph.gain.gain.setTargetAtTime(0, graph.context.currentTime, 0.05);
   }
 
   window.setTimeout(() => {
@@ -35,7 +31,6 @@ function closeAudioGraph(graph: AudioGraph) {
 export function useAetherAudio() {
   const graphRef = useRef<AudioGraph | null>(null);
   const audioEnabled = useExperienceStore((state) => state.audioEnabled);
-
   useEffect(() => {
     if (!audioEnabled) {
       const graph = graphRef.current;
@@ -48,12 +43,13 @@ export function useAetherAudio() {
     const context = new AudioContextCtor();
     const gain = context.createGain();
     const filter = context.createBiquadFilter();
-    const baseFrequencies = [55, 82.5, 110, 165];
+    const baseFrequencies = [55, 82.5, 110, 165, 220];
     const oscillators = baseFrequencies.map((frequency, index) => {
       const oscillator = context.createOscillator();
-      oscillator.type = index % 2 === 0 ? "sine" : "triangle";
+      oscillator.type =
+        index % 3 === 0 ? "sine" : index % 3 === 1 ? "triangle" : "sawtooth";
       oscillator.frequency.value = frequency;
-      oscillator.detune.value = index * 7 - 11;
+      oscillator.detune.value = index * 5 - 14;
       oscillator.connect(filter);
       oscillator.start();
       return oscillator;
@@ -65,7 +61,7 @@ export function useAetherAudio() {
     filter.connect(gain);
     gain.gain.value = 0;
     gain.connect(context.destination);
-    gain.gain.setTargetAtTime(0.035, context.currentTime, 0.25);
+    gain.gain.setTargetAtTime(0.04, context.currentTime, 0.25);
 
     const graph: AudioGraph = {
       context,
@@ -78,25 +74,111 @@ export function useAetherAudio() {
 
     const tick = () => {
       const progress = useExperienceStore.getState().scrollProgress;
+      const imprint = useExperienceStore.getState().resonance;
       const sampled = sampleExperience(progress);
+      const sig = sampled.signature;
       const tension = sampled.simulation.tension;
-      const order = sampled.simulation.order;
-      const interference = sampled.simulation.interference || 0;
-      const diffusion = sampled.simulation.diffusion || 0;
-      const resonance = sampled.simulation.resonance || 0;
+
+      // 1. Biquad filter frequency and Q sweeps
+      let targetFilterFreq = 280 +
+        tension * 820 +
+        sig.crystalline * 620 +
+        sig.fringe * 380 +
+        sig.nebula * 260 +
+        imprint * 120;
+
+      if (sig.singularity > 0.05) {
+        // lowpass drone: sweep filter frequency lower as singularity increases
+        targetFilterFreq = (targetFilterFreq - sig.singularity * 450) * (1.0 - 0.72 * Math.min(1.0, sig.singularity));
+        targetFilterFreq = Math.max(110, targetFilterFreq);
+      }
+
+      if (sig.quantum > 0.05) {
+        // open filter wide for high frequency noise
+        targetFilterFreq += sig.quantum * 1800;
+      }
+
       filter.frequency.setTargetAtTime(
-        420 + tension * 950 + order * 360 + interference * 280 + diffusion * 150,
+        targetFilterFreq,
         context.currentTime,
-        0.12,
+        0.1,
       );
+
+      // High resonance for Pattern (crystalline), medium for Singularity, low for others
+      const targetQ = 0.45 + sig.crystalline * 1.85 + sig.singularity * 0.95;
+      filter.Q.setTargetAtTime(
+        targetQ,
+        context.currentTime,
+        0.14,
+      );
+
+      // 2. Oscillators updates
       oscillators.forEach((oscillator, index) => {
-        const drift = Math.sin(context.currentTime * 0.16 + index) * 5;
-        oscillator.detune.setTargetAtTime(
-          drift + tension * (index + 1) * 5 + resonance * (index % 2 ? 4 : 2) + interference * 3,
+        // Dynamically change oscillator types based on active signatures
+        let oscType: OscillatorType;
+        if (sig.singularity > 0.3 || sig.twist > 0.3) {
+          // Brooding drone: sawtooth
+          oscType = "sawtooth";
+        } else if (sig.crystalline > 0.3) {
+          // Pattern: glittering crystal-clear sine & triangle
+          oscType = index % 2 === 0 ? "sine" : "triangle";
+        } else if (sig.quantum > 0.3) {
+          // Quantum: triangle or sine
+          oscType = "triangle";
+        } else {
+          // Default mix
+          oscType = index % 3 === 0 ? "sine" : index % 3 === 1 ? "triangle" : "sawtooth";
+        }
+
+        if (oscillator.type !== oscType) {
+          oscillator.type = oscType;
+        }
+
+        // Frequencies shifting based on signatures
+        let targetFreq = baseFrequencies[index]!;
+        if (sig.singularity > 0.05) {
+          // brood drone: pitch down
+          targetFreq = targetFreq * (1.0 - 0.36 * Math.min(1.0, sig.singularity));
+        } else if (sig.crystalline > 0.05) {
+          // crystal harmony: perfect octaves/fifth shifts
+          targetFreq = targetFreq * (1.0 + 0.5 * sig.crystalline);
+        } else if (sig.quantum > 0.05) {
+          // quantum drift: high-frequency
+          targetFreq = targetFreq * (2.2 + 3.8 * sig.quantum);
+        }
+        targetFreq += sig.fringe * index * 8;
+
+        oscillator.frequency.setTargetAtTime(
+          targetFreq,
           context.currentTime,
-          0.18,
+          0.2,
+        );
+
+        // Detunes shifting
+        const drift = Math.sin(context.currentTime * (0.12 + index * 0.03)) * 6;
+        let extraDetune = 0;
+        if (sig.singularity > 0.05) {
+          // thick detuned drone
+          extraDetune = (index + 1) * 25 * sig.singularity;
+        }
+        if (sig.quantum > 0.05) {
+          // high frequency drifting noise detunes
+          extraDetune = Math.sin(context.currentTime * (3.8 + index * 1.2)) * 120 * sig.quantum;
+        }
+
+        oscillator.detune.setTargetAtTime(
+          drift +
+            tension * (index + 1) * 4 +
+            sig.twist * (index + 2) * 3 +
+            sig.quantum * index * 2.5 +
+            sig.echo * 5 +
+            imprint * (index % 2 ? 6 : 3) +
+            extraDetune,
+          context.currentTime,
+          0.16,
         );
       });
+
       graph.raf = requestAnimationFrame(tick);
     };
 

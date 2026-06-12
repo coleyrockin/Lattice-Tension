@@ -36,6 +36,9 @@ type ExperienceStore = {
   reducedMotion: boolean;
   profile: PerformanceProfile | null;
   resonance: number;
+  autoplay: boolean;
+  telemetryOpen: boolean;
+  manualTension: number | null;
   setReady: (ready: boolean) => void;
   setScrollProgress: (progress: number) => void;
   setPointer: (pointer: PointerState) => void;
@@ -46,6 +49,9 @@ type ExperienceStore = {
   setReducedMotion: (enabled: boolean) => void;
   setProfile: (profile: PerformanceProfile) => void;
   addResonance: (delta: number) => void;
+  setAutoplay: (autoplay: boolean) => void;
+  setTelemetryOpen: (open: boolean) => void;
+  setManualTension: (val: number | null) => void;
 };
 
 export const useExperienceStore = create<ExperienceStore>((set) => ({
@@ -59,6 +65,9 @@ export const useExperienceStore = create<ExperienceStore>((set) => ({
   reducedMotion: false,
   profile: null,
   resonance: 0,
+  autoplay: false,
+  telemetryOpen: false,
+  manualTension: null,
   setReady: (ready) => set({ ready }),
   setScrollProgress: (scrollProgress) => set({ scrollProgress }),
   setPointer: (pointer) => set({ pointer }),
@@ -71,4 +80,7 @@ export const useExperienceStore = create<ExperienceStore>((set) => ({
   setProfile: (profile) => set({ profile }),
   addResonance: (delta) =>
     set((state) => ({ resonance: Math.max(0, Math.min(2.2, state.resonance + delta)) })),
+  setAutoplay: (autoplay) => set({ autoplay }),
+  setTelemetryOpen: (telemetryOpen) => set({ telemetryOpen }),
+  setManualTension: (manualTension) => set({ manualTension }),
 }));

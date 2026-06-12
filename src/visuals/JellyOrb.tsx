@@ -2,7 +2,6 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Color, Vector3, type Mesh } from "three";
 import { sampleExperience } from "../chapters/interpolate";
-import { PHILOSOPHICAL_FRAGMENTS } from "../chapters/definitions";
 import { createJellyOrbMaterial } from "./jellyOrbMaterial";
 import { descent, useExperienceStore } from "../experience/store";
 
@@ -67,12 +66,16 @@ export function JellyOrb() {
     const resDecay = 1 - Math.exp(-2.6 * dt);
     if (userResonance > 0) addResonance(-userResonance * resDecay * 0.65);
 
-    // FALL INTO THE ORB: dolly the camera inward as descent rises, so the orb
-    // grows to fill the frame and we pass through the glass into the lattice.
-    const enter = Math.min(1, Math.max(0, d / 0.46));
+    const sig = sample.signature;
+    const enter = sig.orbPresence;
     const eased = enter * enter * (3 - 2 * enter);
-    state.camera.position.z =
-      0.68 - eased * 0.39 - sample.visual.cameraProximity * 0.018;
+    const targetZ =
+      0.72 -
+      eased * (0.22 + sig.latticeReveal * 0.48) -
+      sample.visual.cameraProximity * 0.022 +
+      sample.simulation.birth * 0.04;
+    const blend = 1 - Math.exp(-5 * dt);
+    state.camera.position.z += (targetZ - state.camera.position.z) * blend;
 
     const jig = reducedMotion ? 0.25 : 1;
 
@@ -150,9 +153,11 @@ export function JellyOrb() {
 
     u.speed.value = reducedMotion ? 0.14 : 0.6;
     u.tension.value = sample.simulation.tension;
-    // order crisps the interior: Pattern (order→1) reads as a crystalline
-    // lattice; Origin (order→0) stays a soft serene web.
-    u.order.value = sample.simulation.order + (sample.simulation.scale - 1) * 0.2; // Quantum/Nebula/Echo scale effect on interior (new realms)
+    u.order.value =
+      sig.interiorCrystalline * 0.85 + sample.simulation.order * 0.25;
+    u.presence.value = sig.orbPresence;
+    u.collapseDistort.value = sig.orbDistortion;
+    u.fringeRipple.value = sig.fringe;
     // chapter palette drives the glass: deep body absorbs toward a darkened
     // primary, the rim catches the full primary, glints lift toward white.
     PRIMARY.set(sample.palette.primary);
@@ -165,8 +170,10 @@ export function JellyOrb() {
     u.lattice.value =
       0.42 + sample.visual.stressIntensity * 0.4 + sample.simulation.order * 0.12;
 
-    const scale = 0.82 + sample.visual.membraneScale * 0.1;
+    const scale =
+      (0.55 + sample.visual.membraneScale * 0.1) * (0.35 + sig.orbPresence * 0.65);
     mesh.current.scale.setScalar(scale);
+    mesh.current.visible = sig.orbPresence > 0.04;
     mesh.current.position.x = 0.095;
     mesh.current.position.y = 0.015;
 
@@ -185,14 +192,11 @@ export function JellyOrb() {
   return (
     <mesh
       ref={mesh}
+      renderOrder={15}
       onClick={() => {
         const state = useExperienceStore.getState();
         const sample = sampleExperience(state.scrollProgress);
         state.fireImpulse(sample.chapterIndex);
-        state.setSelectedFragment({
-          nodeId: sample.chapterIndex,
-          text: PHILOSOPHICAL_FRAGMENTS[sample.chapterIndex],
-        });
       }}
     >
       <boxGeometry args={[1, 1, 1]} />

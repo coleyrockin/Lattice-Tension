@@ -23,6 +23,31 @@ export type ChapterPalette = {
   accent: string;
 };
 
+export type ChapterSignature = {
+  /** Lattice layer opacity — 0 is orb-only void, 1 is full tunnel */
+  latticeReveal: number;
+  /** Jelly orb scale/presence */
+  orbPresence: number;
+  twist: number;
+  swell: number;
+  veil: number;
+  crystalline: number;
+  fringe: number;
+  singularity: number;
+  quantum: number;
+  nebula: number;
+  echo: number;
+  interferenceLayer: number;
+  echoLayer: number;
+  shellThickness: number;
+  cellDensity: number;
+  absorption: number;
+  focalGlow: number;
+  chromatic: number;
+  orbDistortion: number;
+  interiorCrystalline: number;
+};
+
 export type VisualLayerProfile = {
   membraneOpacity: number;
   membraneScale: number;
@@ -49,6 +74,7 @@ export type ChapterDefinition = {
   };
   palette: ChapterPalette;
   simulation: SimulationState;
+  signature: ChapterSignature;
   visual: VisualLayerProfile;
   post: {
     bloom: number;
@@ -65,6 +91,7 @@ export type SampledExperience = {
   camera: ChapterDefinition["camera"];
   palette: ChapterPalette;
   simulation: SimulationState;
+  signature: ChapterSignature;
   visual: VisualLayerProfile;
   post: ChapterDefinition["post"];
 };

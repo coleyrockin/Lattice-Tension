@@ -50,8 +50,11 @@ export function createJellyOrbMaterial(steps: number) {
   const accent = uniform(new Color('#88e0ff')); // brighter rim and caustics
   const highlight = uniform(new Color('#e0faff')); // enhanced wet glints
   const lattice = uniform(1.8); // brighter internal lattice
-  const resonance = uniform(0); // accumulated user imprints — memory in the internal web + caustics
-  const pointer = uniform(new Vector2()); // set .value.set(x, y) per frame
+  const resonance = uniform(0);
+  const presence = uniform(1);
+  const collapseDistort = uniform(0);
+  const fringeRipple = uniform(0);
+  const pointer = uniform(new Vector2());
   const jiggle = uniform(new Vector3(0, 1, 0)); // wobble axis (spring-driven)
   const squash = uniform(0); // spring displacement: + stretches along jiggle
   const slosh = uniform(new Vector3()); // delayed liquid mass moving inside shell
@@ -103,7 +106,14 @@ export function createJellyOrbMaterial(steps: number) {
       sin(jellyPt.x.mul(5.8).add(t.mul(0.8))).mul(amp.mul(0.26)),
       sin(jellyPt.y.mul(6.6).sub(t.mul(0.9))).mul(amp.mul(0.26)),
     );
-    const q = jellyPt.add(warpA).add(warpB);
+    const collapseWarp = vec3(
+      sin(jellyPt.x.mul(8.2).add(time.mul(2.4))).mul(collapseDistort.mul(0.075)),
+      sin(jellyPt.y.mul(7.6).sub(time.mul(2.1))).mul(collapseDistort.mul(0.065)),
+      sin(jellyPt.z.mul(9.1).add(time.mul(1.8))).mul(collapseDistort.mul(0.07)),
+    );
+    const fringeWarp = sin(jellyPt.x.mul(14).add(jellyPt.z.mul(11)).add(time.mul(0.9)))
+      .mul(fringeRipple.mul(0.04));
+    const q = jellyPt.add(warpA).add(warpB).add(collapseWarp).add(vec3(fringeWarp, fringeWarp.mul(0.6), fringeWarp.mul(-0.4)));
 
     // glacial silhouette morph between a tighter ring-knot and a rounder blob.
     // Tori radii pulled in so they sit just under the core sphere → the
@@ -153,7 +163,7 @@ export function createJellyOrbMaterial(steps: number) {
     // The camera looks down -Z. Using +Z here clamps N.V to zero across most
     // of the front face, turning the whole object into a blown-out fresnel rim.
     const rd = vec3(0, 0, -1).toVar();
-    const finalColor = vec4(0, 0, 0, 1).toVar(); // pure black void
+    const finalColor = vec4(0, 0, 0, 0).toVar(); // transparent void
 
     RaymarchingBox(stepCount, ({ positionRay }) => {
       const p = positionRay.mul(2.6);
@@ -431,22 +441,25 @@ export function createJellyOrbMaterial(steps: number) {
           .mul(1.55)
           .toVar();
 
-        // soften silhouette into true black void (0.24→0.22: absorption already
-        // darkens centres, so we avoid double-darkening)
-        const fog = smoothstep(float(0.2), float(1.1), length(p));
-        finalColor.assign(vec4(mix(rolled, vec3(0), fog.mul(0.22)), 1));
+        // soften silhouette into true black void — reduced from 0.22 to 0.12 so the orb's
+        // edge stays glassy-translucent against the lattice rather than crushing to black.
+        const fog = smoothstep(float(0.18), float(1.2), length(p));
+        const visible = mix(rolled, vec3(0), fog.mul(0.12)).mul(presence);
+        const finalAlpha = mix(float(0.18).add(tension.mul(0.12)), float(0.92), fres).mul(presence).toVar();
+        finalColor.assign(vec4(visible, finalAlpha));
         Break();
       });
     });
 
+    finalColor.a.lessThan(0.01).discard();
     return finalColor;
   });
 
   const material = new NodeMaterial();
   material.colorNode = raymarch();
-  material.transparent = false;
+  material.transparent = true;
   material.side = DoubleSide;
-  material.depthWrite = true;
+  material.depthWrite = false;
 
   return {
     material,
@@ -459,6 +472,9 @@ export function createJellyOrbMaterial(steps: number) {
     highlight,
     lattice,
     resonance,
+    presence,
+    collapseDistort,
+    fringeRipple,
     pointer,
     jiggle,
     squash,

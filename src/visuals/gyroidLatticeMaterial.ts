@@ -63,7 +63,14 @@ export function createGyroidLatticeMaterial(steps: number) {
   const interference = uniform(0); // Interference realm — crossed wave modulation
   const singularity = uniform(0); // Singularity — radial distortion / pull
   const diffusion = uniform(0); // Nebula — volumetric scatter / glow
-  const curvature = uniform(0); // Quantum / curvature effects
+  const curvature = uniform(0);
+  const fringeAmp = uniform(0);
+  const quantumFold = uniform(0);
+  const nebulaFog = uniform(0);
+  const crystalline = uniform(0);
+  const absorptionScale = uniform(1);
+  const shellScale = uniform(1);
+  const focalGlow = uniform(0.3);
   // per-chapter structural signatures (not just recolors):
   const twist = uniform(0); // Collapse — helical shear of cells around the axis
   const swell = uniform(0); // Emergence — cell size breathes along the path
@@ -92,15 +99,16 @@ export function createGyroidLatticeMaterial(steps: number) {
     // peak tension OR high order both reshape the lattice toward Schwarz-P,
     // so ordered chapters read structurally different, not just recoloured.
     const morph = max(
-      smoothstep(0.82, 0.97, tension),
-      smoothstep(0.55, 0.95, order).mul(0.85),
+      max(
+        smoothstep(0.82, 0.97, tension),
+        smoothstep(0.55, 0.95, order).mul(0.85),
+      ),
+      smoothstep(0.18, 0.92, crystalline),
     ).toVar();
-    // Normalize the implicit field by its analytic gradient so shell width
-    // remains stable as the gyroid morphs toward Schwarz-P. Order THINS the
-    // walls (crisp crystal, Pattern); veil thins them further (Aether).
     const thickness = mix(float(0.026), float(0.048), tension)
       .mul(float(1).sub(order.mul(0.28)))
       .mul(float(1).sub(veil.mul(0.45)))
+      .mul(shellScale)
       .toVar();
 
     // fixed orthonormal frame around the descent axis, for the Collapse twist
@@ -153,20 +161,29 @@ export function createGyroidLatticeMaterial(steps: number) {
         )
         .max(0.0)
         .clamp(0.0, 1.0);
-      const theta = axial.mul(twist.mul(0.42));
       const radial = p.sub(axisH.mul(axial));
-      const x1 = dot(radial, axisR);
-      const x2 = dot(radial, axisU);
+      const radialLen = length(radial);
+      const singPull = singularity.mul(exp(radialLen.mul(-0.38)).mul(0.62));
+      const pulled = axisH.mul(axial).add(radial.mul(float(1).sub(singPull))).toVar();
+
+      const theta = axial.mul(twist.mul(0.42));
+      const x1 = dot(pulled.sub(axisH.mul(axial)), axisR);
+      const x2 = dot(pulled.sub(axisH.mul(axial)), axisU);
       const ct = cos(theta);
       const st = sin(theta);
       const pT = axisH
         .mul(axial)
         .add(axisR.mul(x1.mul(ct).sub(x2.mul(st))))
         .add(axisU.mul(x1.mul(st).add(x2.mul(ct))))
+        .add(
+          vec3(
+            sin(pulled.x.mul(19).add(time.mul(0.12))).mul(quantumFold.mul(0.095)),
+            sin(pulled.y.mul(23).sub(time.mul(0.09))).mul(quantumFold.mul(0.095)),
+            sin(pulled.z.mul(21).add(time.mul(0.07))).mul(quantumFold.mul(0.095)),
+          ),
+        )
         .toVar();
 
-      // EMERGENCE swell: cell size breathes in slow waves along the path —
-      // chambers widen and contract like a living cathedral.
       const localFreq = FREQ.mul(
         float(1).sub(swell.mul(0.26).mul(sin(axial.mul(0.55)))),
       ).toVar();
@@ -174,8 +191,13 @@ export function createGyroidLatticeMaterial(steps: number) {
       const fgg = fieldFG(pT.mul(localFreq), morph);
       const gradientLength = max(length(fgg.g), 0.35);
       const distanceToSurface = abs(fgg.f).div(gradientLength).div(localFreq);
-      // scars slightly warp the perceived surface (thicker/echo walls where touched)
-      const scarredDist = distanceToSurface.sub(scar.mul(0.6));
+      const waveA = sin(p.x.mul(localFreq.mul(1.82)).add(time.mul(0.068)));
+      const waveB = sin(p.z.mul(localFreq.mul(2.11)).add(time.mul(-0.055)));
+      const crossed = waveA.mul(waveB);
+      const fringe = crossed
+        .mul(fringeAmp)
+        .mul(interference.mul(0.85).add(0.18));
+      const scarredDist = distanceToSurface.sub(scar.mul(0.6)).add(fringe.mul(0.78));
       const surface = float(1)
         .sub(smoothstep(float(0), thickness, scarredDist))
         .max(0.0)
@@ -184,6 +206,11 @@ export function createGyroidLatticeMaterial(steps: number) {
       // Prevent the first few samples from becoming a luminous windshield.
       const nearFade = smoothstep(0.08, 0.42, t);
       const dens = surface.mul(nearFade).toVar();
+      const fogDens = nebulaFog
+        .mul(exp(distanceToSurface.mul(-4.8)))
+        .mul(float(1).sub(dens))
+        .mul(0.24);
+      glow.addAssign(mix(tint, accent, 0.42).mul(fogDens).mul(trans).mul(STEP));
 
       If(dens.greaterThan(0.001), () => {
         const g = fgg.g.mul(sign(fgg.f));
@@ -228,22 +255,30 @@ export function createGyroidLatticeMaterial(steps: number) {
         const stressLine = smoothstep(0.94, 1.0, stressPhase)
           .mul(surfaceCore)
           .mul(stress);
+        const fringeGlow = mix(tint, highlight, 0.55)
+          .mul(abs(crossed).mul(0.62))
+          .mul(fringeAmp)
+          .mul(dens);
         const surfaceLight = em
-          .mul(dens.mul(float(4.8).add(stress.mul(2.4)).add(veil.mul(2.6))))
-          .add(mix(tint, highlight, 0.62).mul(surfaceCore.mul(0.95)))
+          .mul(dens.mul(float(5.8).add(stress.mul(2.4)).add(veil.mul(3.0))))
+          .add(mix(tint, highlight, 0.62).mul(surfaceCore.mul(1.05)))
           .add(highlight.mul(stressLine.mul(1.4)))
           .add(echo.mul(0.85))
+          .add(fringeGlow)
           .max(vec3(0))
           .clamp(vec3(0), vec3(10)); // prevent NaN
         const resonanceBoost = resonance.mul(0.6).mul(dens);
         glow.addAssign(surfaceLight.mul(trans).mul(STEP).add(resonanceBoost.mul(STEP)));
         // AETHER veil: absorption falls away so the ray survives through many
         // thin shells — layer behind layer receding into transparent depth.
+        // The absorption mix is gentler on the low end (was -16) so even dense
+        // chapters still let a few shells breathe through.
         trans.mulAssign(
           exp(
             dens
               .mul(STEP)
-              .mul(mix(float(-16).sub(collapse.mul(8)), float(-6.0), veil)),
+              .mul(mix(float(-12).sub(collapse.mul(6)), float(-5.0), veil))
+              .mul(absorptionScale),
           ),
         );
       });
@@ -257,9 +292,9 @@ export function createGyroidLatticeMaterial(steps: number) {
     glow.assign( glow.max( vec3(0) ).clamp( vec3(0), vec3(10) ) );
     const focalPosition = uv.sub(vec2(0.42, -0.06));
     const focalCore = exp(length(focalPosition).pow(2).mul(-28))
-      .mul(emergence.mul(0.28).add(order.mul(0.04)));
+      .mul(emergence.mul(0.28).add(order.mul(0.04)).add(focalGlow.mul(0.55)));
     const focalSpark = exp(length(focalPosition).pow(2).mul(-180))
-      .mul(emergence.mul(0.2));
+      .mul(emergence.mul(0.2).add(focalGlow.mul(0.35)));
     // resonance makes the deep focal "remember" — brighter memory core when engaged
     const memCore = exp(length(focalPosition).pow(2).mul(-52))
       .mul(resonance.mul(0.55));
@@ -306,6 +341,13 @@ export function createGyroidLatticeMaterial(steps: number) {
     singularity,
     diffusion,
     curvature,
+    fringeAmp,
+    quantumFold,
+    nebulaFog,
+    crystalline,
+    absorptionScale,
+    shellScale,
+    focalGlow,
     twist,
     swell,
     veil,

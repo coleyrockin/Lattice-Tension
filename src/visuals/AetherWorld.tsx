@@ -1,6 +1,6 @@
-import { useEffect } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
-import { Color } from "three";
+import { useFrame } from "@react-three/fiber";
+import { BackgroundDriver } from "../experience/BackgroundDriver";
+import { CameraRig } from "../experience/CameraRig";
 import { JellyOrb } from "./JellyOrb";
 import { GyroidLattice } from "./GyroidLattice";
 import { EchoLayer } from "./EchoLayer";
@@ -25,20 +25,11 @@ function DescentDriver() {
 }
 
 export function AetherWorld() {
-  const scene = useThree((state) => state.scene);
-
-  useEffect(() => {
-    scene.background = new Color("#020207");
-    scene.fog = null;
-  }, [scene]);
-
-  // The journey: the orb floats on black, the camera falls into it, and the
-  // gyroid lattice crossfades in (renderOrder 10). EchoLayer is the meta final
-  // evolution (renderOrder 12) — appears only at high progress + high resonance
-  // threshold. Generative offspring are driven exclusively by user imprint.
   return (
     <>
       <DescentDriver />
+      <BackgroundDriver />
+      <CameraRig />
       <JellyOrb />
       <GyroidLattice />
       <InterferenceLayer />

@@ -183,7 +183,8 @@ export function createEchoMaterial(steps: number) {
       const dens = surface.mul(nearFade).toVar();
 
       If(dens.greaterThan(0.001), () => {
-        const n = normalize(fgg.g.mul(sign(fgg.f))).toVar();
+        const g = fgg.g.mul(sign(fgg.f));
+        const n = g.div( length(g).max(0.001) ).toVar();
         const ndl = max(dot(n, key), 0).mul(0.58).add(0.44);
         const ndv = max(dot(n, rd.negate()), 0).toVar();
 
@@ -289,7 +290,8 @@ export function createEchoMaterial(steps: number) {
             .mul(childSeed.mul(5.2));
 
           If(childSurf.greaterThan(0.0015), () => {
-            const cN = normalize(cgg.g.mul(sign(cgg.f))).toVar();
+            const cg = cgg.g.mul(sign(cgg.f));
+            const cN = cg.div(length(cg).max(0.001));
             const cNdl = max(dot(cN, key), 0).mul(0.36).add(0.28);
             // child color leans cooler/self-referential toward the viewer's accent
             const childCol = mix(tint, accent, 0.58 + k * 0.12);

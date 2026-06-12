@@ -2,7 +2,6 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Vector3 } from "three";
 import { sampleExperience } from "../chapters/interpolate";
-import { PHILOSOPHICAL_FRAGMENTS } from "../chapters/definitions";
 import {
   GYROID_HEADING,
   createGyroidLatticeMaterial,
@@ -19,11 +18,6 @@ const HEADING = new Vector3(...GYROID_HEADING).normalize();
 const WORLD_UP = new Vector3(0, 1, 0);
 const RIGHT = new Vector3().crossVectors(HEADING, WORLD_UP).normalize();
 const UP = new Vector3().crossVectors(RIGHT, HEADING).normalize();
-
-function smoothstep(a: number, b: number, x: number) {
-  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-  return t * t * (3 - 2 * t);
-}
 
 type Props = { standalone?: boolean };
 
@@ -51,6 +45,7 @@ export function GyroidLattice({ standalone = false }: Props) {
     // smoothed descent → palette, structure, travel and crossfade glide as one
     const d = standalone ? 1 : descent.value;
     const sample = sampleExperience(d);
+    const sig = sample.signature;
     const motion = reducedMotion ? 0.25 : 1;
     const p = pos.current;
 
@@ -60,14 +55,21 @@ export function GyroidLattice({ standalone = false }: Props) {
     const baseRes = sample.simulation.resonance;
     const effectiveRes = Math.min(2.2, baseRes + userResonance);
     u.resonance.value = effectiveRes;
-    u.interference.value = sample.simulation.interference || 0;
-    u.singularity.value = sample.simulation.singularity || 0;
-    u.diffusion.value = sample.simulation.diffusion || 0;
-    u.curvature.value = sample.simulation.curvature || 0;
+    u.interference.value = sig.fringe;
+    u.singularity.value = sig.singularity;
+    u.diffusion.value = sig.nebula * 0.85;
+    u.curvature.value = sig.quantum * 0.75;
+    u.fringeAmp.value = 0.35 + sig.fringe * 1.25;
+    u.quantumFold.value = sig.quantum;
+    u.nebulaFog.value = sig.nebula;
+    u.crystalline.value = sig.crystalline;
+    u.absorptionScale.value = sig.absorption;
+    u.shellScale.value = 0.55 + sig.shellThickness * 0.45;
+    u.focalGlow.value = sig.focalGlow;
     // slow global decay on the user accumulator (shared across orb + lattice)
     if (userResonance > 0) addResonance(-userResonance * resDecay * 0.65);
 
-    const reveal = standalone ? 1 : smoothstep(0.36, 0.56, d);
+    const reveal = standalone ? 1 : sig.latticeReveal;
     const tension = sample.simulation.tension;
 
     if (impulse && impulse.startedAt !== lastImpulse.current) {
@@ -139,18 +141,16 @@ export function GyroidLattice({ standalone = false }: Props) {
     //   Collapse  → helical torque shearing the cells around the axis
     //   Emergence → wide chambers whose cell size breathes along the path
     //   Aether    → thin translucent veils, low absorption, layered depth
-    const aether = smoothstep(0.78, 0.92, sample.globalProgress);
-    u.twist.value = sample.simulation.collapse * 1.0 + sample.simulation.singularity * 0.6; // Singularity: extra torque
-    u.swell.value = sample.simulation.emergence * (1 - aether) + sample.simulation.diffusion * 0.4; // Nebula diffusion
-    u.veil.value = aether;
-    // chapter contour density reframes the lattice; Emergence opens into
-    // sparse cathedral chambers, Aether thins slightly for the veils.
+    u.twist.value = sig.twist;
+    u.swell.value = sig.swell;
+    u.veil.value = sig.veil;
     u.freq.value =
-      3.3 +
-      sample.visual.contourDensity * 2.8 -
-      u.swell.value * 1.7 -
-      aether * 0.9 +
-      sample.simulation.interference * 1.2; // Interference realm: wave density boost
+      2.4 +
+      sig.cellDensity * 2.2 +
+      sample.visual.contourDensity * 1.1 -
+      sig.swell * 1.4 -
+      sig.nebula * 0.9 +
+      sig.fringe * 1.35;
     u.tension.value = tension;
     u.reveal.value = reveal;
     u.pulse.value = pulseAmp.current;
@@ -172,10 +172,6 @@ export function GyroidLattice({ standalone = false }: Props) {
         const state = useExperienceStore.getState();
         const sample = sampleExperience(state.scrollProgress);
         state.fireImpulse(sample.chapterIndex);
-        state.setSelectedFragment({
-          nodeId: sample.chapterIndex,
-          text: PHILOSOPHICAL_FRAGMENTS[sample.chapterIndex],
-        });
       }}
     >
       <planeGeometry args={[2, 2]} />

@@ -188,7 +188,8 @@ export function createInterferenceMaterial(steps: number) {
       const dens = surface.mul(nearFade).toVar();
 
       If(dens.greaterThan(0.001), () => {
-        const n = normalize(fgg.g.mul(sign(fgg.f))).toVar();
+        const g = fgg.g.mul(sign(fgg.f));
+        const n = g.div(length(g).max(0.001)).toVar();
         const ndl = max(dot(n, key), 0).mul(0.58).add(0.44);
         const ndv = max(dot(n, rd.negate()), 0).toVar();
 

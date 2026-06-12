@@ -2,7 +2,6 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Vector3 } from "three";
 import { sampleExperience } from "../chapters/interpolate";
-import { PHILOSOPHICAL_FRAGMENTS } from "../chapters/definitions";
 import {
   INTERFERENCE_HEADING,
   createInterferenceMaterial,
@@ -19,11 +18,6 @@ const HEADING = new Vector3(...INTERFERENCE_HEADING).normalize();
 const WORLD_UP = new Vector3(0, 1, 0);
 const RIGHT = new Vector3().crossVectors(HEADING, WORLD_UP).normalize();
 const UP = new Vector3().crossVectors(RIGHT, HEADING).normalize();
-
-function smoothstep(a: number, b: number, x: number) {
-  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-  return t * t * (3 - 2 * t);
-}
 
 type Props = { standalone?: boolean };
 
@@ -81,16 +75,11 @@ export function InterferenceLayer({ standalone = false }: Props) {
     if (userResonance > 0) addResonance(-userResonance * resDecay * 0.65);
 
     // drive Interference-specific uniforms from sample + resonance
-    const interf = sample.simulation.interference;
+    const sig = sample.signature;
+    const interf = sig.fringe;
     u.interference.value = interf;
-    u.fringeAmp.value = 0.48 + interf * 1.15 + effectiveRes * 0.32;
-
-    // Realm gate: Interference chapter range [1.0, 1.166]. Use raw d so we
-    // can enter the layer precisely when scroll reaches the new realm.
-    // Factor sim.interference + a soft floor so the layer is always present
-    // (low opacity) early rather than popping — follows "always layered" option.
-    const interfGate = smoothstep(0.94, 1.08, d) * (1.0 - smoothstep(1.13, 1.21, d));
-    const reveal = standalone ? 1 : interfGate * (0.22 + 0.78 * interf);
+    u.fringeAmp.value = 0.55 + interf * 1.35 + effectiveRes * 0.28;
+    const reveal = standalone ? 1 : sig.interferenceLayer * sig.latticeReveal;
 
     if (impulse && impulse.startedAt !== lastImpulse.current) {
       lastImpulse.current = impulse.startedAt;
@@ -157,16 +146,10 @@ export function InterferenceLayer({ standalone = false }: Props) {
     // Per-chapter structural signatures — each layer reuses the language
     // so Interference reads as part of the continuous atlas, not a bolt-on.
     // Interference realm boosts wave density via the material's crossed terms.
-    const aether = smoothstep(0.78, 0.92, sample.globalProgress);
-    u.twist.value = sample.simulation.collapse * 0.95 + sample.simulation.singularity * 0.5;
-    u.swell.value = sample.simulation.emergence * (1 - aether) + sample.simulation.diffusion * 0.35;
-    u.veil.value = aether * 0.7;
-    u.freq.value =
-      4.1 +
-      sample.visual.contourDensity * 2.4 -
-      u.swell.value * 1.5 -
-      aether * 0.7 +
-      interf * 2.4; // Interference realm: wave density boost for fringes
+    u.twist.value = sig.twist * 0.4;
+    u.swell.value = sig.swell * 0.35;
+    u.veil.value = sig.veil * 0.5;
+    u.freq.value = 3.8 + sig.cellDensity * 2.6 + interf * 2.8;
     u.tension.value = sample.simulation.tension;
     u.reveal.value = reveal;
     u.pulse.value = pulseAmp.current;
@@ -188,10 +171,6 @@ export function InterferenceLayer({ standalone = false }: Props) {
         const state = useExperienceStore.getState();
         const sample = sampleExperience(state.scrollProgress);
         state.fireImpulse(sample.chapterIndex);
-        state.setSelectedFragment({
-          nodeId: sample.chapterIndex,
-          text: PHILOSOPHICAL_FRAGMENTS[sample.chapterIndex],
-        });
       }}
     >
       <planeGeometry args={[2, 2]} />
