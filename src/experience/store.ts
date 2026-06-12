@@ -35,6 +35,7 @@ type ExperienceStore = {
   audioEnabled: boolean;
   reducedMotion: boolean;
   profile: PerformanceProfile | null;
+  resonance: number;
   setReady: (ready: boolean) => void;
   setScrollProgress: (progress: number) => void;
   setPointer: (pointer: PointerState) => void;
@@ -44,6 +45,7 @@ type ExperienceStore = {
   setAudioEnabled: (enabled: boolean) => void;
   setReducedMotion: (enabled: boolean) => void;
   setProfile: (profile: PerformanceProfile) => void;
+  addResonance: (delta: number) => void;
 };
 
 export const useExperienceStore = create<ExperienceStore>((set) => ({
@@ -56,6 +58,7 @@ export const useExperienceStore = create<ExperienceStore>((set) => ({
   audioEnabled: false,
   reducedMotion: false,
   profile: null,
+  resonance: 0,
   setReady: (ready) => set({ ready }),
   setScrollProgress: (scrollProgress) => set({ scrollProgress }),
   setPointer: (pointer) => set({ pointer }),
@@ -66,4 +69,6 @@ export const useExperienceStore = create<ExperienceStore>((set) => ({
   setAudioEnabled: (audioEnabled) => set({ audioEnabled }),
   setReducedMotion: (reducedMotion) => set({ reducedMotion }),
   setProfile: (profile) => set({ profile }),
+  addResonance: (delta) =>
+    set((state) => ({ resonance: Math.max(0, Math.min(2.2, state.resonance + delta)) })),
 }));

@@ -9,7 +9,7 @@
 
 ## Overview
 
-_Tension Lattice_ is a **real‑time WebGPU art piece** that visualizes the hidden geometry of the universe. You start on a floating molten glass orb, then descend into an infinite, glowing **gyroid lattice**—a mathematically defined, triply‑periodic minimal surface rendered with luminous translucent shells.
+_Tension Lattice_ (Aether Atlas) is a **real‑time WebGPU art piece** exploring the hidden geometry of the universe across multiple realms. Scroll-driven descent through the gyroid lattice + new cosmic layers (Interference waves, Singularity horizons, Quantum folds, Nebula veils, Echo memory). Resonance imprints let your interactions permanently scar and evolve the aether — your personal universe is shareable via URL.
 
 The lattice’s shape is the level‑set of a single equation; *tension* controls the wall thickness. At peak tension the form morphs toward the classic Schwarz‑P surface, creating a hypnotic vortex that feels both organic and crystalline.
 

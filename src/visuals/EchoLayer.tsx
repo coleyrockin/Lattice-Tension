@@ -4,18 +4,18 @@ import { Vector3 } from "three";
 import { sampleExperience } from "../chapters/interpolate";
 import { PHILOSOPHICAL_FRAGMENTS } from "../chapters/definitions";
 import {
-  GYROID_HEADING,
-  createGyroidLatticeMaterial,
-} from "./gyroidLatticeMaterial";
+  ECHO_HEADING,
+  createEchoMaterial,
+} from "./EchoMaterial";
 import { descent, useExperienceStore } from "../experience/store";
 
-const STEPS: Record<string, number> = { high: 150, medium: 96, low: 52 };
+const STEPS: Record<string, number> = { high: 168, medium: 108, low: 58 };
 
-// frame-rate-independent damping decay rates (see JellyOrb.tsx)
+// frame-rate-independent damping decay rates (reused exactly from GyroidLattice)
 const K_STEER = 3.0776; // ≈ -60*ln(1-0.05)
 const K_DRAG = 4.3543; // ≈ -60*ln(1-0.07)
 
-const HEADING = new Vector3(...GYROID_HEADING).normalize();
+const HEADING = new Vector3(...ECHO_HEADING).normalize();
 const WORLD_UP = new Vector3(0, 1, 0);
 const RIGHT = new Vector3().crossVectors(HEADING, WORLD_UP).normalize();
 const UP = new Vector3().crossVectors(RIGHT, HEADING).normalize();
@@ -27,12 +27,34 @@ function smoothstep(a: number, b: number, x: number) {
 
 type Props = { standalone?: boolean };
 
-export function GyroidLattice({ standalone = false }: Props) {
+/**
+ * ECHO LAYER (WITNESS) — the meta final evolution, layered atop the atlas.
+ *
+ * Drives strictly from:
+ * - sampleExperience(descent) for chapter palette / simulation / visual
+ * - userResonance accumulator (shared store)
+ * - effectiveRes = min(2.2, baseRes + userResonance)  (full reuse)
+ *
+ * Reveal is gated: only appears as the final layer when scroll progress
+ * reaches deep echo territory (raw d > ~1.62) AND user imprint is high.
+ * Generative offspring filaments (in material) become brighter/structured
+ * ONLY for high userResonance contribution — "the pattern now contains
+ * your question" is literal: user marks seed the children.
+ *
+ * Full pattern reuse:
+ * - descent/store/interp/fieldFG (via material)
+ * - resonance decay + addResonance on impulse/drag/pointer
+ * - tiered STEPS (higher fidelity for the witness detail)
+ * - identical travel/steer/pulse/pos/fwd math
+ * - same uniform wiring for continuity of atlas language
+ * - click fires impulse + fragment (participation continues in the echo)
+ */
+export function EchoLayer({ standalone = false }: Props) {
   const tier = useExperienceStore((s) => s.profile?.tier ?? "high");
   const reducedMotion = useExperienceStore((s) => s.reducedMotion);
   const addResonance = useExperienceStore((s) => s.addResonance);
   const userResonance = useExperienceStore((s) => s.resonance);
-  const u = useMemo(() => createGyroidLatticeMaterial(STEPS[tier] ?? 150), [tier]);
+  const u = useMemo(() => createEchoMaterial(STEPS[tier] ?? 168), [tier]);
 
   const pos = useRef(new Vector3().copy(HEADING).multiplyScalar(1.2));
   const travel = useRef(1.2);
@@ -48,44 +70,52 @@ export function GyroidLattice({ standalone = false }: Props) {
     const dt = Math.min(delta, 1 / 30);
     const time = state.clock.elapsedTime;
     const { pointer, drag, impulse } = useExperienceStore.getState();
-    // smoothed descent → palette, structure, travel and crossfade glide as one
+    // smoothed descent (raw value allows >1 for echo atlas depth)
     const d = standalone ? 1 : descent.value;
     const sample = sampleExperience(d);
     const motion = reducedMotion ? 0.25 : 1;
     const p = pos.current;
 
-    // resonance decay (gentle) + base from chapter + user accumulation
-    // decay happens here and in JellyOrb so it compounds across interactions
+    // resonance decay + effective (base chapter + user) — identical to Gyroid/Jelly
     const resDecay = 1 - Math.exp(-2.8 * dt);
     const baseRes = sample.simulation.resonance;
     const effectiveRes = Math.min(2.2, baseRes + userResonance);
     u.resonance.value = effectiveRes;
-    // slow global decay on the user accumulator (shared across orb + lattice)
     if (userResonance > 0) addResonance(-userResonance * resDecay * 0.65);
 
-    const reveal = standalone ? 1 : smoothstep(0.36, 0.56, d);
-    const tension = sample.simulation.tension;
+    // IMPRINT: resonance makes generative offspring brighter/structured
+    // ONLY for high user imprint. Threshold chosen so chapter base alone
+    // is insufficient; user interaction (drag/impulse) must contribute.
+    const imprint = Math.max(0, Math.min(1, (effectiveRes - 0.95) / 1.05));
+    u.imprint.value = imprint;
+
+    // Final layer reveal gate: high progress (deep into echo chapter range)
+    // + high resonance threshold. Uses raw descent for late-scroll depth.
+    // When either gate is low, material discards (zero cost).
+    const echoRevealBase = smoothstep(1.62, 1.78, d);
+    const resGate = smoothstep(0.85, 1.55, effectiveRes);
+    const reveal = standalone ? 1 : echoRevealBase * resGate * 0.97;
 
     if (impulse && impulse.startedAt !== lastImpulse.current) {
       lastImpulse.current = impulse.startedAt;
       pulseAmp.current = 1;
-      addResonance(0.18 * sample.simulation.pointerForce);
+      addResonance(0.16 * sample.simulation.pointerForce);
     }
     pulseAmp.current = Math.max(0, pulseAmp.current - dt * 0.72);
 
-    // slow meditative drift down the screw axis + a gentle sway for life
+    // meditative drift + life sway, extended for echo depth
     travel.current =
       1.2 +
-      d * (5.5 + sample.visual.nestedScale * 3.2) +
-      sample.simulation.collapse * 2.2 + // Collapse pulls you in faster
-      time * 0.12 * motion;
+      d * (6.1 + sample.visual.nestedScale * 3.6) +
+      sample.simulation.collapse * 2.4 +
+      time * 0.095 * motion;
     p.copy(HEADING)
       .multiplyScalar(travel.current)
       .addScaledVector(RIGHT, Math.sin(time * 0.11) * 0.45 * motion)
       .addScaledVector(UP, Math.sin(time * 0.083) * 0.4 * motion);
     u.ro.value.copy(p);
 
-    // look down the axis + slow sway + pointer steer (frame-rate-independent)
+    // pointer steer + drag (frame-rate-independent, reused)
     const steerK = 1 - Math.exp(-K_STEER * dt);
     const dragK = 1 - Math.exp(-K_DRAG * dt);
     px.current += (pointer.x - px.current) * steerK;
@@ -93,14 +123,12 @@ export function GyroidLattice({ standalone = false }: Props) {
     dragX.current += (drag.x - dragX.current) * dragK;
     dragY.current += (drag.y - dragY.current) * dragK;
 
-    // continuous resonance from touching the lattice (drag or strong pointer)
+    // sustained interaction deposits resonance even in the witness realm
     if (drag.active || (Math.hypot(pointer.x, pointer.y) > 0.25 && pointer.active)) {
-      addResonance(0.014 * dt * sample.simulation.pointerForce);
+      addResonance(0.013 * dt * sample.simulation.pointerForce);
     }
 
-    // Collapse lean: a slow controlled banking into the vortex (was an 8.2 Hz
-    // shake — that read as glitch). The torque comes from the in-shader twist;
-    // here we just sink and bank, no vibration.
+    // lean + camera-derived sway (reused)
     const collapseLean =
       sample.simulation.collapse * Math.sin(time * 0.7) * 0.06 * motion;
     const cameraYaw =
@@ -129,25 +157,20 @@ export function GyroidLattice({ standalone = false }: Props) {
     u.fwd.value.copy(fwd.current);
 
     u.aspect.value = state.size.width / Math.max(1, state.size.height);
-    // Per-chapter structural signatures — each lattice chapter must read as
-    // its own place, not a recolor of the same tunnel:
-    //   Pattern   → Schwarz-P crystal, thin crisp walls (order, in-shader)
-    //   Collapse  → helical torque shearing the cells around the axis
-    //   Emergence → wide chambers whose cell size breathes along the path
-    //   Aether    → thin translucent veils, low absorption, layered depth
+
+    // Per-chapter signatures reused for seamless atlas continuity.
+    // Echo inherits the late-aether language but the material's children
+    // are the new structural signature: generative from user marks.
     const aether = smoothstep(0.78, 0.92, sample.globalProgress);
-    u.twist.value = sample.simulation.collapse * 1.0 + sample.simulation.singularity * 0.6; // Singularity: extra torque
-    u.swell.value = sample.simulation.emergence * (1 - aether) + sample.simulation.diffusion * 0.4; // Nebula diffusion
-    u.veil.value = aether;
-    // chapter contour density reframes the lattice; Emergence opens into
-    // sparse cathedral chambers, Aether thins slightly for the veils.
+    u.twist.value = sample.simulation.collapse * 1.0;
+    u.swell.value = sample.simulation.emergence * (1 - aether);
+    u.veil.value = aether * 0.65 + 0.25;
     u.freq.value =
-      3.3 +
-      sample.visual.contourDensity * 2.8 -
-      u.swell.value * 1.7 -
-      aether * 0.9 +
-      sample.simulation.interference * 1.2; // Interference realm: wave density boost
-    u.tension.value = tension;
+      3.0 +
+      sample.visual.contourDensity * 2.6 -
+      u.swell.value * 1.5 -
+      aether * 0.85;
+    u.tension.value = sample.simulation.tension;
     u.reveal.value = reveal;
     u.pulse.value = pulseAmp.current;
     u.collapse.value = sample.simulation.collapse;
@@ -163,7 +186,7 @@ export function GyroidLattice({ standalone = false }: Props) {
   return (
     <mesh
       frustumCulled={false}
-      renderOrder={10}
+      renderOrder={12}
       onClick={() => {
         const state = useExperienceStore.getState();
         const sample = sampleExperience(state.scrollProgress);

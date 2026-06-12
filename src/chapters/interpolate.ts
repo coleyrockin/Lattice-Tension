@@ -44,6 +44,12 @@ function mixSimulation(
     collapse: mix(a.collapse, b.collapse, t),
     emergence: mix(a.emergence, b.emergence, t),
     pointerForce: mix(a.pointerForce, b.pointerForce, t),
+    resonance: mix(a.resonance, b.resonance, t),
+    interference: mix(a.interference, b.interference, t),
+    singularity: mix(a.singularity, b.singularity, t),
+    diffusion: mix(a.diffusion, b.diffusion, t),
+    curvature: mix(a.curvature, b.curvature, t),
+    scale: mix(a.scale, b.scale, t),
   };
 }
 

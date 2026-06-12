@@ -46,6 +46,8 @@ export function JellyOrb() {
 
   const tier = useExperienceStore((s) => s.profile?.tier ?? "high");
   const reducedMotion = useExperienceStore((s) => s.reducedMotion);
+  const addResonance = useExperienceStore((s) => s.addResonance);
+  const userResonance = useExperienceStore((s) => s.resonance);
 
   const u = useMemo(() => createJellyOrbMaterial(STEPS[tier] ?? 110), [tier]);
 
@@ -57,6 +59,13 @@ export function JellyOrb() {
     // glide together (set once per frame by <DescentDriver/>)
     const d = descent.value;
     const sample = sampleExperience(d);
+
+    // resonance: wire effective (chapter base + user imprints) + contribute to decay
+    const baseRes = sample.simulation.resonance;
+    const effectiveRes = Math.min(2.2, baseRes + userResonance);
+    u.resonance.value = effectiveRes;
+    const resDecay = 1 - Math.exp(-2.6 * dt);
+    if (userResonance > 0) addResonance(-userResonance * resDecay * 0.65);
 
     // FALL INTO THE ORB: dolly the camera inward as descent rises, so the orb
     // grows to fill the frame and we pass through the glass into the lattice.
@@ -74,6 +83,7 @@ export function JellyOrb() {
       jv.current += 4.15 * jig;
       jaxis.current.set(px.current, py.current, 0.5).normalize();
       sloshVelocity.current.addScaledVector(jaxis.current, -2.8 * jig);
+      addResonance(0.22 * sample.simulation.pointerForce);
     }
     pulseAmp.current = Math.max(0, pulseAmp.current - dt * 1.05);
     u.pulse.value = pulseAmp.current;
@@ -91,6 +101,7 @@ export function JellyOrb() {
         .set(vx, -vy, 0.18)
         .multiplyScalar(Math.min(flick * 11, 2.4) * jig);
       sloshVelocity.current.add(flickImpulse.current);
+      addResonance(Math.min(flick * 0.9, 0.11));
     }
 
     // The shell never fully rests: two slow, incommensurate compression waves
@@ -126,6 +137,12 @@ export function JellyOrb() {
     dragY.current += (drag.y - dragY.current) * dragK;
     px.current += (pointer.x - px.current) * leanK;
     py.current += (pointer.y - py.current) * leanK;
+
+    // sustained drag on the orb deposits resonance (the glass "remembers" being pushed)
+    if (drag.active) {
+      addResonance(0.009 * dt);
+    }
+
     u.pointer.value.set(
       (px.current + dragX.current * 2.1) * lead,
       (py.current - dragY.current * 2.1) * lead,
@@ -135,7 +152,7 @@ export function JellyOrb() {
     u.tension.value = sample.simulation.tension;
     // order crisps the interior: Pattern (order→1) reads as a crystalline
     // lattice; Origin (order→0) stays a soft serene web.
-    u.order.value = sample.simulation.order;
+    u.order.value = sample.simulation.order + (sample.simulation.scale - 1) * 0.2; // Quantum/Nebula/Echo scale effect on interior (new realms)
     // chapter palette drives the glass: deep body absorbs toward a darkened
     // primary, the rim catches the full primary, glints lift toward white.
     PRIMARY.set(sample.palette.primary);

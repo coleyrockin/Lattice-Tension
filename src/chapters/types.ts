@@ -7,6 +7,13 @@ export type SimulationState = {
   collapse: number;
   emergence: number;
   pointerForce: number;
+  resonance: number;
+  // new realm params for multi-universe atlas (interference waves, singularity curvature, diffusion scatter, scale for micro/macro, etc.)
+  interference: number;
+  singularity: number;
+  diffusion: number;
+  curvature: number;
+  scale: number;
 };
 
 export type ChapterPalette = {

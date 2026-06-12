@@ -149,6 +149,25 @@ button {
   animation-delay: -700ms;
 }
 
+.share-control {
+  position: absolute;
+  top: clamp(25px, 4.5vh, 54px);
+  right: clamp(110px, 9vw, 160px);
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(245, 241, 235, 0.55);
+  background: transparent;
+  border: 0;
+  padding: 4px 8px;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: color 200ms ease;
+}
+.share-control:hover {
+  color: var(--gold);
+}
+
 @keyframes sound-bars {
   to {
     height: 100%;

@@ -81,15 +81,18 @@ export function useAetherAudio() {
       const sampled = sampleExperience(progress);
       const tension = sampled.simulation.tension;
       const order = sampled.simulation.order;
+      const interference = sampled.simulation.interference || 0;
+      const diffusion = sampled.simulation.diffusion || 0;
+      const resonance = sampled.simulation.resonance || 0;
       filter.frequency.setTargetAtTime(
-        420 + tension * 950 + order * 360,
+        420 + tension * 950 + order * 360 + interference * 280 + diffusion * 150,
         context.currentTime,
         0.12,
       );
       oscillators.forEach((oscillator, index) => {
         const drift = Math.sin(context.currentTime * 0.16 + index) * 5;
         oscillator.detune.setTargetAtTime(
-          drift + tension * (index + 1) * 5,
+          drift + tension * (index + 1) * 5 + resonance * (index % 2 ? 4 : 2) + interference * 3,
           context.currentTime,
           0.18,
         );

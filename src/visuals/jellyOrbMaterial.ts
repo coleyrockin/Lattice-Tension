@@ -50,6 +50,7 @@ export function createJellyOrbMaterial(steps: number) {
   const accent = uniform(new Color('#88e0ff')); // brighter rim and caustics
   const highlight = uniform(new Color('#e0faff')); // enhanced wet glints
   const lattice = uniform(1.8); // brighter internal lattice
+  const resonance = uniform(0); // accumulated user imprints — memory in the internal web + caustics
   const pointer = uniform(new Vector2()); // set .value.set(x, y) per frame
   const jiggle = uniform(new Vector3(0, 1, 0)); // wobble axis (spring-driven)
   const squash = uniform(0); // spring displacement: + stretches along jiggle
@@ -351,6 +352,10 @@ export function createJellyOrbMaterial(steps: number) {
           const band = smoothstep(bandWidth, 0.0, abs(g));
           const falloff = float(1).sub(float(i).mul(0.14));
           latGlow.addAssign(band.mul(float(0.2).add(order.mul(0.12))).mul(falloff));
+          // resonance memory: imprints make the suspended gyroid web inside the orb
+          // develop brighter nodes and slight fractures — the viewer "marked" it
+          const mem = band.mul(resonance.mul(0.55)).mul(falloff.mul(0.7));
+          latGlow.addAssign(mem);
           // depth-stacked caustics: broad sweeping light bands at low,
           // incommensurate frequencies. Two crossed high-frequency sines make a
           // literal checkerboard — the golf-ball artifact — so keep these wide
@@ -379,7 +384,8 @@ export function createJellyOrbMaterial(steps: number) {
         const latticeCol = latticeHue
           .mul(latSoft.mul(latSoft).mul(0.8))
           .mul(lattice)
-          .mul(float(0.95).add(tension.mul(0.45)));
+          .mul(float(0.95).add(tension.mul(0.45)))
+          .add(resonance.mul(0.22).mul(latSoft)); // resonance memory brightens the remembered web
 
         // Tight sun-glint that twinkles on wave crests (gated by a wavelet mask)
         // — sparkles like sun on water, additive on the light highlight colour.
@@ -452,6 +458,7 @@ export function createJellyOrbMaterial(steps: number) {
     accent,
     highlight,
     lattice,
+    resonance,
     pointer,
     jiggle,
     squash,

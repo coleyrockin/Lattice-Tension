@@ -4,18 +4,18 @@ import { Vector3 } from "three";
 import { sampleExperience } from "../chapters/interpolate";
 import { PHILOSOPHICAL_FRAGMENTS } from "../chapters/definitions";
 import {
-  GYROID_HEADING,
-  createGyroidLatticeMaterial,
-} from "./gyroidLatticeMaterial";
+  INTERFERENCE_HEADING,
+  createInterferenceMaterial,
+} from "./InterferenceMaterial";
 import { descent, useExperienceStore } from "../experience/store";
 
 const STEPS: Record<string, number> = { high: 150, medium: 96, low: 52 };
 
-// frame-rate-independent damping decay rates (see JellyOrb.tsx)
+// frame-rate-independent damping decay rates (exact reuse from GyroidLattice/EchoLayer)
 const K_STEER = 3.0776; // ≈ -60*ln(1-0.05)
 const K_DRAG = 4.3543; // ≈ -60*ln(1-0.07)
 
-const HEADING = new Vector3(...GYROID_HEADING).normalize();
+const HEADING = new Vector3(...INTERFERENCE_HEADING).normalize();
 const WORLD_UP = new Vector3(0, 1, 0);
 const RIGHT = new Vector3().crossVectors(HEADING, WORLD_UP).normalize();
 const UP = new Vector3().crossVectors(RIGHT, HEADING).normalize();
@@ -27,12 +27,30 @@ function smoothstep(a: number, b: number, x: number) {
 
 type Props = { standalone?: boolean };
 
-export function GyroidLattice({ standalone = false }: Props) {
+/**
+ * INTERFERENCE LAYER — crossed-wave realm driver.
+ *
+ * Modeled 1:1 on GyroidLattice.tsx:
+ * - useMemo material per tier (STEPS high/medium/low)
+ * - useFrame: sampleExperience(d) + userResonance → effectiveRes
+ * - drive new uniforms (interference, fringeAmp) + all atlas continuity ones
+ * - accumulate resonance on impulse + sustained drag/pointer (K springs)
+ * - identical travel/steer/pulse/pos/fwd math + sway
+ * - plane mesh, onClick fires impulse + fragment
+ * - reveal gated to Interference range (~1.0-1.166) using raw descent
+ *   while still factoring sample.simulation.interference so low early
+ * - poetic comments, tier respect, full reuse of descent/store/addResonance
+ *
+ * Renders as a distinct visual layer (renderOrder 11) between lattice and echo.
+ * Fringes are geometric (distanceToSurface modulation in material) so they
+ * integrate with the gyroid shells rather than float on top.
+ */
+export function InterferenceLayer({ standalone = false }: Props) {
   const tier = useExperienceStore((s) => s.profile?.tier ?? "high");
   const reducedMotion = useExperienceStore((s) => s.reducedMotion);
   const addResonance = useExperienceStore((s) => s.addResonance);
   const userResonance = useExperienceStore((s) => s.resonance);
-  const u = useMemo(() => createGyroidLatticeMaterial(STEPS[tier] ?? 150), [tier]);
+  const u = useMemo(() => createInterferenceMaterial(STEPS[tier] ?? 150), [tier]);
 
   const pos = useRef(new Vector3().copy(HEADING).multiplyScalar(1.2));
   const travel = useRef(1.2);
@@ -55,30 +73,38 @@ export function GyroidLattice({ standalone = false }: Props) {
     const p = pos.current;
 
     // resonance decay (gentle) + base from chapter + user accumulation
-    // decay happens here and in JellyOrb so it compounds across interactions
     const resDecay = 1 - Math.exp(-2.8 * dt);
     const baseRes = sample.simulation.resonance;
     const effectiveRes = Math.min(2.2, baseRes + userResonance);
     u.resonance.value = effectiveRes;
-    // slow global decay on the user accumulator (shared across orb + lattice)
+    // slow global decay on the user accumulator (shared across layers)
     if (userResonance > 0) addResonance(-userResonance * resDecay * 0.65);
 
-    const reveal = standalone ? 1 : smoothstep(0.36, 0.56, d);
-    const tension = sample.simulation.tension;
+    // drive Interference-specific uniforms from sample + resonance
+    const interf = sample.simulation.interference;
+    u.interference.value = interf;
+    u.fringeAmp.value = 0.48 + interf * 1.15 + effectiveRes * 0.32;
+
+    // Realm gate: Interference chapter range [1.0, 1.166]. Use raw d so we
+    // can enter the layer precisely when scroll reaches the new realm.
+    // Factor sim.interference + a soft floor so the layer is always present
+    // (low opacity) early rather than popping — follows "always layered" option.
+    const interfGate = smoothstep(0.94, 1.08, d) * (1.0 - smoothstep(1.13, 1.21, d));
+    const reveal = standalone ? 1 : interfGate * (0.22 + 0.78 * interf);
 
     if (impulse && impulse.startedAt !== lastImpulse.current) {
       lastImpulse.current = impulse.startedAt;
       pulseAmp.current = 1;
-      addResonance(0.18 * sample.simulation.pointerForce);
+      addResonance(0.17 * sample.simulation.pointerForce);
     }
     pulseAmp.current = Math.max(0, pulseAmp.current - dt * 0.72);
 
     // slow meditative drift down the screw axis + a gentle sway for life
     travel.current =
       1.2 +
-      d * (5.5 + sample.visual.nestedScale * 3.2) +
-      sample.simulation.collapse * 2.2 + // Collapse pulls you in faster
-      time * 0.12 * motion;
+      d * (5.8 + sample.visual.nestedScale * 3.4) +
+      sample.simulation.collapse * 2.1 +
+      time * 0.11 * motion;
     p.copy(HEADING)
       .multiplyScalar(travel.current)
       .addScaledVector(RIGHT, Math.sin(time * 0.11) * 0.45 * motion)
@@ -93,14 +119,12 @@ export function GyroidLattice({ standalone = false }: Props) {
     dragX.current += (drag.x - dragX.current) * dragK;
     dragY.current += (drag.y - dragY.current) * dragK;
 
-    // continuous resonance from touching the lattice (drag or strong pointer)
+    // continuous resonance from touching (drag or strong pointer)
     if (drag.active || (Math.hypot(pointer.x, pointer.y) > 0.25 && pointer.active)) {
-      addResonance(0.014 * dt * sample.simulation.pointerForce);
+      addResonance(0.015 * dt * sample.simulation.pointerForce);
     }
 
-    // Collapse lean: a slow controlled banking into the vortex (was an 8.2 Hz
-    // shake — that read as glitch). The torque comes from the in-shader twist;
-    // here we just sink and bank, no vibration.
+    // Collapse lean + camera sway (reused exactly)
     const collapseLean =
       sample.simulation.collapse * Math.sin(time * 0.7) * 0.06 * motion;
     const cameraYaw =
@@ -129,25 +153,21 @@ export function GyroidLattice({ standalone = false }: Props) {
     u.fwd.value.copy(fwd.current);
 
     u.aspect.value = state.size.width / Math.max(1, state.size.height);
-    // Per-chapter structural signatures — each lattice chapter must read as
-    // its own place, not a recolor of the same tunnel:
-    //   Pattern   → Schwarz-P crystal, thin crisp walls (order, in-shader)
-    //   Collapse  → helical torque shearing the cells around the axis
-    //   Emergence → wide chambers whose cell size breathes along the path
-    //   Aether    → thin translucent veils, low absorption, layered depth
+
+    // Per-chapter structural signatures — each layer reuses the language
+    // so Interference reads as part of the continuous atlas, not a bolt-on.
+    // Interference realm boosts wave density via the material's crossed terms.
     const aether = smoothstep(0.78, 0.92, sample.globalProgress);
-    u.twist.value = sample.simulation.collapse * 1.0 + sample.simulation.singularity * 0.6; // Singularity: extra torque
-    u.swell.value = sample.simulation.emergence * (1 - aether) + sample.simulation.diffusion * 0.4; // Nebula diffusion
-    u.veil.value = aether;
-    // chapter contour density reframes the lattice; Emergence opens into
-    // sparse cathedral chambers, Aether thins slightly for the veils.
+    u.twist.value = sample.simulation.collapse * 0.95 + sample.simulation.singularity * 0.5;
+    u.swell.value = sample.simulation.emergence * (1 - aether) + sample.simulation.diffusion * 0.35;
+    u.veil.value = aether * 0.7;
     u.freq.value =
-      3.3 +
-      sample.visual.contourDensity * 2.8 -
-      u.swell.value * 1.7 -
-      aether * 0.9 +
-      sample.simulation.interference * 1.2; // Interference realm: wave density boost
-    u.tension.value = tension;
+      4.1 +
+      sample.visual.contourDensity * 2.4 -
+      u.swell.value * 1.5 -
+      aether * 0.7 +
+      interf * 2.4; // Interference realm: wave density boost for fringes
+    u.tension.value = sample.simulation.tension;
     u.reveal.value = reveal;
     u.pulse.value = pulseAmp.current;
     u.collapse.value = sample.simulation.collapse;
@@ -163,7 +183,7 @@ export function GyroidLattice({ standalone = false }: Props) {
   return (
     <mesh
       frustumCulled={false}
-      renderOrder={10}
+      renderOrder={11}
       onClick={() => {
         const state = useExperienceStore.getState();
         const sample = sampleExperience(state.scrollProgress);

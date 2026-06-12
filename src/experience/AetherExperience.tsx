@@ -49,6 +49,22 @@ export function AetherExperience() {
     };
   }, [setScrollProgress]);
 
+  // load shared atlas state from ?p= &r= (from share button)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const p = parseFloat(params.get("p") || "");
+    const r = parseFloat(params.get("r") || "");
+    if (!isNaN(p)) {
+      const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      window.scrollTo({ top: p * maxScroll, behavior: "auto" });
+    }
+    if (!isNaN(r)) {
+      // prime resonance (will be added to by interactions; decay will apply)
+      // direct mutate for initial (store setter)
+      useExperienceStore.setState({ resonance: Math.max(0, Math.min(2.2, r)) });
+    }
+  }, []);
+
   const scrollHeight = useMemo(
     () => `${Math.max(CHAPTERS.length, SCROLL_MULTIPLIER) * 100}vh`,
     [],

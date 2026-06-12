@@ -14,6 +14,8 @@ export function InterfaceOverlay() {
   const setSelectedFragment = useExperienceStore(
     (state) => state.setSelectedFragment,
   );
+  const resonance = useExperienceStore((state) => state.resonance);
+  const scrollProgress = useExperienceStore((state) => state.scrollProgress);
   const activeIndex = Math.min(
     CHAPTERS.length - 1,
     Math.floor(progress * CHAPTERS.length),
@@ -48,6 +50,20 @@ export function InterfaceOverlay() {
             <i key={index} />
           ))}
         </span>
+      </button>
+
+      <button
+        className="share-control"
+        type="button"
+        aria-label="Copy link to your resonant descent (share your aether)"
+        onClick={() => {
+          const url = `${window.location.origin}${window.location.pathname}?p=${scrollProgress.toFixed(3)}&r=${resonance.toFixed(2)}`;
+          navigator.clipboard?.writeText(url).then(() => {
+            // silent success; user can paste the personal atlas state
+          }).catch(() => {});
+        }}
+      >
+        <span>Share your Aether</span>
       </button>
 
       <section
@@ -86,7 +102,7 @@ export function InterfaceOverlay() {
       </nav>
 
       <div className="interaction-cue" aria-hidden="true">
-        <span>{progress < 0.035 ? "Scroll to enter" : "Drag the field"}</span>
+        <span>{progress < 0.035 ? "Scroll to enter the atlas" : "Drag — leave your mark on the aether"}</span>
         <i />
       </div>
 
