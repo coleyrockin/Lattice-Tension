@@ -60,6 +60,10 @@ export function GyroidLattice({ standalone = false }: Props) {
     const baseRes = sample.simulation.resonance;
     const effectiveRes = Math.min(2.2, baseRes + userResonance);
     u.resonance.value = effectiveRes;
+    u.interference.value = sample.simulation.interference || 0;
+    u.singularity.value = sample.simulation.singularity || 0;
+    u.diffusion.value = sample.simulation.diffusion || 0;
+    u.curvature.value = sample.simulation.curvature || 0;
     // slow global decay on the user accumulator (shared across orb + lattice)
     if (userResonance > 0) addResonance(-userResonance * resDecay * 0.65);
 

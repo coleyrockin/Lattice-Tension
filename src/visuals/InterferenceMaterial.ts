@@ -27,6 +27,7 @@ import {
   vec3,
   vec4,
   cos,
+  time,
 } from "three/tsl";
 import { fieldFG } from "./sdf";
 
@@ -125,6 +126,9 @@ export function createInterferenceMaterial(steps: number) {
       // click pulse: a travelling brightening shell
       const pulseRing = exp(length(p.sub(ro)).sub(pulse.mul(7)).pow(2).mul(-0.5)).mul(pulse);
 
+      // COLLAPSE twist: shear the cells helically around the descent axis
+      const axial = dot(p, axisH);
+
       // RESONANCE IMPRINTS (user scars): axial ridges + filaments.
       // In Interference these become the seeds that amplify the crossed fringes.
       const scarPhase = axial.mul(7.4).add(time.mul(0.031));
@@ -142,9 +146,6 @@ export function createInterferenceMaterial(steps: number) {
               .mul(-0.11),
           ),
         );
-
-      // COLLAPSE twist: shear the cells helically around the descent axis
-      const axial = dot(p, axisH);
       const theta = axial.mul(twist.mul(0.42));
       const radial = p.sub(axisH.mul(axial));
       const x1 = dot(radial, axisR);

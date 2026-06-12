@@ -27,6 +27,7 @@ import {
   vec3,
   vec4,
   cos,
+  time,
 } from "three/tsl";
 import { fieldFG } from "./sdf";
 
@@ -59,6 +60,10 @@ export function createGyroidLatticeMaterial(steps: number) {
   const order = uniform(0);
   const stress = uniform(0.5);
   const resonance = uniform(0); // user imprints — scars and resonant filaments left by interaction
+  const interference = uniform(0); // Interference realm — crossed wave modulation
+  const singularity = uniform(0); // Singularity — radial distortion / pull
+  const diffusion = uniform(0); // Nebula — volumetric scatter / glow
+  const curvature = uniform(0); // Quantum / curvature effects
   // per-chapter structural signatures (not just recolors):
   const twist = uniform(0); // Collapse — helical shear of cells around the axis
   const swell = uniform(0); // Emergence — cell size breathes along the path
@@ -122,6 +127,10 @@ export function createGyroidLatticeMaterial(steps: number) {
       // click pulse: a travelling brightening shell
       const pulseRing = exp(length(p.sub(ro)).sub(pulse.mul(7)).pow(2).mul(-0.5)).mul(pulse);
 
+      // COLLAPSE twist: shear the cells helically around the descent axis —
+      // the tunnel itself torques, structurally unlike any other chapter.
+      const axial = dot(p, axisH);
+
       // RESONANCE IMPRINTS (user scars): accumulated interaction leaves slow
       // axial ridges and bright filaments. The lattice remembers where it was
       // touched — stronger in high-tension chapters, blooms in Emergence/Aether.
@@ -129,7 +138,9 @@ export function createGyroidLatticeMaterial(steps: number) {
       const scar = resonance
         .mul(0.014)
         .mul(sin(scarPhase).mul(0.6).add(0.7))
-        .mul(smoothstep(0.2, 0.95, resonance));
+        .mul(smoothstep(0.2, 0.95, resonance))
+        .max(0.0)
+        .clamp(0.0, 1.0);
       const echo = resonance
         .mul(0.9)
         .mul(
@@ -139,11 +150,9 @@ export function createGyroidLatticeMaterial(steps: number) {
               .pow(2)
               .mul(-0.11),
           ),
-        );
-
-      // COLLAPSE twist: shear the cells helically around the descent axis —
-      // the tunnel itself torques, structurally unlike any other chapter.
-      const axial = dot(p, axisH);
+        )
+        .max(0.0)
+        .clamp(0.0, 1.0);
       const theta = axial.mul(twist.mul(0.42));
       const radial = p.sub(axisH.mul(axial));
       const x1 = dot(radial, axisR);
@@ -169,13 +178,16 @@ export function createGyroidLatticeMaterial(steps: number) {
       const scarredDist = distanceToSurface.sub(scar.mul(0.6));
       const surface = float(1)
         .sub(smoothstep(float(0), thickness, scarredDist))
+        .max(0.0)
+        .min(1.0)
         .toVar();
       // Prevent the first few samples from becoming a luminous windshield.
       const nearFade = smoothstep(0.08, 0.42, t);
       const dens = surface.mul(nearFade).toVar();
 
       If(dens.greaterThan(0.001), () => {
-        const n = normalize(fgg.g.mul(sign(fgg.f))).toVar();
+        const g = fgg.g.mul(sign(fgg.f));
+        const n = g.div( length(g).max(0.001) ).toVar();
         const ndl = max(dot(n, key), 0).mul(0.58).add(0.44);
         const ndv = max(dot(n, rd.negate()), 0).toVar();
 
@@ -220,7 +232,9 @@ export function createGyroidLatticeMaterial(steps: number) {
           .mul(dens.mul(float(4.8).add(stress.mul(2.4)).add(veil.mul(2.6))))
           .add(mix(tint, highlight, 0.62).mul(surfaceCore.mul(0.95)))
           .add(highlight.mul(stressLine.mul(1.4)))
-          .add(echo.mul(0.85)); // resonance echo filaments
+          .add(echo.mul(0.85))
+          .max(vec3(0))
+          .clamp(vec3(0), vec3(10)); // prevent NaN
         const resonanceBoost = resonance.mul(0.6).mul(dens);
         glow.addAssign(surfaceLight.mul(trans).mul(STEP).add(resonanceBoost.mul(STEP)));
         // AETHER veil: absorption falls away so the ray survives through many
@@ -240,6 +254,7 @@ export function createGyroidLatticeMaterial(steps: number) {
     });
 
     glow.mulAssign(0.92);
+    glow.assign( glow.max( vec3(0) ).clamp( vec3(0), vec3(10) ) );
     const focalPosition = uv.sub(vec2(0.42, -0.06));
     const focalCore = exp(length(focalPosition).pow(2).mul(-28))
       .mul(emergence.mul(0.28).add(order.mul(0.04)));
@@ -248,11 +263,17 @@ export function createGyroidLatticeMaterial(steps: number) {
     // resonance makes the deep focal "remember" — brighter memory core when engaged
     const memCore = exp(length(focalPosition).pow(2).mul(-52))
       .mul(resonance.mul(0.55));
+    const diffCore = exp(length(focalPosition).pow(2).mul(-40))
+      .mul(diffusion.mul(0.6));
+    const curvSpark = exp(length(focalPosition).pow(2).mul(-100))
+      .mul(curvature.mul(0.3));
     glow.addAssign(
       mix(accent, tint, 0.42)
         .mul(focalCore)
         .add(highlight.mul(focalSpark))
-        .add(highlight.mul(memCore)),
+        .add(highlight.mul(memCore))
+        .add(tint.mul(diffCore))
+        .add(accent.mul(curvSpark)),
     );
 
     // alpha = reveal → crossfades the lattice in over the orb during the descent
@@ -281,6 +302,10 @@ export function createGyroidLatticeMaterial(steps: number) {
     order,
     stress,
     resonance,
+    interference,
+    singularity,
+    diffusion,
+    curvature,
     twist,
     swell,
     veil,
