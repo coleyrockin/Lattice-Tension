@@ -42,7 +42,6 @@ type Props = { standalone?: boolean };
 export function InterferenceLayer({ standalone = false }: Props) {
   const tier = useExperienceStore((s) => s.profile?.tier ?? "high");
   const reducedMotion = useExperienceStore((s) => s.reducedMotion);
-  const addResonance = useExperienceStore((s) => s.addResonance);
   const userResonance = useExperienceStore((s) => s.resonance);
   const u = useMemo(() => createInterferenceMaterial(STEPS[tier] ?? 150), [tier]);
 
@@ -66,13 +65,9 @@ export function InterferenceLayer({ standalone = false }: Props) {
     const motion = reducedMotion ? 0.25 : 1;
     const p = pos.current;
 
-    // resonance decay (gentle) + base from chapter + user accumulation
-    const resDecay = 1 - Math.exp(-2.8 * dt);
     const baseRes = sample.simulation.resonance;
     const effectiveRes = Math.min(2.2, baseRes + userResonance);
     u.resonance.value = effectiveRes;
-    // slow global decay on the user accumulator (shared across layers)
-    if (userResonance > 0) addResonance(-userResonance * resDecay * 0.65);
 
     // drive Interference-specific uniforms from sample + resonance
     const sig = sample.signature;
@@ -84,7 +79,6 @@ export function InterferenceLayer({ standalone = false }: Props) {
     if (impulse && impulse.startedAt !== lastImpulse.current) {
       lastImpulse.current = impulse.startedAt;
       pulseAmp.current = 1;
-      addResonance(0.17 * sample.simulation.pointerForce);
     }
     pulseAmp.current = Math.max(0, pulseAmp.current - dt * 0.72);
 
@@ -107,11 +101,6 @@ export function InterferenceLayer({ standalone = false }: Props) {
     py.current += (pointer.y - py.current) * steerK;
     dragX.current += (drag.x - dragX.current) * dragK;
     dragY.current += (drag.y - dragY.current) * dragK;
-
-    // continuous resonance from touching (drag or strong pointer)
-    if (drag.active || (Math.hypot(pointer.x, pointer.y) > 0.25 && pointer.active)) {
-      addResonance(0.015 * dt * sample.simulation.pointerForce);
-    }
 
     // Collapse lean + camera sway (reused exactly)
     const collapseLean =

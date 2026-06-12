@@ -51,7 +51,6 @@ type Props = { standalone?: boolean };
 export function EchoLayer({ standalone = false }: Props) {
   const tier = useExperienceStore((s) => s.profile?.tier ?? "high");
   const reducedMotion = useExperienceStore((s) => s.reducedMotion);
-  const addResonance = useExperienceStore((s) => s.addResonance);
   const userResonance = useExperienceStore((s) => s.resonance);
   const u = useMemo(() => createEchoMaterial(STEPS[tier] ?? 168), [tier]);
 
@@ -75,12 +74,9 @@ export function EchoLayer({ standalone = false }: Props) {
     const motion = reducedMotion ? 0.25 : 1;
     const p = pos.current;
 
-    // resonance decay + effective (base chapter + user) — identical to Gyroid/Jelly
-    const resDecay = 1 - Math.exp(-2.8 * dt);
     const baseRes = sample.simulation.resonance;
     const effectiveRes = Math.min(2.2, baseRes + userResonance);
     u.resonance.value = effectiveRes;
-    if (userResonance > 0) addResonance(-userResonance * resDecay * 0.65);
 
     // IMPRINT: resonance makes generative offspring brighter/structured
     // ONLY for high user imprint. Threshold chosen so chapter base alone
@@ -98,7 +94,6 @@ export function EchoLayer({ standalone = false }: Props) {
     if (impulse && impulse.startedAt !== lastImpulse.current) {
       lastImpulse.current = impulse.startedAt;
       pulseAmp.current = 1;
-      addResonance(0.16 * sample.simulation.pointerForce);
     }
     pulseAmp.current = Math.max(0, pulseAmp.current - dt * 0.72);
 
@@ -121,11 +116,6 @@ export function EchoLayer({ standalone = false }: Props) {
     py.current += (pointer.y - py.current) * steerK;
     dragX.current += (drag.x - dragX.current) * dragK;
     dragY.current += (drag.y - dragY.current) * dragK;
-
-    // sustained interaction deposits resonance even in the witness realm
-    if (drag.active || (Math.hypot(pointer.x, pointer.y) > 0.25 && pointer.active)) {
-      addResonance(0.013 * dt * sample.simulation.pointerForce);
-    }
 
     // lean + camera-derived sway (reused)
     const collapseLean =

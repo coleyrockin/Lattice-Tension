@@ -7,7 +7,7 @@ import { bloom } from "three/examples/jsm/tsl/display/BloomNode.js";
 import { chromaticAberration } from "three/examples/jsm/tsl/display/ChromaticAberrationNode.js";
 import { film } from "three/examples/jsm/tsl/display/FilmNode.js";
 import { sampleExperience } from "../chapters/interpolate";
-import { useExperienceStore } from "../experience/store";
+import { descent } from "../experience/store";
 
 /**
  * Full TSL post stack: bloom → chromatic aberration → film grain → vignette.
@@ -38,20 +38,15 @@ export function TslBloom() {
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 1 / 30);
-    const progress = useExperienceStore.getState().scrollProgress;
+    const progress = descent.value;
     const sample = sampleExperience(progress);
     const sig = sample.signature;
 
-    // Strength: chapter bloom param drives the max, but base is low so mids stay clean.
-    // Nebula and echo get the fullest halos; Collapse/Singularity stay tight and sharp.
     post.bloomPass.strength.value =
-      0.08 + sample.post.bloom * 0.16 + sig.focalGlow * 0.12 + sig.nebula * 0.06;
-    // Radius: wider for soft diffusion chapters, tighter for crystalline chapters.
+      0.1 + sample.post.bloom * 0.18 + sig.focalGlow * 0.14 + sig.nebula * 0.08 + sig.echo * 0.04;
     post.bloomPass.radius.value =
-      0.22 + sig.nebula * 0.22 + sig.echo * 0.1 + sig.veil * 0.08 - sig.crystalline * 0.06;
-    // Threshold: high by default so only hot emissive regions bloom; nebula lowers it
-    // slightly to catch the volumetric fog glow at softer luminance levels.
-    post.bloomPass.threshold.value = 0.91 - sig.nebula * 0.12 - sig.focalGlow * 0.04;
+      0.24 + sig.nebula * 0.24 + sig.echo * 0.12 + sig.veil * 0.1 - sig.crystalline * 0.05;
+    post.bloomPass.threshold.value = 0.86 - sig.nebula * 0.14 - sig.focalGlow * 0.06 - sig.echo * 0.03;
     post.chromaStrength.value =
       sample.post.aberration * 160 + sig.chromatic * 0.013;
     post.grainIntensity.value = 0.018 + sig.nebula * 0.04 + sig.echo * 0.025;
@@ -59,7 +54,7 @@ export function TslBloom() {
     // Exposure: slightly brighter base so the lattice details read well; absorption-heavy
     // chapters compensate upward so the tunnels don't crush to black.
     const exposure =
-      0.50 + sig.focalGlow * 0.12 - sig.absorption * 0.04 + sig.nebula * 0.06 + sig.veil * 0.04;
+      0.52 + sig.focalGlow * 0.14 - sig.absorption * 0.035 + sig.nebula * 0.07 + sig.veil * 0.05 + sig.echo * 0.03;
     gl.toneMappingExposure += (exposure - gl.toneMappingExposure) * (1 - Math.exp(-5 * dt));
 
     post.pipeline.render();

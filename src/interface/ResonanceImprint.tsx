@@ -16,6 +16,7 @@ export function ResonanceImprint() {
   const drag = useExperienceStore((s) => s.drag);
   const pointer = useExperienceStore((s) => s.pointer);
   const resonance = useExperienceStore((s) => s.resonance);
+  const reducedMotion = useExperienceStore((s) => s.reducedMotion);
   const [ripples, setRipples] = useState<Ripple[]>([]);
   const nextId = useRef(0);
   const lastSpawn = useRef(0);
@@ -24,10 +25,15 @@ export function ResonanceImprint() {
   pointerRef.current = pointer;
 
   useEffect(() => {
-    if (!drag.active) return;
+    if (!drag.active || reducedMotion) return;
 
     let frame = 0;
     const tick = (now: number) => {
+      if (document.hidden) {
+        frame = requestAnimationFrame(tick);
+        return;
+      }
+
       const interval = Math.max(90, 220 - resonance * 45);
       if (now - lastSpawn.current >= interval) {
         lastSpawn.current = now;
@@ -43,7 +49,7 @@ export function ResonanceImprint() {
 
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [drag.active, resonance]);
+  }, [drag.active, reducedMotion, resonance]);
 
   useEffect(() => {
     if (ripples.length === 0) return;

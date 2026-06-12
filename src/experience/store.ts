@@ -39,6 +39,7 @@ type ExperienceStore = {
   autoplay: boolean;
   telemetryOpen: boolean;
   manualTension: number | null;
+  renderError: boolean;
   setReady: (ready: boolean) => void;
   setScrollProgress: (progress: number) => void;
   setPointer: (pointer: PointerState) => void;
@@ -52,6 +53,7 @@ type ExperienceStore = {
   setAutoplay: (autoplay: boolean) => void;
   setTelemetryOpen: (open: boolean) => void;
   setManualTension: (val: number | null) => void;
+  setRenderError: (failed: boolean) => void;
 };
 
 export const useExperienceStore = create<ExperienceStore>((set) => ({
@@ -68,6 +70,7 @@ export const useExperienceStore = create<ExperienceStore>((set) => ({
   autoplay: false,
   telemetryOpen: false,
   manualTension: null,
+  renderError: false,
   setReady: (ready) => set({ ready }),
   setScrollProgress: (scrollProgress) => set({ scrollProgress }),
   setPointer: (pointer) => set({ pointer }),
@@ -83,4 +86,5 @@ export const useExperienceStore = create<ExperienceStore>((set) => ({
   setAutoplay: (autoplay) => set({ autoplay }),
   setTelemetryOpen: (telemetryOpen) => set({ telemetryOpen }),
   setManualTension: (manualTension) => set({ manualTension }),
+  setRenderError: (renderError) => set({ renderError }),
 }));

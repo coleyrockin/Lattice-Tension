@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { sampleExperience } from "../chapters/interpolate";
-import { useExperienceStore } from "./store";
+import { descent, useExperienceStore } from "./store";
 
 type AudioGraph = {
   context: AudioContext;
@@ -62,6 +62,7 @@ export function useAetherAudio() {
     gain.gain.value = 0;
     gain.connect(context.destination);
     gain.gain.setTargetAtTime(0.04, context.currentTime, 0.25);
+    void context.resume();
 
     const graph: AudioGraph = {
       context,
@@ -73,7 +74,12 @@ export function useAetherAudio() {
     };
 
     const tick = () => {
-      const progress = useExperienceStore.getState().scrollProgress;
+      if (document.hidden || graph.closing) {
+        graph.raf = requestAnimationFrame(tick);
+        return;
+      }
+
+      const progress = descent.value;
       const imprint = useExperienceStore.getState().resonance;
       const sampled = sampleExperience(progress);
       const sig = sampled.signature;

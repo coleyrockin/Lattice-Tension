@@ -26,6 +26,7 @@ export function AetherExperience() {
   const setPointer = useExperienceStore((state) => state.setPointer);
   const setDrag = useExperienceStore((state) => state.setDrag);
   const [webglAvailable] = useState(hasUsableWebGL);
+  const renderError = useExperienceStore((state) => state.renderError);
   const dragOrigin = useRef<{ x: number; y: number } | null>(null);
   const dragValue = useRef({ x: 0, y: 0 });
   const lastPointer = useRef({ x: 0, y: 0 });
@@ -38,18 +39,27 @@ export function AetherExperience() {
   }, [reducedMotion, setProfile, setReducedMotion]);
 
   useEffect(() => {
+    let resizeTimer = 0;
     const updateScroll = () => {
       setScrollProgress(atlasProgressFromScroll(window.scrollY));
+    };
+    const onResize = () => {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(() => {
+        updateScroll();
+        setProfile(detectPerformanceProfile(reducedMotion));
+      }, 180);
     };
 
     updateScroll();
     window.addEventListener("scroll", updateScroll, { passive: true });
-    window.addEventListener("resize", updateScroll);
+    window.addEventListener("resize", onResize);
     return () => {
       window.removeEventListener("scroll", updateScroll);
-      window.removeEventListener("resize", updateScroll);
+      window.removeEventListener("resize", onResize);
+      window.clearTimeout(resizeTimer);
     };
-  }, [setScrollProgress]);
+  }, [reducedMotion, setProfile, setScrollProgress]);
 
   // Autoplay driver
   const autoplay = useExperienceStore((state) => state.autoplay);
@@ -61,6 +71,10 @@ export function AetherExperience() {
     let frameId: number;
 
     const tick = (now: number) => {
+      if (document.hidden) {
+        frameId = requestAnimationFrame(tick);
+        return;
+      }
       const dt = (now - lastTime) / 1000;
       lastTime = now;
 
@@ -132,9 +146,15 @@ export function AetherExperience() {
     [],
   );
 
-  if (!webglAvailable) {
+  if (!webglAvailable || renderError) {
     return <WebGLFallback />;
   }
+
+  const resetDrag = () => {
+    dragOrigin.current = null;
+    dragValue.current = { x: 0, y: 0 };
+    setDrag({ x: 0, y: 0, active: false });
+  };
 
   return (
     <div className="aether">
@@ -154,7 +174,10 @@ export function AetherExperience() {
             setDrag({ ...dragValue.current, active: true });
           }
         }}
-        onPointerLeave={() => setPointer({ x: 0, y: 0, active: false })}
+        onPointerLeave={() => {
+          setPointer({ x: 0, y: 0, active: false });
+          resetDrag();
+        }}
         onPointerDown={(event) => {
           if ((event.target as HTMLElement).closest("[data-aether-ui]")) return;
           dragOrigin.current = { x: event.clientX, y: event.clientY };
@@ -185,9 +208,7 @@ export function AetherExperience() {
           );
         }}
         onPointerCancel={() => {
-          dragOrigin.current = null;
-          dragValue.current = { x: 0, y: 0 };
-          setDrag({ x: 0, y: 0, active: false });
+          resetDrag();
         }}
       >
         <ExperienceCanvas />

@@ -63,20 +63,8 @@ export function JellyOrb() {
     const baseRes = sample.simulation.resonance;
     const effectiveRes = Math.min(2.2, baseRes + userResonance);
     u.resonance.value = effectiveRes;
-    const resDecay = 1 - Math.exp(-2.6 * dt);
-    if (userResonance > 0) addResonance(-userResonance * resDecay * 0.65);
 
     const sig = sample.signature;
-    const enter = sig.orbPresence;
-    const eased = enter * enter * (3 - 2 * enter);
-    const targetZ =
-      0.72 -
-      eased * (0.22 + sig.latticeReveal * 0.48) -
-      sample.visual.cameraProximity * 0.022 +
-      sample.simulation.birth * 0.04;
-    const blend = 1 - Math.exp(-5 * dt);
-    state.camera.position.z += (targetZ - state.camera.position.z) * blend;
-
     const jig = reducedMotion ? 0.25 : 1;
 
     // click / impulse → pulse + a hard jiggle kick (overshoot)
@@ -86,7 +74,6 @@ export function JellyOrb() {
       jv.current += 4.15 * jig;
       jaxis.current.set(px.current, py.current, 0.5).normalize();
       sloshVelocity.current.addScaledVector(jaxis.current, -2.8 * jig);
-      addResonance(0.22 * sample.simulation.pointerForce);
     }
     pulseAmp.current = Math.max(0, pulseAmp.current - dt * 1.05);
     u.pulse.value = pulseAmp.current;
@@ -141,10 +128,7 @@ export function JellyOrb() {
     px.current += (pointer.x - px.current) * leanK;
     py.current += (pointer.y - py.current) * leanK;
 
-    // sustained drag on the orb deposits resonance (the glass "remembers" being pushed)
-    if (drag.active) {
-      addResonance(0.009 * dt);
-    }
+    // sustained drag deposits handled centrally in InteractionDriver
 
     u.pointer.value.set(
       (px.current + dragX.current * 2.1) * lead,

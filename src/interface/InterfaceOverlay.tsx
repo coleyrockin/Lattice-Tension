@@ -8,6 +8,7 @@ import {
 } from "../chapters/atlas";
 import { sampleExperience } from "../chapters/interpolate";
 import { useExperienceStore } from "../experience/store";
+import { useSmoothedDescent } from "../experience/useSmoothedDescent";
 import { ResonanceImprint } from "./ResonanceImprint";
 
 const REALM_LABELS: Record<string, string> = {
@@ -26,7 +27,7 @@ const REALM_LABELS: Record<string, string> = {
 };
 
 export function InterfaceOverlay() {
-  const progress = useExperienceStore((state) => state.scrollProgress);
+  const progress = useSmoothedDescent();
   const ready = useExperienceStore((state) => state.ready);
   const audioEnabled = useExperienceStore((state) => state.audioEnabled);
   const selectedFragment = useExperienceStore(
@@ -60,22 +61,6 @@ export function InterfaceOverlay() {
   const atlasDepth = progress / ATLAS_MAX;
   const inExtendedRealm = progress >= 1;
   const realmLabel = REALM_LABELS[chapter.id] ?? "Realm";
-
-  useEffect(() => {
-    const root = document.documentElement;
-    root.style.setProperty("--chapter-primary", chapter.palette.primary);
-    root.style.setProperty("--chapter-secondary", chapter.palette.secondary);
-    root.style.setProperty("--chapter-accent", chapter.palette.accent);
-    root.style.setProperty("--chapter-void", chapter.palette.void);
-    root.style.setProperty(
-      "--atmosphere-strength",
-      String(0.08 + chapter.signature.nebula * 0.12 + chapter.signature.veil * 0.06),
-    );
-    root.style.setProperty(
-      "--vignette-strength",
-      String(0.35 + chapter.post.vignette * 0.35 + chapter.signature.singularity * 0.2),
-    );
-  }, [chapter]);
 
   useEffect(() => {
     document.documentElement.style.setProperty(

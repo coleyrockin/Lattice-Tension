@@ -24,7 +24,6 @@ type Props = { standalone?: boolean };
 export function GyroidLattice({ standalone = false }: Props) {
   const tier = useExperienceStore((s) => s.profile?.tier ?? "high");
   const reducedMotion = useExperienceStore((s) => s.reducedMotion);
-  const addResonance = useExperienceStore((s) => s.addResonance);
   const userResonance = useExperienceStore((s) => s.resonance);
   const u = useMemo(() => createGyroidLatticeMaterial(STEPS[tier] ?? 150), [tier]);
 
@@ -49,9 +48,6 @@ export function GyroidLattice({ standalone = false }: Props) {
     const motion = reducedMotion ? 0.25 : 1;
     const p = pos.current;
 
-    // resonance decay (gentle) + base from chapter + user accumulation
-    // decay happens here and in JellyOrb so it compounds across interactions
-    const resDecay = 1 - Math.exp(-2.8 * dt);
     const baseRes = sample.simulation.resonance;
     const effectiveRes = Math.min(2.2, baseRes + userResonance);
     u.resonance.value = effectiveRes;
@@ -66,8 +62,6 @@ export function GyroidLattice({ standalone = false }: Props) {
     u.absorptionScale.value = sig.absorption;
     u.shellScale.value = 0.55 + sig.shellThickness * 0.45;
     u.focalGlow.value = sig.focalGlow;
-    // slow global decay on the user accumulator (shared across orb + lattice)
-    if (userResonance > 0) addResonance(-userResonance * resDecay * 0.65);
 
     const reveal = standalone ? 1 : sig.latticeReveal;
     const tension = sample.simulation.tension;
@@ -75,7 +69,6 @@ export function GyroidLattice({ standalone = false }: Props) {
     if (impulse && impulse.startedAt !== lastImpulse.current) {
       lastImpulse.current = impulse.startedAt;
       pulseAmp.current = 1;
-      addResonance(0.18 * sample.simulation.pointerForce);
     }
     pulseAmp.current = Math.max(0, pulseAmp.current - dt * 0.72);
 
@@ -98,11 +91,6 @@ export function GyroidLattice({ standalone = false }: Props) {
     py.current += (pointer.y - py.current) * steerK;
     dragX.current += (drag.x - dragX.current) * dragK;
     dragY.current += (drag.y - dragY.current) * dragK;
-
-    // continuous resonance from touching the lattice (drag or strong pointer)
-    if (drag.active || (Math.hypot(pointer.x, pointer.y) > 0.25 && pointer.active)) {
-      addResonance(0.014 * dt * sample.simulation.pointerForce);
-    }
 
     // Collapse lean: a slow controlled banking into the vortex (was an 8.2 Hz
     // shake — that read as glitch). The torque comes from the in-shader twist;

@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { BackgroundDriver } from "../experience/BackgroundDriver";
 import { CameraRig } from "../experience/CameraRig";
@@ -5,6 +6,7 @@ import { JellyOrb } from "./JellyOrb";
 import { GyroidLattice } from "./GyroidLattice";
 import { EchoLayer } from "./EchoLayer";
 import { InterferenceLayer } from "./InterferenceLayer";
+import { sampleExperience } from "../chapters/interpolate";
 import { descent, useExperienceStore } from "../experience/store";
 
 /**
@@ -24,10 +26,45 @@ function DescentDriver() {
   return null;
 }
 
+/** Single owner for imprint decay and drag/impulse deposits — avoids 4× stacking. */
+function InteractionDriver() {
+  const lastImpulse = useRef(0);
+
+  useFrame((_, delta) => {
+    const dt = Math.min(delta, 1 / 30);
+    const state = useExperienceStore.getState();
+    const { resonance, drag, impulse, pointer, addResonance } = state;
+
+    if (resonance > 0) {
+      const resDecay = 1 - Math.exp(-2.6 * dt);
+      addResonance(-resonance * resDecay * 0.65);
+    }
+
+    const sample = sampleExperience(descent.value);
+
+    if (drag.active) {
+      addResonance(0.011 * dt * sample.simulation.pointerForce);
+    } else if (
+      pointer.active &&
+      Math.hypot(pointer.x, pointer.y) > 0.25
+    ) {
+      addResonance(0.005 * dt * sample.simulation.pointerForce);
+    }
+
+    if (impulse && impulse.startedAt !== lastImpulse.current) {
+      lastImpulse.current = impulse.startedAt;
+      addResonance(0.2 * sample.simulation.pointerForce);
+    }
+  });
+
+  return null;
+}
+
 export function AetherWorld() {
   return (
     <>
       <DescentDriver />
+      <InteractionDriver />
       <BackgroundDriver />
       <CameraRig />
       <JellyOrb />

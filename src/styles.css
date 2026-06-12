@@ -91,12 +91,12 @@ button {
     ),
     radial-gradient(
       circle at center,
-      transparent 42%,
+      transparent 38%,
       color-mix(in srgb, var(--chapter-void) calc(var(--vignette-strength) * 100%), transparent) 100%
     );
   mix-blend-mode: screen;
-  opacity: 0.85;
-  transition: opacity 600ms ease;
+  opacity: 0.92;
+  transition: opacity 800ms ease;
 }
 
 .atmosphere::after {
@@ -1355,5 +1355,27 @@ button {
     scroll-behavior: auto !important;
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
+  }
+
+  .loading-screen__signal i {
+    animation: none !important;
+    opacity: 0.55;
+  }
+
+  .resonance-imprint__ring {
+    display: none;
+  }
+
+  .chapter {
+    animation: none !important;
+    opacity: 1;
+    filter: none;
+    transform: translateY(-50%);
+  }
+
+  .chapter-rail__line span,
+  .atlas-bar__fill,
+  .resonance-meter__fill {
+    transition: none !important;
   }
 }

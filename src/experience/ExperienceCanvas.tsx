@@ -10,6 +10,7 @@ export function ExperienceCanvas() {
   const profile = useExperienceStore((state) => state.profile);
   const reducedMotion = useExperienceStore((state) => state.reducedMotion);
   const setReady = useExperienceStore((state) => state.setReady);
+  const setRenderError = useExperienceStore((state) => state.setRenderError);
 
   return (
     <Canvas
@@ -22,12 +23,16 @@ export function ExperienceCanvas() {
           antialias: profile?.antialias ?? true,
           alpha: false,
           powerPreference: "high-performance",
-          // No native WebGPU → transpile the TSL graph to GLSL on WebGL2 (lossless)
           forceWebGL:
             typeof navigator !== "undefined" &&
             !(navigator as unknown as { gpu?: unknown }).gpu,
         });
-        await renderer.init();
+        try {
+          await renderer.init();
+        } catch {
+          setRenderError(true);
+          throw new Error("WebGPU renderer initialization failed");
+        }
         renderer.outputColorSpace = SRGBColorSpace;
         renderer.toneMapping = ACESFilmicToneMapping;
         renderer.toneMappingExposure = 0.51;
