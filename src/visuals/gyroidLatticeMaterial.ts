@@ -311,8 +311,15 @@ export function createGyroidLatticeMaterial(steps: number) {
         .add(accent.mul(curvSpark)),
     );
 
+    // Highlight roll-off: dense / low-absorption realms (Singularity, Quantum)
+    // accumulate enough emission to flood past the bloom threshold and wash to
+    // white under ACES. A per-channel soft knee leaves the black void and mids
+    // (< ~0.62) linear and only compresses the brights — restoring contrast.
+    const rolledGlow = glow.div(
+      vec3(1).add(max(glow.sub(vec3(0.62)), vec3(0)).mul(0.85)),
+    );
     // alpha = reveal → crossfades the lattice in over the orb during the descent
-    return vec4(glow, reveal);
+    return vec4(rolledGlow, reveal);
   });
 
   const material = new NodeMaterial();
