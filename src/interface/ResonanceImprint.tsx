@@ -22,7 +22,11 @@ export function ResonanceImprint() {
   const lastSpawn = useRef(0);
   const pointerRef = useRef(pointer);
 
-  pointerRef.current = pointer;
+  // Keep the latest pointer in a ref for the rAF loop without writing during
+  // render (which React flags) — the effect runs after every commit.
+  useEffect(() => {
+    pointerRef.current = pointer;
+  }, [pointer]);
 
   useEffect(() => {
     if (!drag.active || reducedMotion) return;

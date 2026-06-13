@@ -300,7 +300,7 @@ export function createEchoMaterial(steps: number) {
               .mul(cNdl)
               .mul(imprint); // gated: only structured when high user imprint
             // add very faintly so main structure remains dominant
-            glow.addAssign(childLight.mul(trans).mul(STEP * 0.55));
+            glow.addAssign(childLight.mul(trans).mul(STEP.mul(0.55)));
           });
         }
       });
