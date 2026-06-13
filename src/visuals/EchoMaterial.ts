@@ -237,7 +237,7 @@ export function createEchoMaterial(steps: number) {
           exp(
             dens
               .mul(STEP)
-              .mul(mix(float(-16).sub(collapse.mul(8)), float(-5.6), veil)),
+              .mul(mix(float(-16).sub(collapse.mul(8)), float(-9.0), veil)),
           ),
         );
       });

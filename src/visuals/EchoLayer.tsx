@@ -152,7 +152,10 @@ export function EchoLayer({ standalone = false }: Props) {
     // are the new structural signature: generative from user marks.
     u.twist.value = sig.twist * 0.25;
     u.swell.value = sig.swell * 0.45;
-    u.veil.value = sig.veil * 0.75 + sig.echo * 0.2;
+    // Echo stays translucent-layered but not transparent — keep the veil
+    // moderate so far shells still absorb and a black void survives between the
+    // filaments (otherwise the whole frame washes to flat cream).
+    u.veil.value = sig.veil * 0.5 + sig.echo * 0.05;
     u.freq.value = 2.8 + sig.cellDensity * 1.8 + sig.echo * 0.6;
     u.tension.value = sample.simulation.tension;
     u.reveal.value = reveal;
