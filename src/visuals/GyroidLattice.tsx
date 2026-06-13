@@ -1,6 +1,6 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Vector3 } from "three";
+import { Vector3, type Mesh } from "three";
 import { sampleExperience } from "../chapters/interpolate";
 import {
   GYROID_HEADING,
@@ -36,6 +36,7 @@ export function GyroidLattice({ standalone = false }: Props) {
   const dragY = useRef(0);
   const pulseAmp = useRef(0);
   const lastImpulse = useRef(0);
+  const mesh = useRef<Mesh>(null!);
 
   useFrame((state, delta) => {
     const dt = Math.min(delta, 1 / 30);
@@ -64,6 +65,10 @@ export function GyroidLattice({ standalone = false }: Props) {
     u.focalGlow.value = sig.focalGlow;
 
     const reveal = standalone ? 1 : sig.latticeReveal;
+    // Cull the whole draw when the layer is imperceptible — a full-screen
+    // raymarch dispatched at reveal≈0 still rasterizes ~3.7M fragments. Skipping
+    // the draw entirely (vs the in-shader discard) is the biggest perf win.
+    if (mesh.current) mesh.current.visible = reveal > 0.012;
     const tension = sample.simulation.tension;
 
     if (impulse && impulse.startedAt !== lastImpulse.current) {
@@ -154,6 +159,7 @@ export function GyroidLattice({ standalone = false }: Props) {
 
   return (
     <mesh
+      ref={mesh}
       frustumCulled={false}
       renderOrder={10}
       onClick={() => {

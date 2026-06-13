@@ -1,10 +1,27 @@
-import { Canvas } from "@react-three/fiber";
-import { Suspense } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
+import { Suspense, useEffect } from "react";
 import { ACESFilmicToneMapping, SRGBColorSpace } from "three";
 import { WebGPURenderer } from "three/webgpu";
 import { useExperienceStore } from "./store";
 import { AetherWorld } from "../visuals/AetherWorld";
 import { TslBloom } from "../visuals/TslBloom";
+
+/**
+ * Pause the render loop while the tab is hidden. WebGPU setAnimationLoop is not
+ * reliably throttled when backgrounded, so four full-screen raymarch shaders can
+ * keep burning the GPU on an invisible tab — heating the machine and worsening
+ * foreground performance after a tab switch. frameloop "never" stops all frames.
+ */
+function VisibilityPause() {
+  const setFrameloop = useThree((s) => s.setFrameloop);
+  useEffect(() => {
+    const onVis = () => setFrameloop(document.hidden ? "never" : "always");
+    document.addEventListener("visibilitychange", onVis);
+    onVis();
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [setFrameloop]);
+  return null;
+}
 
 export function ExperienceCanvas() {
   const profile = useExperienceStore((state) => state.profile);
@@ -44,6 +61,7 @@ export function ExperienceCanvas() {
       }}
     >
       <Suspense fallback={null}>
+        <VisibilityPause />
         <AetherWorld />
         {!reducedMotion && profile?.postprocessing ? <TslBloom /> : null}
       </Suspense>

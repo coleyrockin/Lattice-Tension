@@ -59,9 +59,12 @@ export function choosePerformanceProfile(
 
   return {
     tier: "high",
-    maxDpr: Math.min(1.75, input.devicePixelRatio),
+    // DPR is a quadratic multiplier over every full-screen raymarch pass AND
+    // the bloom chain. 1.4 vs 1.75 is ~36% fewer fragments; the emissive glow +
+    // ACES/bloom hide the resolution drop almost entirely on a DPR-2 display.
+    maxDpr: Math.min(1.4, input.devicePixelRatio),
     particleCount: 1100,
-      nodeCount: 34,
+    nodeCount: 34,
     membraneSegments: 84,
     postprocessing: true,
     depthOfField: true,

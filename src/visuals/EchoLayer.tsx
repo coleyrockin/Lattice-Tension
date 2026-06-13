@@ -1,6 +1,6 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Vector3 } from "three";
+import { Vector3, type Mesh } from "three";
 import { sampleExperience } from "../chapters/interpolate";
 import {
   ECHO_HEADING,
@@ -63,6 +63,7 @@ export function EchoLayer({ standalone = false }: Props) {
   const dragY = useRef(0);
   const pulseAmp = useRef(0);
   const lastImpulse = useRef(0);
+  const mesh = useRef<Mesh>(null!);
 
   useFrame((state, delta) => {
     const dt = Math.min(delta, 1 / 30);
@@ -90,6 +91,10 @@ export function EchoLayer({ standalone = false }: Props) {
     const sig = sample.signature;
     const resGate = smoothstep(0.55, 1.35, effectiveRes);
     const reveal = standalone ? 1 : sig.echoLayer * resGate * (0.45 + sig.echo * 0.55);
+    // Cull the draw when imperceptible — Echo is reveal≈0 in ~10/12 chapters
+    // (and gated further by resonance), so it skips its heavy 168-step march
+    // (plus the child sub-loop) for nearly the whole experience.
+    if (mesh.current) mesh.current.visible = reveal > 0.012;
 
     if (impulse && impulse.startedAt !== lastImpulse.current) {
       lastImpulse.current = impulse.startedAt;
@@ -172,6 +177,7 @@ export function EchoLayer({ standalone = false }: Props) {
 
   return (
     <mesh
+      ref={mesh}
       frustumCulled={false}
       renderOrder={12}
       onClick={() => {

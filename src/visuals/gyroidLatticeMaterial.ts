@@ -119,7 +119,7 @@ export function createGyroidLatticeMaterial(steps: number) {
     // skip all march work while invisible (crossfade = 0). NOTE: this must be
     // a discard, NOT If(reveal>0)→Loop — a uniform-conditional wrapping the
     // march loop silently compiles to a no-op on WebGPU (glow stays 0 forever).
-    reveal.lessThan(0.01).discard();
+    reveal.lessThan(0.04).discard();
 
     // EMISSIVE VOLUMETRIC: march straight through, accumulate glowing gyroid
     // shells with absorption. You see THROUGH layer after layer into infinite

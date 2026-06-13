@@ -1,6 +1,6 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Vector3 } from "three";
+import { Vector3, type Mesh } from "three";
 import { sampleExperience } from "../chapters/interpolate";
 import {
   INTERFERENCE_HEADING,
@@ -54,6 +54,7 @@ export function InterferenceLayer({ standalone = false }: Props) {
   const dragY = useRef(0);
   const pulseAmp = useRef(0);
   const lastImpulse = useRef(0);
+  const mesh = useRef<Mesh>(null!);
 
   useFrame((state, delta) => {
     const dt = Math.min(delta, 1 / 30);
@@ -75,6 +76,9 @@ export function InterferenceLayer({ standalone = false }: Props) {
     u.interference.value = interf;
     u.fringeAmp.value = 0.55 + interf * 1.35 + effectiveRes * 0.28;
     const reveal = standalone ? 1 : sig.interferenceLayer * sig.latticeReveal;
+    // Cull the draw when imperceptible — Interference is reveal≈0 in ~8/12
+    // chapters, so this skips a full-screen raymarch for most of the scroll.
+    if (mesh.current) mesh.current.visible = reveal > 0.012;
 
     if (impulse && impulse.startedAt !== lastImpulse.current) {
       lastImpulse.current = impulse.startedAt;
@@ -154,6 +158,7 @@ export function InterferenceLayer({ standalone = false }: Props) {
 
   return (
     <mesh
+      ref={mesh}
       frustumCulled={false}
       renderOrder={11}
       onClick={() => {

@@ -112,7 +112,7 @@ export function createInterferenceMaterial(steps: number) {
     const axisU = vec3(-0.4082, 0.8165, -0.4082);
 
     // skip all march work while invisible
-    reveal.lessThan(0.01).discard();
+    reveal.lessThan(0.04).discard();
 
     // EMISSIVE VOLUMETRIC: march straight through, accumulate glowing shells
     const STEP = float(0.032);

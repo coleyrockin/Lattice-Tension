@@ -118,7 +118,7 @@ export function createEchoMaterial(steps: number) {
     const axisU = vec3(-0.4082, 0.8165, -0.4082);
 
     // skip march while reveal near zero (crossfade / threshold gate)
-    reveal.lessThan(0.01).discard();
+    reveal.lessThan(0.04).discard();
 
     // EMISSIVE VOLUMETRIC march — identical structure to gyroid
     const STEP = float(0.032);
