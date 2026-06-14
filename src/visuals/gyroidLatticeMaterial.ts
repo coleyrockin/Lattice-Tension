@@ -13,6 +13,7 @@ import {
   dot,
   exp,
   float,
+  fract,
   length,
   max,
   mix,
@@ -22,6 +23,7 @@ import {
   sign,
   sin,
   smoothstep,
+  sqrt,
   uniform,
   vec2,
   vec3,
@@ -125,7 +127,13 @@ export function createGyroidLatticeMaterial(steps: number) {
     // shells with absorption. You see THROUGH layer after layer into infinite
     // depth — a luminous lattice cathedral that can never present a flat wall.
     const STEP = float(0.032);
-    const t = float(0.02).toVar();
+    // Per-ray start jitter: decorrelates the regular STEP lattice from the
+    // gyroid periodicity so coherent banding, feathery shell combing, and the
+    // central axial seam dissolve into fine noise the bloom hides.
+    const dither = fract(
+      sin(uv.x.mul(113.7).add(uv.y.mul(271.3))).mul(43758.5453),
+    );
+    const t = float(0.02).add(dither.mul(STEP)).toVar();
     const glow = vec3(0).toVar();
     const trans = float(1).toVar(); // transmittance (1 → clear, 0 → fully absorbed)
     const key = normalize(vec3(0.4, 0.7, 0.55));
@@ -190,7 +198,11 @@ export function createGyroidLatticeMaterial(steps: number) {
 
       const fgg = fieldFG(pT.mul(localFreq), morph);
       const gradientLength = max(length(fgg.g), 0.35);
-      const distanceToSurface = abs(fgg.f).div(gradientLength).div(localFreq);
+      // Smooth |f| (sqrt(f²+ε) instead of abs) removes the C0 kink at the f=0
+      // sheet crossings that anchors the hard vertical seam down frame-center.
+      const distanceToSurface = sqrt(fgg.f.mul(fgg.f).add(0.0001))
+        .div(gradientLength)
+        .div(localFreq);
       const waveA = sin(p.x.mul(localFreq.mul(1.82)).add(time.mul(0.068)));
       const waveB = sin(p.z.mul(localFreq.mul(2.11)).add(time.mul(-0.055)));
       const crossed = waveA.mul(waveB);
@@ -206,10 +218,13 @@ export function createGyroidLatticeMaterial(steps: number) {
       // Prevent the first few samples from becoming a luminous windshield.
       const nearFade = smoothstep(0.08, 0.42, t);
       const dens = surface.mul(nearFade).toVar();
+      // Gate the volumetric fog to genuinely low-density regions and cap it so
+      // it can't flood the mid-realms (Nebula/Interference) into milky haze.
       const fogDens = nebulaFog
         .mul(exp(distanceToSurface.mul(-4.8)))
         .mul(float(1).sub(dens))
-        .mul(0.24);
+        .mul(0.15)
+        .min(0.05);
       glow.addAssign(mix(tint, accent, 0.42).mul(fogDens).mul(trans).mul(STEP));
 
       If(dens.greaterThan(0.001), () => {
@@ -260,7 +275,7 @@ export function createGyroidLatticeMaterial(steps: number) {
           .mul(fringeAmp)
           .mul(dens);
         const surfaceLight = em
-          .mul(dens.mul(float(5.8).add(stress.mul(2.4)).add(veil.mul(3.0))))
+          .mul(dens.mul(float(4.6).add(stress.mul(2.0)).add(veil.mul(2.6))))
           .add(mix(tint, highlight, 0.62).mul(surfaceCore.mul(1.05)))
           .add(highlight.mul(stressLine.mul(1.4)))
           .add(echo.mul(0.85))
@@ -277,8 +292,8 @@ export function createGyroidLatticeMaterial(steps: number) {
           exp(
             dens
               .mul(STEP)
-              .mul(mix(float(-12).sub(collapse.mul(6)), float(-5.0), veil))
-              .mul(absorptionScale),
+              .mul(mix(float(-19).sub(collapse.mul(8)), float(-7.0), veil))
+              .mul(max(absorptionScale, 0.55)),
           ),
         );
       });
@@ -299,7 +314,7 @@ export function createGyroidLatticeMaterial(steps: number) {
     const memCore = exp(length(focalPosition).pow(2).mul(-52))
       .mul(resonance.mul(0.55));
     const diffCore = exp(length(focalPosition).pow(2).mul(-40))
-      .mul(diffusion.mul(0.6));
+      .mul(diffusion.mul(0.35));
     const curvSpark = exp(length(focalPosition).pow(2).mul(-100))
       .mul(curvature.mul(0.3));
     glow.addAssign(

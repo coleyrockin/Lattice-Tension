@@ -94,7 +94,7 @@ function sampleSignature(rawProgress: number): ChapterSignature {
     return mixSignature(from.signature, to.signature, blendT);
   }
 
-  return from.signature;
+  return { ...from.signature };
 }
 
 function mixVisual(

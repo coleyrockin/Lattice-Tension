@@ -26,7 +26,9 @@ export function TslBloom() {
     const scenePass = pass(scene, camera);
     const color = scenePass.getTextureNode();
     const bloomPass = bloom(color, 0.22, 0.38, 0.92);
-    const bloomed = color.add(bloomPass);
+    // Screen-blend, not raw add: already-bright pixels can't stack a second full
+    // bloom pass on top and roll to white under ACES — preserves mid contrast.
+    const bloomed = color.add(bloomPass.mul(color.oneMinus()));
     const chromed = chromaticAberration(bloomed, chromaStrength, vec2(0.5, 0.5));
     const grained = film(chromed, grainIntensity);
 
@@ -46,15 +48,16 @@ export function TslBloom() {
       0.1 + sample.post.bloom * 0.18 + sig.focalGlow * 0.14 + sig.nebula * 0.08 + sig.echo * 0.04;
     post.bloomPass.radius.value =
       0.24 + sig.nebula * 0.24 + sig.echo * 0.12 + sig.veil * 0.1 - sig.crystalline * 0.05;
-    post.bloomPass.threshold.value = 0.86 - sig.nebula * 0.14 - sig.focalGlow * 0.06 - sig.echo * 0.03;
+    post.bloomPass.threshold.value = 0.92 - sig.nebula * 0.05 - sig.focalGlow * 0.03 - sig.echo * 0.02;
     post.chromaStrength.value =
       sample.post.aberration * 160 + sig.chromatic * 0.013;
     post.grainIntensity.value = 0.018 + sig.nebula * 0.04 + sig.echo * 0.025;
 
-    // Exposure: slightly brighter base so the lattice details read well; absorption-heavy
-    // chapters compensate upward so the tunnels don't crush to black.
+    // Exposure: hold a controlled base; fog-heavy realms (Nebula) drop exposure
+    // a touch to recover black-void contrast rather than compensating upward
+    // (the old upward push is what washed the mid-descent to milky haze).
     const exposure =
-      0.52 + sig.focalGlow * 0.14 - sig.absorption * 0.035 + sig.nebula * 0.07 + sig.veil * 0.05 + sig.echo * 0.03;
+      0.5 + sig.focalGlow * 0.12 - sig.absorption * 0.04 - sig.nebula * 0.05 + sig.echo * 0.02;
     gl.toneMappingExposure += (exposure - gl.toneMappingExposure) * (1 - Math.exp(-5 * dt));
 
     post.pipeline.render();

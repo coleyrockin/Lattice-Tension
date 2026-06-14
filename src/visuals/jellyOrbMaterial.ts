@@ -356,11 +356,11 @@ export function createJellyOrbMaterial(steps: number) {
         const bandWidth = mix(float(0.55), float(0.2), order);
         const gphase = vec3(time.mul(0.06), time.mul(-0.04), time.mul(0.05))
           .add(slosh.mul(1.8));
-        Loop(6, ({ i }) => {
-          lp.addAssign(refrDir.mul(0.092)); // march along the refracted ray
+        Loop(10, ({ i }) => {
+          lp.addAssign(refrDir.mul(0.055)); // march along the refracted ray
           const g = gyroid(lp.mul(gscale).add(gphase) as ReturnType<typeof vec3>);
           const band = smoothstep(bandWidth, 0.0, abs(g));
-          const falloff = float(1).sub(float(i).mul(0.14));
+          const falloff = float(1).sub(float(i).mul(0.085));
           latGlow.addAssign(band.mul(float(0.2).add(order.mul(0.12))).mul(falloff));
           // resonance memory: imprints make the suspended gyroid web inside the orb
           // develop brighter nodes and slight fractures — the viewer "marked" it
