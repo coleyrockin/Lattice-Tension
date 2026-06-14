@@ -3,7 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import { Color, Vector3, type Mesh } from "three";
 import { sampleExperience } from "../chapters/interpolate";
 import { createJellyOrbMaterial } from "./jellyOrbMaterial";
-import { descent, useExperienceStore } from "../experience/store";
+import { descent, frameSample, useExperienceStore } from "../experience/store";
 
 // frame-rate-independent damping decay rates: a per-frame lerp of `c` at 60fps
 // has decay k = -60*ln(1-c). Lerp factor each frame = 1 - exp(-k*dt), so the
@@ -46,18 +46,18 @@ export function JellyOrb() {
   const tier = useExperienceStore((s) => s.profile?.tier ?? "high");
   const reducedMotion = useExperienceStore((s) => s.reducedMotion);
   const addResonance = useExperienceStore((s) => s.addResonance);
-  const userResonance = useExperienceStore((s) => s.resonance);
 
   const u = useMemo(() => createJellyOrbMaterial(STEPS[tier] ?? 110), [tier]);
 
   useFrame((state, delta) => {
     const dt = Math.min(delta, 1 / 30);
     const t = state.clock.elapsedTime;
-    const { pointer, drag, impulse } = useExperienceStore.getState();
+    const { pointer, drag, impulse, resonance: userResonance } =
+      useExperienceStore.getState();
     // read the smoothed descent so camera, palette, tension and structure all
     // glide together (set once per frame by <DescentDriver/>)
     const d = descent.value;
-    const sample = sampleExperience(d);
+    const sample = frameSample.current ?? sampleExperience(d);
 
     // resonance: wire effective (chapter base + user imprints) + contribute to decay
     const baseRes = sample.simulation.resonance;

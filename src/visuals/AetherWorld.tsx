@@ -7,7 +7,7 @@ import { GyroidLattice } from "./GyroidLattice";
 import { EchoLayer } from "./EchoLayer";
 import { InterferenceLayer } from "./InterferenceLayer";
 import { sampleExperience } from "../chapters/interpolate";
-import { descent, useExperienceStore } from "../experience/store";
+import { descent, frameSample, useExperienceStore } from "../experience/store";
 
 /**
  * Owns the single smoothed `descent` value. Runs first (mounted first, default
@@ -22,6 +22,9 @@ function DescentDriver() {
     descent.target = useExperienceStore.getState().scrollProgress;
     const k = 6;
     descent.value += (descent.target - descent.value) * (1 - Math.exp(-k * dt));
+    // Compute the chapter sample ONCE per frame; every layer + driver reads it
+    // from frameSample instead of each re-deriving it (and re-allocating Colors).
+    frameSample.current = sampleExperience(descent.value);
   });
   return null;
 }
@@ -40,7 +43,7 @@ function InteractionDriver() {
       addResonance(-resonance * resDecay * 0.65);
     }
 
-    const sample = sampleExperience(descent.value);
+    const sample = frameSample.current ?? sampleExperience(descent.value);
 
     if (drag.active) {
       addResonance(0.011 * dt * sample.simulation.pointerForce);

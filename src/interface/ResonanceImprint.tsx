@@ -13,23 +13,18 @@ type Ripple = {
  * traces on the aether. Spawns while dragging; intensity scales with imprint.
  */
 export function ResonanceImprint() {
-  const drag = useExperienceStore((s) => s.drag);
-  const pointer = useExperienceStore((s) => s.pointer);
-  const resonance = useExperienceStore((s) => s.resonance);
+  // Only `drag.active` and `reducedMotion` gate the rAF loop — subscribe to
+  // those. Pointer and resonance change every move/frame, so reading them via a
+  // selector would re-render this whole ripple tree continuously; read them
+  // imperatively inside the tick instead.
+  const dragActive = useExperienceStore((s) => s.drag.active);
   const reducedMotion = useExperienceStore((s) => s.reducedMotion);
   const [ripples, setRipples] = useState<Ripple[]>([]);
   const nextId = useRef(0);
   const lastSpawn = useRef(0);
-  const pointerRef = useRef(pointer);
-
-  // Keep the latest pointer in a ref for the rAF loop without writing during
-  // render (which React flags) — the effect runs after every commit.
-  useEffect(() => {
-    pointerRef.current = pointer;
-  }, [pointer]);
 
   useEffect(() => {
-    if (!drag.active || reducedMotion) return;
+    if (!dragActive || reducedMotion) return;
 
     let frame = 0;
     const tick = (now: number) => {
@@ -38,12 +33,12 @@ export function ResonanceImprint() {
         return;
       }
 
+      const { pointer, resonance } = useExperienceStore.getState();
       const interval = Math.max(90, 220 - resonance * 45);
       if (now - lastSpawn.current >= interval) {
         lastSpawn.current = now;
-        const { x, y } = pointerRef.current;
-        const px = ((x + 1) / 2) * window.innerWidth;
-        const py = ((1 - y) / 2) * window.innerHeight;
+        const px = ((pointer.x + 1) / 2) * window.innerWidth;
+        const py = ((1 - pointer.y) / 2) * window.innerHeight;
         const id = nextId.current++;
         const strength = 0.55 + Math.min(1, resonance / 2.2) * 0.45;
         setRipples((prev) => [...prev.slice(-11), { id, x: px, y: py, strength }]);
@@ -53,7 +48,7 @@ export function ResonanceImprint() {
 
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [drag.active, reducedMotion, resonance]);
+  }, [dragActive, reducedMotion]);
 
   useEffect(() => {
     if (ripples.length === 0) return;

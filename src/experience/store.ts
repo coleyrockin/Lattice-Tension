@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { PerformanceProfile } from "../performance/profile";
+import type { SampledExperience } from "../chapters/types";
 
 /**
  * Smoothed descent — a single eased value the whole scene reads from so the
@@ -8,6 +9,16 @@ import type { PerformanceProfile } from "../performance/profile";
  * <DescentDriver/>; kept as a plain module ref to avoid per-frame re-renders.
  */
 export const descent = { value: 0, target: 0 };
+
+/**
+ * The chapter sample for the current frame, computed ONCE per frame by
+ * <DescentDriver/> and read by every layer + driver. sampleExperience()
+ * allocates ~10 Color objects per call; computing it once instead of ~8×/frame
+ * removes thousands of allocations/sec and the minor-GC stutter they caused.
+ */
+export const frameSample: { current: SampledExperience | null } = {
+  current: null,
+};
 
 export type PointerState = {
   x: number;

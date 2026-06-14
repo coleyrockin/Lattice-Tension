@@ -6,7 +6,7 @@ import {
   ECHO_HEADING,
   createEchoMaterial,
 } from "./EchoMaterial";
-import { descent, useExperienceStore } from "../experience/store";
+import { descent, frameSample, useExperienceStore } from "../experience/store";
 
 const STEPS: Record<string, number> = { high: 168, medium: 108, low: 58 };
 
@@ -51,7 +51,6 @@ type Props = { standalone?: boolean };
 export function EchoLayer({ standalone = false }: Props) {
   const tier = useExperienceStore((s) => s.profile?.tier ?? "high");
   const reducedMotion = useExperienceStore((s) => s.reducedMotion);
-  const userResonance = useExperienceStore((s) => s.resonance);
   const u = useMemo(() => createEchoMaterial(STEPS[tier] ?? 168), [tier]);
 
   const pos = useRef(new Vector3().copy(HEADING).multiplyScalar(1.2));
@@ -68,10 +67,12 @@ export function EchoLayer({ standalone = false }: Props) {
   useFrame((state, delta) => {
     const dt = Math.min(delta, 1 / 30);
     const time = state.clock.elapsedTime;
-    const { pointer, drag, impulse } = useExperienceStore.getState();
+    const { pointer, drag, impulse, resonance: userResonance } =
+      useExperienceStore.getState();
     // smoothed descent (raw value allows >1 for echo atlas depth)
     const d = standalone ? 1 : descent.value;
-    const sample = sampleExperience(d);
+    const sample =
+      !standalone && frameSample.current ? frameSample.current : sampleExperience(d);
     const motion = reducedMotion ? 0.25 : 1;
     const p = pos.current;
 
