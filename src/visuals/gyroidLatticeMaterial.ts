@@ -20,7 +20,6 @@ import {
   normalize,
   positionGeometry,
   screenUV,
-  sign,
   sin,
   smoothstep,
   sqrt,
@@ -228,10 +227,15 @@ export function createGyroidLatticeMaterial(steps: number) {
       glow.addAssign(mix(tint, accent, 0.42).mul(fogDens).mul(trans).mul(STEP));
 
       If(dens.greaterThan(0.001), () => {
-        const g = fgg.g.mul(sign(fgg.f));
+        // Two-sided lighting: light by the UNSIGNED gradient and take abs() of
+        // the lambert/view terms. The old `sign(fgg.f)` flipped the normal 180°
+        // across the iso-surface (f=0), producing a hard shading seam; abs() is
+        // even, so it's continuous across the gradient sign change — seam gone,
+        // no dark/NaN band (length is still ε-guarded).
+        const g = fgg.g;
         const n = g.div( length(g).max(0.001) ).toVar();
-        const ndl = max(dot(n, key), 0).mul(0.58).add(0.44);
-        const ndv = max(dot(n, rd.negate()), 0).toVar();
+        const ndl = abs(dot(n, key)).mul(0.58).add(0.44);
+        const ndv = abs(dot(n, rd.negate())).toVar();
 
         // Preserve several readable shells before they recede into indigo-black.
         const depth = smoothstep(0.3, 6.0, t);

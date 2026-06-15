@@ -8,6 +8,7 @@ import {
   Fn,
   If,
   Loop,
+  abs,
   cross,
   dot,
   exp,
@@ -194,10 +195,12 @@ export function createEchoMaterial(steps: number) {
       const dens = surface.mul(nearFade).toVar();
 
       If(dens.greaterThan(0.001), () => {
-        const g = fgg.g.mul(sign(fgg.f));
+        // Two-sided lighting (see gyroid): unsigned gradient + abs() lambert/
+        // view terms removes the 180° normal seam at f=0 continuously.
+        const g = fgg.g;
         const n = g.div( length(g).max(0.001) ).toVar();
-        const ndl = max(dot(n, key), 0).mul(0.58).add(0.44);
-        const ndv = max(dot(n, rd.negate()), 0).toVar();
+        const ndl = abs(dot(n, key)).mul(0.58).add(0.44);
+        const ndv = abs(dot(n, rd.negate())).toVar();
 
         const depth = smoothstep(0.3, 6.0, t);
         const spectralPhase = cos(
