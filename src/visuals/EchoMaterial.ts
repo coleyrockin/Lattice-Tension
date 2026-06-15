@@ -13,6 +13,7 @@ import {
   dot,
   exp,
   float,
+  fract,
   length,
   max,
   mix,
@@ -22,6 +23,7 @@ import {
   sign,
   sin,
   smoothstep,
+  sqrt,
   uniform,
   vec2,
   vec3,
@@ -122,7 +124,11 @@ export function createEchoMaterial(steps: number) {
 
     // EMISSIVE VOLUMETRIC march — identical structure to gyroid
     const STEP = float(0.032);
-    const t = float(0.02).toVar();
+    // Per-ray start jitter (propagated from gyroid) — kills coherent banding.
+    const dither = fract(
+      sin(uv.x.mul(113.7).add(uv.y.mul(271.3))).mul(43758.5453),
+    );
+    const t = float(0.02).add(dither.mul(STEP)).toVar();
     const glow = vec3(0).toVar();
     const trans = float(1).toVar();
     const key = normalize(vec3(0.4, 0.7, 0.55));
@@ -174,7 +180,9 @@ export function createEchoMaterial(steps: number) {
 
       const fgg = fieldFG(pT.mul(localFreq), morph);
       const gradientLength = max(length(fgg.g), 0.35);
-      const distanceToSurface = abs(fgg.f).div(gradientLength).div(localFreq);
+      const distanceToSurface = sqrt(fgg.f.mul(fgg.f).add(0.0001))
+        .div(gradientLength)
+        .div(localFreq);
       const scarredDist = distanceToSurface.sub(scar.mul(0.6));
       const surface = float(1)
         .sub(smoothstep(float(0), thickness, scarredDist))
@@ -237,7 +245,7 @@ export function createEchoMaterial(steps: number) {
           exp(
             dens
               .mul(STEP)
-              .mul(mix(float(-16).sub(collapse.mul(8)), float(-9.0), veil)),
+              .mul(mix(float(-19).sub(collapse.mul(8)), float(-8.0), veil)),
           ),
         );
       });
@@ -282,7 +290,7 @@ export function createEchoMaterial(steps: number) {
           const childLocalFreq = localFreq.mul(1.72 + k * 0.09); // children are finer
           const cgg = fieldFG(childPt.mul(childLocalFreq), morph);
           const cGradL = max(length(cgg.g), 0.28);
-          const cDist = abs(cgg.f).div(cGradL).div(childLocalFreq);
+          const cDist = sqrt(cgg.f.mul(cgg.f).add(0.0001)).div(cGradL).div(childLocalFreq);
           // thinner child shells — they are filaments, not the main lattice
           const childSurf = float(1)
             .sub(smoothstep(float(0), thickness.mul(0.58), cDist))

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck — TSL node DSL: runtime-correct, but its operator types can't be
 // modeled by TypeScript. App code outside this shader stays fully type-checked.
-import { Color, DoubleSide, Vector2, Vector3 } from 'three';
+import { Color, FrontSide, Vector2, Vector3 } from 'three';
 import { NodeMaterial } from 'three/webgpu';
 import {
   Break,
@@ -30,6 +30,10 @@ import {
   vec3,
   vec4,
   time,
+  fract,
+  cameraPosition,
+  positionGeometry,
+  modelWorldMatrixInverse,
 } from 'three/tsl';
 import { RaymarchingBox } from 'three/examples/jsm/tsl/utils/Raymarching.js';
 
@@ -160,10 +164,23 @@ export function createJellyOrbMaterial(steps: number) {
   };
 
   const raymarch = Fn(() => {
-    // The camera looks down -Z. Using +Z here clamps N.V to zero across most
-    // of the front face, turning the whole object into a blown-out fresnel rim.
-    const rd = vec3(0, 0, -1).toVar();
+    // True per-pixel view ray, reconstructed exactly as RaymarchingBox builds it:
+    // the camera position transformed into object space, pointing at this
+    // fragment. Using a constant (0,0,-1) made every view-dependent term
+    // (fresnel, refraction, reflection, specular) correct ONLY dead-centre and
+    // wrong toward the rim — the orb read as a flat stepped blob. This single
+    // line is what makes the whole sphere behave like glass.
+    const vOrigin = modelWorldMatrixInverse.mul(vec4(cameraPosition, 1.0)).xyz;
+    const rd = normalize(positionGeometry.sub(vOrigin)).toVar();
     const finalColor = vec4(0, 0, 0, 0).toVar(); // transparent void
+
+    // per-pixel blue-noise-ish hash → decorrelates the interior sub-march so the
+    // 10 lattice shells stop landing at the same depth on every ray (the hard
+    // concentric stair-step rings). Hash is stable per fragment.
+    const hash = fract(
+      sin(positionGeometry.x.mul(127.31).add(positionGeometry.y.mul(311.7)))
+        .mul(43758.5453),
+    ).toVar();
 
     RaymarchingBox(stepCount, ({ positionRay }) => {
       const p = positionRay.mul(2.6);
@@ -171,13 +188,14 @@ export function createJellyOrbMaterial(steps: number) {
 
       If(d.lessThan(0.0015), () => {
         const e = float(0.0012);
-        const n = normalize(
-          vec3(
-            map(p.add(vec3(e, 0, 0)) as ReturnType<typeof vec3>).sub(map(p.sub(vec3(e, 0, 0)) as ReturnType<typeof vec3>)),
-            map(p.add(vec3(0, e, 0)) as ReturnType<typeof vec3>).sub(map(p.sub(vec3(0, e, 0)) as ReturnType<typeof vec3>)),
-            map(p.add(vec3(0, 0, e)) as ReturnType<typeof vec3>).sub(map(p.sub(vec3(0, 0, e)) as ReturnType<typeof vec3>)),
-          ),
-        ).toVar();
+        const grad = vec3(
+          map(p.add(vec3(e, 0, 0)) as ReturnType<typeof vec3>).sub(map(p.sub(vec3(e, 0, 0)) as ReturnType<typeof vec3>)),
+          map(p.add(vec3(0, e, 0)) as ReturnType<typeof vec3>).sub(map(p.sub(vec3(0, e, 0)) as ReturnType<typeof vec3>)),
+          map(p.add(vec3(0, 0, e)) as ReturnType<typeof vec3>).sub(map(p.sub(vec3(0, 0, e)) as ReturnType<typeof vec3>)),
+        );
+        // Length-guarded normalize: at the core the central-difference gradient
+        // can collapse to ~0 → normalize(0)=NaN that poisons the whole pixel.
+        const n = grad.div(max(length(grad), float(1e-5))).toVar();
 
         // Wavelet wet skin: a screen-stable tangent frame (with pole guard)
         // carries a detail-normal so light dances across a rippling water
@@ -257,7 +275,9 @@ export function createJellyOrbMaterial(steps: number) {
         const envCol = highlight
           .mul(env)
           .add(accent.mul(pow(max(dot(refl, sky), 0), 6.0).mul(0.12)))
-          .add(mix(tint, accent, 0.6).mul(0.2));
+          // luminous ambient floor → the reflective rim catches a bright sky
+          // instead of mirroring the empty black void as a dark crescent.
+          .add(mix(accent, highlight, 0.5).mul(0.42));
         // Schlick, but capped so the body always shows through the rim (a fully
         // mirror rim against an empty environment reads as a black crescent).
         const F0 = float(0.02);
@@ -269,8 +289,11 @@ export function createJellyOrbMaterial(steps: number) {
         // milky-frosted only at the grazing silhouette (how real frosted-glass
         // spheres behave). milkRim is gated by diff so dark back-rims stay black.
         const grazeMask = smoothstep(0.55, 0.05, ndv).toVar();
-        const frostN = sin(n.x.mul(34.0).add(time.mul(0.4)))
-          .mul(sin(n.y.mul(31.0).sub(time.mul(0.3))))
+        // Lower-frequency frost so the grazing rim reads as soft frosted glass
+        // instead of a buzzing high-frequency moiré (the product of two fast
+        // sines over the normal aliased hard on curved silhouettes).
+        const frostN = sin(n.x.mul(13.0).add(time.mul(0.4)))
+          .mul(sin(n.y.mul(11.5).sub(time.mul(0.3))))
           .mul(0.5)
           .add(0.5);
         const iriCol = mix(tint, accent, pow(float(1).sub(ndv), 1.5).mul(0.94));
@@ -323,7 +346,7 @@ export function createJellyOrbMaterial(steps: number) {
         // in the deep. This is the change that turns a lit shell into a volume.
         // Gentler absorption so light carries deep into the body → luminous,
         // translucent tropical water rather than an opaque marble.
-        const absorb = vec3(1.0).sub(tint).mul(float(1.2).add(tension.mul(0.3)));
+        const absorb = vec3(1.0).sub(tint).mul(float(0.9).add(tension.mul(0.25)));
         const transmit = vec3(
           exp(absorb.x.mul(thickness).negate()),
           exp(absorb.y.mul(thickness).negate()),
@@ -348,7 +371,10 @@ export function createJellyOrbMaterial(steps: number) {
         // a short inward sub-march from the hit point accumulates the glowing web
         const latGlow = float(0).toVar();
         const causAccum = float(0).toVar();
-        const lp = p.toVar();
+        // jitter the march start by up to one step so the 10 discrete shells
+        // land at different depths per pixel → the concentric stair-step rings
+        // dissolve into fine noise the bloom + output dither smooth away.
+        const lp = p.add(refrDir.mul(hash.mul(0.055))).toVar();
         // Soft wide veils by default; `order` (Pattern chapter) tightens them
         // into a finer, crisper crystalline lattice — Origin's interior stays a
         // diffuse glow, Pattern's reads as structured geometry.
@@ -402,8 +428,8 @@ export function createJellyOrbMaterial(steps: number) {
         const sparkMask = smoothstep(
           0.6,
           1.0,
-          sin(uu.mul(31.7).add(wt.mul(3.3)))
-            .mul(sin(vv.mul(26.3).sub(wt.mul(2.7))))
+          sin(uu.mul(18.3).add(wt.mul(3.3)))
+            .mul(sin(vv.mul(15.1).sub(wt.mul(2.7))))
             .mul(0.5)
             .add(0.5),
         );
@@ -426,11 +452,24 @@ export function createJellyOrbMaterial(steps: number) {
           envCol,
           fres,
         ).toVar();
+        // Dispersive fresnel rim-glow: a luminous meniscus at the silhouette
+        // with a faint chromatic split (blue refracts most → spreads inward,
+        // red stays pinned to the very edge). Keeps the orb reading as a glass
+        // shell catching light rather than a sphere fading to black. Stays in
+        // the cool palette, so the split is subtle, not a rainbow.
+        const eInv = float(1).sub(ndv);
+        const dispR = pow(eInv, 4.4);
+        const dispG = pow(eInv, 3.6);
+        const dispB = pow(eInv, 2.9);
+        const rimGlow = mix(accent, highlight, fresnel)
+          .mul(vec3(dispR, dispG, dispB))
+          .mul(0.55);
         const col = glass
           .add(spec)
           .add(softSpec.mul(0.5))
           .add(movingSheen.mul(0.6))
           .add(sunGlint)
+          .add(rimGlow)
           .toVar();
         // Hue-preserving floor keeps overlaps inside the chapter palette; a
         // Reinhard soft-knee then compresses only the brights, so mids and the
@@ -458,8 +497,13 @@ export function createJellyOrbMaterial(steps: number) {
   const material = new NodeMaterial();
   material.colorNode = raymarch();
   material.transparent = true;
-  material.side = DoubleSide;
+  // FrontSide: the camera is outside the bounding box, so only the near faces
+  // need to launch rays. DoubleSide double-composited the back faces — with the
+  // true per-pixel view ray that produced a hard vertical seam — and doubled the
+  // cost of the scene's heaviest shader for zero gain.
+  material.side = FrontSide;
   material.depthWrite = false;
+  material.depthTest = false;
 
   return {
     material,

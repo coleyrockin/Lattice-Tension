@@ -13,6 +13,7 @@ import {
   dot,
   exp,
   float,
+  fract,
   length,
   max,
   mix,
@@ -22,6 +23,7 @@ import {
   sign,
   sin,
   smoothstep,
+  sqrt,
   uniform,
   vec2,
   vec3,
@@ -116,7 +118,12 @@ export function createInterferenceMaterial(steps: number) {
 
     // EMISSIVE VOLUMETRIC: march straight through, accumulate glowing shells
     const STEP = float(0.032);
-    const t = float(0.02).toVar();
+    // Per-ray start jitter (propagated from gyroid) — decorrelates the regular
+    // STEP lattice from the gyroid periodicity so coherent banding dissolves.
+    const dither = fract(
+      sin(uv.x.mul(113.7).add(uv.y.mul(271.3))).mul(43758.5453),
+    );
+    const t = float(0.02).add(dither.mul(STEP)).toVar();
     const glow = vec3(0).toVar();
     const trans = float(1).toVar();
     const key = normalize(vec3(0.4, 0.7, 0.55));
@@ -165,7 +172,9 @@ export function createInterferenceMaterial(steps: number) {
 
       const fgg = fieldFG(pT.mul(localFreq), morph);
       const gradientLength = max(length(fgg.g), 0.35);
-      const distanceToSurface = abs(fgg.f).div(gradientLength).div(localFreq);
+      const distanceToSurface = sqrt(fgg.f.mul(fgg.f).add(0.0001))
+        .div(gradientLength)
+        .div(localFreq);
 
       // CROSSED WAVE INTERFERENCE — the heart of the realm.
       // Two sin waves on roughly orthogonal projections (x/z here for visible
@@ -247,7 +256,7 @@ export function createInterferenceMaterial(steps: number) {
           exp(
             dens
               .mul(STEP)
-              .mul(mix(float(-16).sub(collapse.mul(8)), float(-6.0), veil)),
+              .mul(mix(float(-19).sub(collapse.mul(8)), float(-7.0), veil)),
           ),
         );
       });
