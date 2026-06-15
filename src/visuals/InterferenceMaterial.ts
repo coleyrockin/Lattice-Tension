@@ -72,6 +72,9 @@ export function createInterferenceMaterial(steps: number) {
   const twist = uniform(0);
   const swell = uniform(0);
   const veil = uniform(0);
+  // Per-chapter absorption densify/thin (parity with gyroid) — fed from
+  // sig.absorption so dense realms darken and thin realms stay translucent.
+  const absorptionScale = uniform(1);
   const tint = uniform(new Color("#4fd8ff"));
   const accent = uniform(new Color("#ff6bb3"));
   const highlight = uniform(new Color("#aaff88"));
@@ -256,7 +259,8 @@ export function createInterferenceMaterial(steps: number) {
           exp(
             dens
               .mul(STEP)
-              .mul(mix(float(-19).sub(collapse.mul(8)), float(-7.0), veil)),
+              .mul(mix(float(-19).sub(collapse.mul(8)), float(-7.0), veil))
+              .mul(max(absorptionScale, 0.55)),
           ),
         );
       });
@@ -321,6 +325,7 @@ export function createInterferenceMaterial(steps: number) {
     twist,
     swell,
     veil,
+    absorptionScale,
     tint,
     accent,
     highlight,

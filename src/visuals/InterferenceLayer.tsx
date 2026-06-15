@@ -143,6 +143,7 @@ export function InterferenceLayer({ standalone = false }: Props) {
     u.twist.value = sig.twist * 0.4;
     u.swell.value = sig.swell * 0.35;
     u.veil.value = sig.veil * 0.5;
+    u.absorptionScale.value = sig.absorption;
     u.freq.value = 3.8 + sig.cellDensity * 2.6 + interf * 2.8;
     u.tension.value = sample.simulation.tension;
     u.reveal.value = reveal;

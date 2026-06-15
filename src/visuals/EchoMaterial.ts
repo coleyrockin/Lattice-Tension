@@ -8,7 +8,6 @@ import {
   Fn,
   If,
   Loop,
-  abs,
   cross,
   dot,
   exp,
@@ -79,6 +78,10 @@ export function createEchoMaterial(steps: number) {
   const twist = uniform(0);
   const swell = uniform(0);
   const veil = uniform(0);
+  // Per-chapter absorption densify/thin (parity with gyroid) — fed from
+  // sig.absorption so dense realms (Singularity) darken and thin realms
+  // (Nebula/Aether) stay translucent instead of milking out to white.
+  const absorptionScale = uniform(1);
   const tint = uniform(new Color("#16d9c8"));
   const accent = uniform(new Color("#a855f7"));
   const highlight = uniform(new Color("#ffc66d"));
@@ -245,7 +248,8 @@ export function createEchoMaterial(steps: number) {
           exp(
             dens
               .mul(STEP)
-              .mul(mix(float(-19).sub(collapse.mul(8)), float(-8.0), veil)),
+              .mul(mix(float(-19).sub(collapse.mul(8)), float(-8.0), veil))
+              .mul(max(absorptionScale, 0.55)),
           ),
         );
       });
@@ -373,6 +377,7 @@ export function createEchoMaterial(steps: number) {
     twist,
     swell,
     veil,
+    absorptionScale,
     tint,
     accent,
     highlight,

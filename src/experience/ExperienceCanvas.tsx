@@ -32,7 +32,7 @@ export function ExperienceCanvas() {
   return (
     <Canvas
       className="aether-canvas"
-      dpr={[1, profile?.maxDpr ?? 1.25]}
+      dpr={[1, profile?.maxDpr ?? 1]}
       camera={{ position: [0, 0, 0.65], fov: 50, near: 0.1, far: 20 }}
       gl={async (props) => {
         const renderer = new WebGPURenderer({

@@ -9,7 +9,18 @@ export default defineConfig({
   },
   build: {
     target: "es2022",
-    sourcemap: true,
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          // three (incl. three/webgpu + three/tsl) is the heaviest dep —
+          // split it out so app-only changes don't bust its cached chunk.
+          if (id.includes("/three/")) return "three";
+          return "vendor";
+        },
+      },
+    },
   },
   test: {
     environment: "jsdom",

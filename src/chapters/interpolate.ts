@@ -1,4 +1,4 @@
-import { Color, MathUtils } from "three";
+import { Color, LinearSRGBColorSpace, MathUtils } from "three";
 import { CHAPTERS } from "./definitions";
 import { ATLAS_MAX, clampAtlasProgress } from "./atlas";
 import { useExperienceStore } from "../experience/store";
@@ -19,8 +19,55 @@ function mixVector(a: Vector3Tuple, b: Vector3Tuple, t: number): Vector3Tuple {
   return [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)];
 }
 
+// OKLab transform (Björn Ottosson) operating on LINEAR sRGB. Three's Color is
+// linear-light internally (ColorManagement on), so .r/.g/.b feed straight in.
+type Oklab = [number, number, number];
+
+function linearRgbToOklab(r: number, g: number, b: number): Oklab {
+  const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+  const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+  const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+  const l_ = Math.cbrt(l);
+  const m_ = Math.cbrt(m);
+  const s_ = Math.cbrt(s);
+  return [
+    0.2104542553 * l_ + 0.793617785 * m_ - 0.0040720468 * s_,
+    1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_,
+    0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_,
+  ];
+}
+
+const oklabScratch = new Color();
+
+function oklabToHex(L: number, A: number, B: number): string {
+  const l_ = L + 0.3963377774 * A + 0.2158037573 * B;
+  const m_ = L - 0.1055613458 * A - 0.0638541728 * B;
+  const s_ = L - 0.0894841775 * A - 1.291485548 * B;
+  const l = l_ * l_ * l_;
+  const m = m_ * m_ * m_;
+  const s = s_ * s_ * s_;
+  const r = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+  const g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+  const b = -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s;
+  // setRGB in linear space; getHexString clamps to gamut + encodes to sRGB.
+  oklabScratch.setRGB(r, g, b, LinearSRGBColorSpace);
+  return `#${oklabScratch.getHexString()}`;
+}
+
+// Interpolate in OKLab so complementary hues cross perceptually instead of
+// collapsing through achromatic gray (the "muddy blend" at chapter joins).
 function mixColor(a: string, b: string, t: number) {
-  return `#${new Color(a).lerp(new Color(b), t).getHexString()}`;
+  if (t <= 0) return a.startsWith("#") ? a : `#${new Color(a).getHexString()}`;
+  if (t >= 1) return b.startsWith("#") ? b : `#${new Color(b).getHexString()}`;
+  const ca = new Color(a);
+  const cb = new Color(b);
+  const la = linearRgbToOklab(ca.r, ca.g, ca.b);
+  const lb = linearRgbToOklab(cb.r, cb.g, cb.b);
+  return oklabToHex(
+    mix(la[0], lb[0], t),
+    mix(la[1], lb[1], t),
+    mix(la[2], lb[2], t),
+  );
 }
 
 function mixPalette(
