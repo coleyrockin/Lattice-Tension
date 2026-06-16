@@ -22,9 +22,9 @@ describe("chapter interpolation", () => {
     const collapse = sampleExperience(CHAPTERS[3].range[0] + 0.05);
     const interference = sampleExperience(CHAPTERS[6].range[0] + 0.05);
 
-    // Origin now carries a faint ghost-cathedral lattice (0.15) so the void
-    // around the seed isn't dead-black — still far below the orb's dominance.
-    expect(origin.signature.latticeReveal).toBeLessThan(0.2);
+    // Origin now carries a visible ghost-cathedral lattice so the void around
+    // the seed is alive, but the orb still dominates the opening read.
+    expect(origin.signature.latticeReveal).toBeLessThan(0.3);
     expect(origin.signature.orbPresence).toBeGreaterThan(0.9);
     expect(pattern.signature.crystalline).toBeGreaterThan(0.9);
     expect(collapse.signature.twist).toBeGreaterThan(0.9);

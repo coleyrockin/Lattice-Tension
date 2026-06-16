@@ -18,6 +18,11 @@ export function getActiveChapterIndex(atlasProgress: number) {
   return 0;
 }
 
+export function getChapterCenterProgress(index: number) {
+  const chapter = CHAPTERS[Math.max(0, Math.min(CHAPTERS.length - 1, index))];
+  return clampAtlasProgress((chapter.range[0] + chapter.range[1]) * 0.5);
+}
+
 export function atlasProgressFromScroll(scrollY: number) {
   const maxScroll = Math.max(
     1,

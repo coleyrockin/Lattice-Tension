@@ -127,6 +127,9 @@ export function AetherExperience() {
 
   // load shared atlas state from ?p= &r= (from share button)
   useEffect(() => {
+    if ("scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
     const params = new URLSearchParams(window.location.search);
     const p = parseFloat(params.get("p") || "");
     const r = parseFloat(params.get("r") || "");
@@ -135,6 +138,8 @@ export function AetherExperience() {
         top: scrollYForAtlasProgress(atlasFromShareParam(p)),
         behavior: "auto",
       });
+    } else {
+      window.scrollTo({ top: 0, behavior: "auto" });
     }
     if (!isNaN(r)) {
       useExperienceStore.setState({ resonance: Math.max(0, Math.min(2.2, r)) });

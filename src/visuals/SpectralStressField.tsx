@@ -1,0 +1,345 @@
+import { useEffect, useMemo, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
+import {
+  AdditiveBlending,
+  BufferAttribute,
+  BufferGeometry,
+  Color,
+  DoubleSide,
+  Group,
+  LineBasicMaterial,
+  MathUtils,
+  MeshBasicMaterial,
+} from "three";
+import { sampleExperience } from "../chapters/interpolate";
+import { descent, frameSample, useExperienceStore } from "../experience/store";
+
+type DetailProfile = {
+  filaments: number;
+  halos: number;
+  ribbons: number;
+  segments: number;
+};
+
+const DETAIL: Record<string, DetailProfile> = {
+  high: { filaments: 58, halos: 12, ribbons: 8, segments: 34 },
+  medium: { filaments: 42, halos: 9, ribbons: 6, segments: 28 },
+  low: { filaments: 28, halos: 6, ribbons: 4, segments: 22 },
+};
+
+const WHITE = new Color("#ffffff");
+const PRIMARY = new Color();
+const SECONDARY = new Color();
+const ACCENT = new Color();
+const RIBBON = new Color();
+
+function fract(value: number) {
+  return value - Math.floor(value);
+}
+
+function seeded(seed: number) {
+  return fract(Math.sin(seed * 12.9898) * 43758.5453123);
+}
+
+function addLine(
+  positions: number[],
+  ax: number,
+  ay: number,
+  az: number,
+  bx: number,
+  by: number,
+  bz: number,
+) {
+  positions.push(ax, ay, az, bx, by, bz);
+}
+
+function makeGeometry(positions: number[]) {
+  const geometry = new BufferGeometry();
+  geometry.setAttribute("position", new BufferAttribute(new Float32Array(positions), 3));
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function createFilamentGeometry(detail: DetailProfile) {
+  const positions: number[] = [];
+
+  for (let i = 0; i < detail.filaments; i += 1) {
+    const r0 = seeded(i + 1);
+    const r1 = seeded(i + 7.3);
+    const r2 = seeded(i + 13.7);
+    const radius = 0.22 + r0 * 1.22;
+    const span = 1.15 + r1 * 3.6;
+    const start = seeded(i + 22.2) * Math.PI * 2;
+    const cx = (seeded(i + 41.2) - 0.5) * 0.9;
+    const cy = (seeded(i + 51.8) - 0.5) * 0.68;
+    const z = -0.12 - r2 * 1.2;
+    const bow = (seeded(i + 68.5) - 0.5) * 0.5;
+    const segments = Math.max(8, Math.round(detail.segments * (0.52 + r1 * 0.68)));
+
+    for (let j = 0; j < segments; j += 1) {
+      const a0 = start + (j / segments) * span;
+      const a1 = start + ((j + 1) / segments) * span;
+      const w0 = 1 + Math.sin(j * 0.77 + i) * 0.055;
+      const w1 = 1 + Math.sin((j + 1) * 0.77 + i) * 0.055;
+      const x0 = cx + Math.cos(a0) * radius * w0 + Math.sin(a0 * 0.5 + i) * 0.035;
+      const y0 =
+        cy + Math.sin(a0) * radius * 0.56 * w0 + Math.sin(a0 * 1.7) * bow * 0.16;
+      const x1 = cx + Math.cos(a1) * radius * w1 + Math.sin(a1 * 0.5 + i) * 0.035;
+      const y1 =
+        cy + Math.sin(a1) * radius * 0.56 * w1 + Math.sin(a1 * 1.7) * bow * 0.16;
+      const z0 = z + Math.sin(a0 * 1.3 + i) * 0.12;
+      const z1 = z + Math.sin(a1 * 1.3 + i) * 0.12;
+      addLine(positions, x0, y0, z0, x1, y1, z1);
+    }
+  }
+
+  return makeGeometry(positions);
+}
+
+function createHaloGeometry(detail: DetailProfile) {
+  const positions: number[] = [];
+
+  for (let i = 0; i < detail.halos; i += 1) {
+    const radius = 0.16 + i * 0.145;
+    const squash = 0.34 + seeded(i + 91.4) * 0.38;
+    const z = -0.35 - i * 0.12;
+    const offsetX = (seeded(i + 101.4) - 0.5) * 0.2;
+    const offsetY = (seeded(i + 117.9) - 0.5) * 0.16;
+    const segments = detail.segments * 2;
+
+    for (let j = 0; j < segments; j += 1) {
+      const a0 = (j / segments) * Math.PI * 2;
+      const a1 = ((j + 1) / segments) * Math.PI * 2;
+      const pulse0 = 1 + Math.sin(a0 * 3 + i * 0.8) * 0.035;
+      const pulse1 = 1 + Math.sin(a1 * 3 + i * 0.8) * 0.035;
+      addLine(
+        positions,
+        offsetX + Math.cos(a0) * radius * pulse0,
+        offsetY + Math.sin(a0) * radius * squash * pulse0,
+        z + Math.sin(a0 * 2 + i) * 0.035,
+        offsetX + Math.cos(a1) * radius * pulse1,
+        offsetY + Math.sin(a1) * radius * squash * pulse1,
+        z + Math.sin(a1 * 2 + i) * 0.035,
+      );
+    }
+  }
+
+  return makeGeometry(positions);
+}
+
+function createRibbonGeometry(detail: DetailProfile) {
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const segments = detail.segments * 2;
+
+  for (let ribbon = 0; ribbon < detail.ribbons; ribbon += 1) {
+    const phase = seeded(ribbon + 201.5) * Math.PI * 2;
+    const baseY = -0.78 + seeded(ribbon + 217.5) * 1.62;
+    const amp = 0.18 + seeded(ribbon + 229.9) * 0.36;
+    const slope = (seeded(ribbon + 239.2) - 0.5) * 0.62;
+    const z = 0.04 - seeded(ribbon + 251.9) * 0.42;
+    const width = 0.012 + seeded(ribbon + 271.1) * 0.024;
+    const base = positions.length / 3;
+
+    for (let i = 0; i <= segments; i += 1) {
+      const t = i / segments;
+      const x = -1.62 + t * 3.24;
+      const wave = Math.sin(t * Math.PI * 2.15 + phase);
+      const y = baseY + wave * amp + (t - 0.5) * slope;
+      const tangentX = 3.24;
+      const tangentY =
+        Math.cos(t * Math.PI * 2.15 + phase) * amp * Math.PI * 2.15 + slope;
+      const invLen = 1 / Math.max(0.001, Math.hypot(tangentX, tangentY));
+      const nx = -tangentY * invLen;
+      const ny = tangentX * invLen;
+      const taper = Math.sin(t * Math.PI);
+      const w = width * (0.4 + taper * 1.15);
+
+      positions.push(
+        x + nx * w,
+        y + ny * w,
+        z + Math.sin(t * Math.PI * 2 + phase) * 0.04,
+        x - nx * w,
+        y - ny * w,
+        z + Math.sin(t * Math.PI * 2 + phase) * 0.04,
+      );
+
+      if (i < segments) {
+        const row = base + i * 2;
+        indices.push(row, row + 1, row + 2, row + 1, row + 3, row + 2);
+      }
+    }
+  }
+
+  const geometry = makeGeometry(positions);
+  geometry.setIndex(indices);
+  return geometry;
+}
+
+export function SpectralStressField() {
+  const group = useRef<Group>(null!);
+  const pulse = useRef(0);
+  const lastImpulse = useRef(0);
+  const tier = useExperienceStore((state) => state.profile?.tier ?? "high");
+  const reducedMotion = useExperienceStore((state) => state.reducedMotion);
+
+  const detail = DETAIL[tier] ?? DETAIL.high;
+  const geometries = useMemo(
+    () => ({
+      filaments: createFilamentGeometry(detail),
+      halos: createHaloGeometry(detail),
+      ribbons: createRibbonGeometry(detail),
+    }),
+    [detail],
+  );
+
+  const materials = useMemo(
+    () => ({
+      filaments: new LineBasicMaterial({
+        transparent: true,
+        opacity: 0.36,
+        blending: AdditiveBlending,
+        depthTest: false,
+        depthWrite: false,
+      }),
+      halos: new LineBasicMaterial({
+        transparent: true,
+        opacity: 0.24,
+        blending: AdditiveBlending,
+        depthTest: false,
+        depthWrite: false,
+      }),
+      ribbons: new MeshBasicMaterial({
+        transparent: true,
+        opacity: 0.12,
+        blending: AdditiveBlending,
+        depthTest: false,
+        depthWrite: false,
+        side: DoubleSide,
+      }),
+    }),
+    [],
+  );
+
+  useEffect(
+    () => () => {
+      geometries.filaments.dispose();
+      geometries.halos.dispose();
+      geometries.ribbons.dispose();
+    },
+    [geometries],
+  );
+
+  useEffect(
+    () => () => {
+      materials.filaments.dispose();
+      materials.halos.dispose();
+      materials.ribbons.dispose();
+    },
+    [materials],
+  );
+
+  useFrame((state, delta) => {
+    const dt = Math.min(delta, 1 / 30);
+    const time = state.clock.elapsedTime;
+    const sample = frameSample.current ?? sampleExperience(descent.value);
+    const { pointer, drag, impulse, resonance } = useExperienceStore.getState();
+    const motion = reducedMotion ? 0.18 : 1;
+    const originBoost = sample.chapterIndex === 0 ? 0.42 : 0;
+    const returnBoost = sample.chapterIndex === 11 ? 0.68 : 0;
+
+    if (impulse && impulse.startedAt !== lastImpulse.current) {
+      lastImpulse.current = impulse.startedAt;
+      pulse.current = 1;
+    }
+    pulse.current = Math.max(0, pulse.current - dt * 0.8);
+
+    const visual = sample.visual;
+    const sig = sample.signature;
+    const fieldEnergy = MathUtils.clamp(
+      visual.filamentIntensity *
+        (0.45 + sig.latticeReveal * 0.55 + sig.orbPresence * 0.18) +
+        resonance * 0.12 +
+        pulse.current * 0.38 +
+        originBoost * 0.22 +
+        returnBoost * 0.28,
+      0,
+      1.8,
+    );
+    const haloEnergy = MathUtils.clamp(
+      visual.haloDepth + pulse.current * 0.34 + originBoost * 0.4 + returnBoost * 0.62,
+      0,
+      1.9,
+    );
+    const ribbonEnergy = MathUtils.clamp(
+      visual.ribbonDepth * 0.55 + visual.spectralLift * 0.25 + pulse.current * 0.22,
+      0,
+      1.4,
+    );
+
+    if (group.current) {
+      group.current.visible = fieldEnergy > 0.04 || haloEnergy > 0.06;
+      group.current.position.x =
+        pointer.x * sample.simulation.pointerForce * 0.055 + drag.x * 0.24;
+      group.current.position.y =
+        pointer.y * sample.simulation.pointerForce * 0.035 - drag.y * 0.2;
+      group.current.rotation.x = drag.y * 0.09 * motion;
+      group.current.rotation.y = -drag.x * 0.11 * motion;
+      group.current.rotation.z =
+        time * 0.018 * motion + Math.sin(time * 0.13) * 0.035 * motion + pointer.x * 0.025;
+      const breathing =
+        1 +
+        Math.sin(time * 0.43 + sample.chapterIndex) * 0.025 * motion +
+        visual.haloDepth * 0.045 +
+        pulse.current * 0.035;
+      group.current.scale.set(
+        breathing * (1 + drag.x * 0.08),
+        breathing * (1 - drag.y * 0.07),
+        breathing,
+      );
+    }
+
+    PRIMARY.set(sample.palette.primary).lerp(WHITE, 0.08 + visual.spectralLift * 0.04);
+    SECONDARY.set(sample.palette.secondary).lerp(WHITE, 0.04);
+    ACCENT.set(sample.palette.accent).lerp(WHITE, 0.02);
+    RIBBON.copy(ACCENT).lerp(PRIMARY, 0.28).multiplyScalar(1.18);
+
+    materials.filaments.color.copy(PRIMARY);
+    materials.halos.color.copy(SECONDARY);
+    materials.ribbons.color.copy(RIBBON);
+    materials.filaments.opacity = MathUtils.clamp(
+      0.06 + fieldEnergy * 0.2 + originBoost * 0.04 + returnBoost * 0.055,
+      0,
+      0.5,
+    );
+    materials.halos.opacity = MathUtils.clamp(
+      0.035 + haloEnergy * 0.14 + originBoost * 0.06 + returnBoost * 0.12,
+      0,
+      0.46,
+    );
+    materials.ribbons.opacity = MathUtils.clamp(0.035 + ribbonEnergy * 0.16, 0, 0.28);
+  });
+
+  return (
+    <group ref={group}>
+      <mesh
+        geometry={geometries.ribbons}
+        material={materials.ribbons}
+        frustumCulled={false}
+        renderOrder={13}
+      />
+      <lineSegments
+        geometry={geometries.halos}
+        material={materials.halos}
+        frustumCulled={false}
+        renderOrder={13}
+      />
+      <lineSegments
+        geometry={geometries.filaments}
+        material={materials.filaments}
+        frustumCulled={false}
+        renderOrder={14}
+      />
+    </group>
+  );
+}

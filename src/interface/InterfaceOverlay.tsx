@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { CHAPTERS, PHILOSOPHICAL_FRAGMENTS } from "../chapters/definitions";
 import {
   ATLAS_MAX,
+  getChapterCenterProgress,
   getActiveChapterIndex,
   normalizeAtlasForShare,
   scrollYForAtlasProgress,
@@ -77,7 +78,7 @@ export function InterfaceOverlay() {
 
   const navigateToChapter = (index: number) => {
     window.scrollTo({
-      top: scrollYForAtlasProgress(CHAPTERS[index].range[0]),
+      top: scrollYForAtlasProgress(getChapterCenterProgress(index)),
       behavior: "smooth",
     });
   };

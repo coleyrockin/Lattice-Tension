@@ -196,6 +196,9 @@ function mixVisual(
     cameraProximity: mix(a.cameraProximity, b.cameraProximity, t),
     ribbonDepth: mix(a.ribbonDepth, b.ribbonDepth, t),
     nestedScale: mix(a.nestedScale, b.nestedScale, t),
+    filamentIntensity: mix(a.filamentIntensity, b.filamentIntensity, t),
+    haloDepth: mix(a.haloDepth, b.haloDepth, t),
+    spectralLift: mix(a.spectralLift, b.spectralLift, t),
   };
 }
 

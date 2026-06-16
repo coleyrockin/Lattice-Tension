@@ -6,6 +6,7 @@ import { JellyOrb } from "./JellyOrb";
 import { GyroidLattice } from "./GyroidLattice";
 import { EchoLayer } from "./EchoLayer";
 import { InterferenceLayer } from "./InterferenceLayer";
+import { SpectralStressField } from "./SpectralStressField";
 import { sampleExperience } from "../chapters/interpolate";
 import { descent, frameSample, useExperienceStore } from "../experience/store";
 
@@ -74,6 +75,7 @@ export function AetherWorld() {
       <GyroidLattice />
       <InterferenceLayer />
       <EchoLayer />
+      <SpectralStressField />
     </>
   );
 }

@@ -58,6 +58,9 @@ export type VisualLayerProfile = {
   cameraProximity: number;
   ribbonDepth: number;
   nestedScale: number;
+  filamentIntensity: number;
+  haloDepth: number;
+  spectralLift: number;
 };
 
 export type ChapterDefinition = {

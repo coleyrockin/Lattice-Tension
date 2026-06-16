@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { ATLAS_MAX, clampAtlasProgress, getActiveChapterIndex } from "./atlas";
+import {
+  ATLAS_MAX,
+  clampAtlasProgress,
+  getActiveChapterIndex,
+  getChapterCenterProgress,
+} from "./atlas";
 import { CHAPTERS } from "./definitions";
 
 describe("atlas progress", () => {
@@ -18,5 +23,14 @@ describe("atlas progress", () => {
   it("clamps atlas progress", () => {
     expect(clampAtlasProgress(-1)).toBe(0);
     expect(clampAtlasProgress(99)).toBe(ATLAS_MAX);
+  });
+
+  it("returns the visual center of a chapter for rail navigation", () => {
+    CHAPTERS.forEach((chapter, index) => {
+      const center = getChapterCenterProgress(index);
+      expect(center).toBeGreaterThan(chapter.range[0]);
+      expect(center).toBeLessThanOrEqual(chapter.range[1]);
+      expect(getActiveChapterIndex(center)).toBe(index);
+    });
   });
 });
