@@ -162,7 +162,8 @@ export function EchoLayer({ standalone = false }: Props) {
     // moderate so far shells still absorb and a black void survives between the
     // filaments (otherwise the whole frame washes to flat cream).
     u.veil.value = sig.veil * 0.5 + sig.echo * 0.05;
-    u.absorptionScale.value = sig.absorption;
+    // Compressed absorption band (see GyroidLattice for rationale) — keep parity.
+    u.absorptionScale.value = 0.62 + ((sig.absorption - 0.18) / 1.37) * 0.46;
     u.freq.value = 2.8 + sig.cellDensity * 1.8 + sig.echo * 0.6;
     u.tension.value = sample.simulation.tension;
     u.reveal.value = reveal;

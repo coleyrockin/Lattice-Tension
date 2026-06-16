@@ -99,3 +99,17 @@ export const useExperienceStore = create<ExperienceStore>((set) => ({
   setManualTension: (manualTension) => set({ manualTension }),
   setRenderError: (renderError) => set({ renderError }),
 }));
+
+// Dev-only capture affordance: snap the eased descent to an exact atlas position,
+// bypassing the critically-damped follow (whose lag under a throttled automation
+// rAF makes scroll-driven screenshots land on the wrong chapter). Stripped from
+// production builds. Usage from a harness: window.__snapDescent(atlasValue).
+if (import.meta.env.DEV && typeof window !== "undefined") {
+  (
+    window as unknown as { __snapDescent: (atlas: number) => void }
+  ).__snapDescent = (atlas: number) => {
+    useExperienceStore.getState().setScrollProgress(atlas);
+    descent.value = atlas;
+    descent.target = atlas;
+  };
+}

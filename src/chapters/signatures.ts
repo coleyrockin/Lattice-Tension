@@ -6,7 +6,7 @@ import type { ChapterSignature } from "./types";
  */
 export const CHAPTER_SIGNATURES: Record<string, ChapterSignature> = {
   origin: {
-    latticeReveal: 0,
+    latticeReveal: 0.15,
     orbPresence: 1.2,
     twist: 0,
     swell: 0,
@@ -25,7 +25,7 @@ export const CHAPTER_SIGNATURES: Record<string, ChapterSignature> = {
     focalGlow: 0.1,
     chromatic: 0.02,
     orbDistortion: 0,
-    interiorCrystalline: 0,
+    interiorCrystalline: 0.35,
   },
   tension: {
     latticeReveal: 0.5,
@@ -74,7 +74,7 @@ export const CHAPTER_SIGNATURES: Record<string, ChapterSignature> = {
   collapse: {
     latticeReveal: 1.0,
     orbPresence: 0.05,
-    twist: 1.3,
+    twist: 1.6,
     swell: 0,
     veil: 0,
     crystalline: 0.1,
@@ -162,7 +162,7 @@ export const CHAPTER_SIGNATURES: Record<string, ChapterSignature> = {
   singularity: {
     latticeReveal: 1.0,
     orbPresence: 0.05,
-    twist: 1.8,
+    twist: 2.2,
     swell: 0,
     veil: 0,
     crystalline: 0,
@@ -205,7 +205,7 @@ export const CHAPTER_SIGNATURES: Record<string, ChapterSignature> = {
   },
   nebula: {
     latticeReveal: 0.62,
-    orbPresence: 0.42,
+    orbPresence: 0.6,
     twist: 0,
     swell: 1.6,
     veil: 1.2,
@@ -213,7 +213,7 @@ export const CHAPTER_SIGNATURES: Record<string, ChapterSignature> = {
     fringe: 0.08,
     singularity: 0,
     quantum: 0.05,
-    nebula: 1.9,
+    nebula: 1.5,
     echo: 0.12,
     interferenceLayer: 0,
     echoLayer: 0,
@@ -267,6 +267,6 @@ export const CHAPTER_SIGNATURES: Record<string, ChapterSignature> = {
     focalGlow: 0.28,
     chromatic: 0.04,
     orbDistortion: 0,
-    interiorCrystalline: 0.08,
+    interiorCrystalline: 0.4,
   },
 };

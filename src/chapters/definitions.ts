@@ -21,7 +21,7 @@ export const CHAPTERS: ChapterDefinition[] = [
     fragment:
       "In the beginning was the word, and the word was a pattern — a point defined by everything it might touch.",
     range: [0, sixth],
-    camera: { position: [0.25, 0.28, 11.9], target: [0.15, 0, -0.45], fov: 42 },
+    camera: { position: [0.25, 0.28, 11.9], target: [0.0, 0, -0.45], fov: 42 },
     palette: {
       void: "#020208",
       primary: "#00f0ff",
@@ -397,9 +397,12 @@ export const CHAPTERS: ChapterDefinition[] = [
     range: [1.5, 1.666],
     camera: { position: [1.2, 0.75, 11.8], target: [0.08, 0.12, -0.7], fov: 49 },
     palette: {
+      // Blue-led: pure gold (#ffd700) as primary skewed to crimson under ACES +
+      // saturation in this dim realm. Leading with the deep blue (ACES-safe) and
+      // keeping gold as the secondary gives a true gold/blue/pink nebula.
       void: "#010204",
-      primary: "#ffd700",
-      secondary: "#2563eb",
+      primary: "#2563eb",
+      secondary: "#ffd700",
       accent: "#ff73b9",
     },
     simulation: {

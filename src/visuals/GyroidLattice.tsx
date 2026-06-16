@@ -62,7 +62,12 @@ export function GyroidLattice({ standalone = false }: Props) {
     u.quantumFold.value = sig.quantum;
     u.nebulaFog.value = sig.nebula;
     u.crystalline.value = sig.crystalline;
-    u.absorptionScale.value = sig.absorption;
+    // Remap the raw signature absorption (0.18–1.55) into a compressed 0.62–1.08
+    // band. Raw values >=1.0 extinguished the ray in the first march steps (only
+    // the post-loop focal dot survived → "dot on black"); <=0.65 over-accumulated
+    // into blown foam. The compressed band keeps EVERY chapter in the proven
+    // emergence/interference legibility zone: structure + real blacks + color.
+    u.absorptionScale.value = 0.62 + ((sig.absorption - 0.18) / 1.37) * 0.46;
     u.shellScale.value = 0.55 + sig.shellThickness * 0.45;
     u.focalGlow.value = sig.focalGlow;
 
@@ -139,13 +144,19 @@ export function GyroidLattice({ standalone = false }: Props) {
     u.twist.value = sig.twist;
     u.swell.value = sig.swell;
     u.veil.value = sig.veil;
-    u.freq.value =
+    // Floor the cell frequency at 1.8: high swell+nebula (Nebula chapter) drove
+    // this NEGATIVE (-0.22), collapsing the gyroid to a DC field with no surface
+    // to intersect — that is why Nebula rendered as a flat wall, not a lattice.
+    // Cap the subtractive terms at 1.0 so they soften cells without erasing them.
+    u.freq.value = Math.max(
+      1.8,
       2.4 +
-      sig.cellDensity * 2.2 +
-      sample.visual.contourDensity * 1.1 -
-      sig.swell * 1.4 -
-      sig.nebula * 0.9 +
-      sig.fringe * 1.35;
+        sig.cellDensity * 2.2 +
+        sample.visual.contourDensity * 1.1 -
+        Math.min(sig.swell, 1.0) * 1.0 -
+        Math.min(sig.nebula, 1.0) * 0.6 +
+        sig.fringe * 1.35,
+    );
     u.tension.value = tension;
     u.reveal.value = reveal;
     u.pulse.value = pulseAmp.current;

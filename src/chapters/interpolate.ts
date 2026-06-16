@@ -144,6 +144,39 @@ function sampleSignature(rawProgress: number): ChapterSignature {
   return { ...from.signature };
 }
 
+// Palette gets the SAME plateau as the signature (not a raw smootherstep across
+// the whole span). Without this, a chapter's CENTER — where its statement shows
+// and its structure plateaus — was a ~50/50 OKLab blend with the NEXT chapter's
+// palette (verified: pattern's lime center rendered pure collapse-red). The
+// plateau makes each chapter read its OWN color at center; transitions still
+// crossfade smoothly in the outer SIGNATURE_TRANSITION band at each end.
+function samplePalette(rawProgress: number): ChapterPalette {
+  const progress = clampAtlasProgress(rawProgress);
+  const { from, to, linearProgress } = chapterBlend(progress);
+  const chapterIndex = getChapterIndexAt(progress);
+
+  if (linearProgress <= SIGNATURE_TRANSITION) {
+    const prev = CHAPTERS[Math.max(0, chapterIndex - 1)].palette;
+    const blendT = MathUtils.smootherstep(
+      linearProgress / SIGNATURE_TRANSITION,
+      0,
+      1,
+    );
+    return mixPalette(prev, from.palette, blendT);
+  }
+
+  if (linearProgress >= 1 - SIGNATURE_TRANSITION) {
+    const blendT = MathUtils.smootherstep(
+      (linearProgress - (1 - SIGNATURE_TRANSITION)) / SIGNATURE_TRANSITION,
+      0,
+      1,
+    );
+    return mixPalette(from.palette, to.palette, blendT);
+  }
+
+  return { ...from.palette };
+}
+
 function mixVisual(
   a: VisualLayerProfile,
   b: VisualLayerProfile,
@@ -205,7 +238,7 @@ export function sampleExperience(rawProgress: number): SampledExperience {
       target: mixVector(from.camera.target, to.camera.target, t),
       fov: mix(from.camera.fov, to.camera.fov, t),
     },
-    palette: mixPalette(from.palette, to.palette, t),
+    palette: samplePalette(progress),
     simulation: mixSimulation(from.simulation, to.simulation, t),
     signature: sampleSignature(progress),
     visual: mixVisual(from.visual, to.visual, t),

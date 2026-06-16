@@ -158,7 +158,7 @@ export function JellyOrb() {
       (0.55 + sample.visual.membraneScale * 0.1) * (0.35 + sig.orbPresence * 0.65);
     mesh.current.scale.setScalar(scale);
     mesh.current.visible = sig.orbPresence > 0.04;
-    mesh.current.position.x = 0.095;
+    mesh.current.position.x = 0.0;
     mesh.current.position.y = 0.015;
 
     // multi-axis incommensurate tumble — never repeats

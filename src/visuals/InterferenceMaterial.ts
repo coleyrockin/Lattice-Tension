@@ -24,7 +24,6 @@ import {
   smoothstep,
   sqrt,
   uniform,
-  vec2,
   vec3,
   vec4,
   cos,
@@ -217,7 +216,7 @@ export function createInterferenceMaterial(steps: number) {
         )
           .mul(0.5)
           .add(0.5);
-        const nearColor = mix(tint, accent, spectralPhase.mul(0.5));
+        const nearColor = mix(mix(tint, highlight, 0.15), accent, spectralPhase.mul(0.42).add(0.06));
         const baseC = mix(nearColor, tint.mul(0.12), depth);
         const graze = float(1).sub(ndv).pow(3.0);
         const rimC = mix(baseC, accent, graze.mul(0.55));
@@ -227,7 +226,7 @@ export function createInterferenceMaterial(steps: number) {
         )
           .mul(0.5)
           .add(0.5);
-        const em = mix(rimC, accent, iri.mul(0.28))
+        const em = mix(rimC, mix(accent, highlight, 0.4), iri.mul(0.28))
           .mul(ndl)
           .add(pulseRing.mul(0.75));
         const surfaceCore = dens.pow(2.4);
@@ -248,8 +247,8 @@ export function createInterferenceMaterial(steps: number) {
           .mul(fringeAmp)
           .mul(dens);
         const surfaceLight = em
-          .mul(dens.mul(float(4.8).add(stress.mul(2.4)).add(veil.mul(2.6))))
-          .add(mix(tint, highlight, 0.62).mul(surfaceCore.mul(0.95)))
+          .mul(dens.mul(float(2.9).add(stress.mul(1.4)).add(veil.mul(1.4))))
+          .add(mix(tint, highlight, 0.62).mul(surfaceCore.mul(0.64)))
           .add(highlight.mul(stressLine.mul(1.4)))
           .add(echo.mul(0.85))
           .add(fringeGlow); // crossed fringes contribute emissive trace
@@ -260,8 +259,8 @@ export function createInterferenceMaterial(steps: number) {
           exp(
             dens
               .mul(STEP)
-              .mul(mix(float(-19).sub(collapse.mul(8)), float(-7.0), veil))
-              .mul(max(absorptionScale, 0.55)),
+              .mul(mix(float(-9).sub(collapse.mul(4)), float(-4.5), veil.mul(0.55).clamp(0, 1)))
+              .mul(max(absorptionScale, 0.6)),
           ),
         );
       });
@@ -272,7 +271,10 @@ export function createInterferenceMaterial(steps: number) {
     });
 
     glow.mulAssign(0.92);
-    const focalPosition = uv.sub(vec2(0.42, -0.06));
+    // Centered + field-gated + in-palette focal (see gyroidLatticeMaterial).
+    const fieldEnergy = dot(glow, vec3(0.333)).toVar();
+    const focalGate = fieldEnergy.mul(2.2).add(0.25).clamp(0, 1).toVar();
+    const focalPosition = uv.toVar();
     const focalCore = exp(length(focalPosition).pow(2).mul(-28))
       .mul(emergence.mul(0.28).add(order.mul(0.04)));
     const focalSpark = exp(length(focalPosition).pow(2).mul(-180))
@@ -285,18 +287,19 @@ export function createInterferenceMaterial(steps: number) {
     glow.addAssign(
       mix(accent, tint, 0.42)
         .mul(focalCore)
-        .add(highlight.mul(focalSpark))
-        .add(highlight.mul(memCore))
-        .add(highlight.mul(fringeCore)),
+        .add(mix(tint, highlight, 0.5).mul(focalSpark))
+        .add(mix(accent, highlight, 0.4).mul(memCore))
+        .add(mix(accent, highlight, 0.5).mul(fringeCore))
+        .mul(focalGate),
     );
 
-    // Highlight roll-off: dense / low-absorption realms accumulate enough
-    // emission to flood past the bloom threshold and wash to white under ACES.
-    // A per-channel soft knee leaves the black void and mids (< ~0.62) linear
-    // and only compresses the brights — restoring colour and contrast.
-    const rolledGlow = glow.div(
-      vec3(1).add(max(glow.sub(vec3(0.62)), vec3(0)).mul(0.85)),
-    );
+    // Luminance-based highlight roll-off (hue-preserving — see gyroid). Compress
+    // on luminance and rescale channels uniformly so brights compress without
+    // desaturating to white.
+    const lumW = vec3(0.2126, 0.7152, 0.0722);
+    const lum = dot(glow, lumW).toVar();
+    const lumRolled = lum.div(float(1).add(max(lum.sub(0.5), float(0)).mul(1.2)));
+    const rolledGlow = glow.mul(lumRolled.div(max(lum, float(0.0001))));
     // alpha = reveal → crossfades / gates the layer
     return vec4(rolledGlow, reveal);
   });

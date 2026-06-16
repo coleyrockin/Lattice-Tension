@@ -24,7 +24,6 @@ import {
   smoothstep,
   sqrt,
   uniform,
-  vec2,
   vec3,
   vec4,
   cos,
@@ -219,12 +218,25 @@ export function createGyroidLatticeMaterial(steps: number) {
       const dens = surface.mul(nearFade).toVar();
       // Gate the volumetric fog to genuinely low-density regions and cap it so
       // it can't flood the mid-realms (Nebula/Interference) into milky haze.
+      // Large-scale spatial turbulence makes the gas CLUMP into bright billows
+      // and dark rifts (Hubble-pillar gas) instead of a uniform flat wall.
+      const fogClump = sin(p.x.mul(0.6))
+        .mul(sin(p.y.mul(0.5)))
+        .mul(sin(p.z.mul(0.42).add(time.mul(0.05))))
+        .mul(0.5)
+        .add(0.62);
       const fogDens = nebulaFog
         .mul(exp(distanceToSurface.mul(-4.8)))
         .mul(float(1).sub(dens))
-        .mul(0.15)
-        .min(0.05);
-      glow.addAssign(mix(tint, accent, 0.42).mul(fogDens).mul(trans).mul(STEP));
+        .mul(fogClump)
+        .mul(0.24)
+        .min(0.09);
+      // Gas colour leads with the accent (Nebula's blue) lifted by the gold tint
+      // and pink highlight → a gold/blue/pink cloud rather than the dim gold that
+      // was crushing to crimson. Accent-led keeps the secondary hue alive.
+      glow.addAssign(
+        mix(mix(accent, tint, 0.5), highlight, 0.3).mul(fogDens).mul(trans).mul(STEP),
+      );
 
       If(dens.greaterThan(0.001), () => {
         // Two-sided lighting: light by the UNSIGNED gradient and take abs() of
@@ -248,7 +260,16 @@ export function createGyroidLatticeMaterial(steps: number) {
         )
           .mul(0.5)
           .add(0.5);
-        const nearColor = mix(tint, accent, spectralPhase.mul(0.5));
+        // Palette fidelity: the field used to blend only tint+accent (primary+
+        // secondary), so a chapter's THIRD palette colour (highlight) never
+        // entered and 3-colour palettes read as ~1.5 colours. Fold highlight into
+        // the near colour and floor the accent weight so the secondary is always
+        // present — every chapter now reads all three of its hues.
+        const nearColor = mix(
+          mix(tint, highlight, 0.15),
+          accent,
+          spectralPhase.mul(0.42).add(0.06),
+        );
         const baseC = mix(nearColor, tint.mul(0.12), depth);
         const graze = float(1).sub(ndv).pow(3.0);
         const rimC = mix(baseC, accent, graze.mul(0.55));
@@ -258,7 +279,7 @@ export function createGyroidLatticeMaterial(steps: number) {
         )
           .mul(0.5)
           .add(0.5);
-        const em = mix(rimC, accent, iri.mul(0.28))
+        const em = mix(rimC, mix(accent, highlight, 0.4), iri.mul(0.28))
           .mul(ndl)
           .add(pulseRing.mul(0.75));
         const surfaceCore = dens.pow(2.4);
@@ -279,8 +300,8 @@ export function createGyroidLatticeMaterial(steps: number) {
           .mul(fringeAmp)
           .mul(dens);
         const surfaceLight = em
-          .mul(dens.mul(float(4.6).add(stress.mul(2.0)).add(veil.mul(2.6))))
-          .add(mix(tint, highlight, 0.62).mul(surfaceCore.mul(1.05)))
+          .mul(dens.mul(float(2.8).add(stress.mul(1.2)).add(veil.mul(1.4))))
+          .add(mix(tint, highlight, 0.62).mul(surfaceCore.mul(0.7)))
           .add(highlight.mul(stressLine.mul(1.4)))
           .add(echo.mul(0.85))
           .add(fringeGlow)
@@ -296,8 +317,8 @@ export function createGyroidLatticeMaterial(steps: number) {
           exp(
             dens
               .mul(STEP)
-              .mul(mix(float(-19).sub(collapse.mul(8)), float(-7.0), veil))
-              .mul(max(absorptionScale, 0.55)),
+              .mul(mix(float(-9).sub(collapse.mul(4)), float(-4.5), veil.mul(0.55).clamp(0, 1)))
+              .mul(max(absorptionScale, 0.6)),
           ),
         );
       });
@@ -309,7 +330,14 @@ export function createGyroidLatticeMaterial(steps: number) {
 
     glow.mulAssign(0.92);
     glow.assign( glow.max( vec3(0) ).clamp( vec3(0), vec3(10) ) );
-    const focalPosition = uv.sub(vec2(0.42, -0.06));
+    // Focal glow: CENTERED (was a leftover off-centre constant at (0.42,-0.06)
+    // that read as a status-LED on black), FIELD-GATED so on a sparse frame it
+    // dims to ~25% and never becomes a lonely dot, and IN-PALETTE recoloured so
+    // the spark/memory cores stop reading universal orange (they were raw
+    // `highlight`) and instead match each chapter's hue.
+    const fieldEnergy = dot(glow, vec3(0.333)).toVar();
+    const focalGate = fieldEnergy.mul(2.2).add(0.25).clamp(0, 1).toVar();
+    const focalPosition = uv.toVar();
     const focalCore = exp(length(focalPosition).pow(2).mul(-28))
       .mul(emergence.mul(0.28).add(order.mul(0.04)).add(focalGlow.mul(0.55)));
     const focalSpark = exp(length(focalPosition).pow(2).mul(-180))
@@ -324,19 +352,24 @@ export function createGyroidLatticeMaterial(steps: number) {
     glow.addAssign(
       mix(accent, tint, 0.42)
         .mul(focalCore)
-        .add(highlight.mul(focalSpark))
-        .add(highlight.mul(memCore))
+        .add(mix(tint, highlight, 0.5).mul(focalSpark))
+        .add(mix(accent, highlight, 0.4).mul(memCore))
         .add(tint.mul(diffCore))
-        .add(accent.mul(curvSpark)),
+        .add(accent.mul(curvSpark))
+        .mul(focalGate),
     );
 
-    // Highlight roll-off: dense / low-absorption realms (Singularity, Quantum)
-    // accumulate enough emission to flood past the bloom threshold and wash to
-    // white under ACES. A per-channel soft knee leaves the black void and mids
-    // (< ~0.62) linear and only compresses the brights — restoring contrast.
-    const rolledGlow = glow.div(
-      vec3(1).add(max(glow.sub(vec3(0.62)), vec3(0)).mul(0.85)),
-    );
+    // Highlight roll-off: dense / low-absorption realms (Aether, Singularity,
+    // Quantum) accumulate enough emission to flood past the bloom threshold and
+    // wash to white. The old per-channel knee compressed each channel
+    // independently, so the brightest channel collapsed toward the others →
+    // DESATURATION to white. Compress on LUMINANCE instead and rescale all three
+    // channels by the same factor → identical brightness rolloff but the HUE is
+    // preserved (Aether stays violet/cyan, not white). Knee ~0.5, slope 1.2.
+    const lumW = vec3(0.2126, 0.7152, 0.0722);
+    const lum = dot(glow, lumW).toVar();
+    const lumRolled = lum.div(float(1).add(max(lum.sub(0.5), float(0)).mul(1.2)));
+    const rolledGlow = glow.mul(lumRolled.div(max(lum, float(0.0001))));
     // alpha = reveal → crossfades the lattice in over the orb during the descent
     return vec4(rolledGlow, reveal);
   });

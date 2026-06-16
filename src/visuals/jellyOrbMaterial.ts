@@ -355,8 +355,8 @@ export function createJellyOrbMaterial(steps: number) {
         const clearInterior = mix(accent, tint, smoothstep(0.0, 1.2, thickness));
         const deepBody = clearInterior
           .mul(transmit)
-          .mul(float(0.62).add(diff.mul(0.5)).add(fill.mul(0.35)))
-          .add(accent.mul(0.05)) // faint color floor → shadows glow, never black
+          .mul(float(0.88).add(diff.mul(0.5)).add(fill.mul(0.35)))
+          .add(mix(tint, accent, 0.5).mul(0.1)) // color floor → core glows, never black
           .toVar();
         // subsurface scatter: a soft turquoise glow lit from within, peaking
         // through the mid-body and backlit limbs → tropical-water translucency
@@ -387,7 +387,7 @@ export function createJellyOrbMaterial(steps: number) {
           const g = gyroid(lp.mul(gscale).add(gphase) as ReturnType<typeof vec3>);
           const band = smoothstep(bandWidth, 0.0, abs(g));
           const falloff = float(1).sub(float(i).mul(0.085));
-          latGlow.addAssign(band.mul(float(0.2).add(order.mul(0.12))).mul(falloff));
+          latGlow.addAssign(band.mul(float(0.32).add(order.mul(0.12))).mul(falloff));
           // resonance memory: imprints make the suspended gyroid web inside the orb
           // develop brighter nodes and slight fractures — the viewer "marked" it
           const mem = band.mul(resonance.mul(0.55)).mul(falloff.mul(0.7));
@@ -418,7 +418,7 @@ export function createJellyOrbMaterial(steps: number) {
         const latSoft = min(latGlow, float(1.25));
         const latticeHue = mix(tint, accent, latSoft.mul(0.72).add(fresnel.mul(0.12)));
         const latticeCol = latticeHue
-          .mul(latSoft.mul(latSoft).mul(0.8))
+          .mul(latSoft.mul(latSoft).mul(1.4))
           .mul(lattice)
           .mul(float(0.95).add(tension.mul(0.45)))
           .add(resonance.mul(0.22).mul(latSoft)); // resonance memory brightens the remembered web
@@ -484,7 +484,11 @@ export function createJellyOrbMaterial(steps: number) {
         // edge stays glassy-translucent against the lattice rather than crushing to black.
         const fog = smoothstep(float(0.18), float(1.2), length(p));
         const visible = mix(rolled, vec3(0), fog.mul(0.12)).mul(presence);
-        const finalAlpha = mix(float(0.18).add(tension.mul(0.12)), float(0.92), fres).mul(presence).toVar();
+        // Higher body opacity floor: at 0.18 the body was ~80% transparent and
+        // composited to nothing over the black void, leaving only the fresnel
+        // RIM (origin/origin_core read as a hollow outline). 0.42 makes the lit
+        // body read as a filled luminous seed while staying translucent glass.
+        const finalAlpha = mix(float(0.42).add(tension.mul(0.12)), float(0.94), fres).mul(presence).toVar();
         finalColor.assign(vec4(visible, finalAlpha));
         Break();
       });
