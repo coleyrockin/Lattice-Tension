@@ -65,14 +65,18 @@ export function CameraRig() {
     // Orb proximity dolly — single owner so JellyOrb doesn't fight this rig
     const enter = sig.orbPresence;
     const eased = enter * enter * (3 - 2 * enter);
-    // Near-clip guard: when the orb is the hero (high presence) AND there's no
-    // lit lattice backdrop (very low latticeReveal — i.e. Origin), the dolly
-    // parks the camera so close that the orb's bounding box crosses the camera
-    // near plane and is clipped to nothing — Origin rendered black. Push the
-    // camera back into the zone where the raymarched orb actually rasterizes.
-    // Gated to latticeReveal < 0.3, so only Origin is affected (origin_core at
-    // 0.32 and every other realm get exactly 0).
-    const nearClipGuard = eased * Math.max(0, 0.3 - sig.latticeReveal) * 2.7;
+    // Near-clip guard: the two "hero orb" chapters (Origin & Origin Core, the
+    // only ones with orbPresence ≈ 1.2) get the dolly pulled so far in that the
+    // orb's bounding box crosses the camera near plane (0.1) and clips to
+    // nothing — both rendered black. Push the camera back into the zone where
+    // the raymarched orb actually rasterizes (verified by a cam-z sweep: orb is
+    // black for z ≤ 0.45, renders at z ≥ 0.55 → target ≈ 0.57). Gated on
+    // presence so ONLY those two bookend chapters move; every other realm = 0.
+    const heroGate = (() => {
+      const x = Math.min(1, Math.max(0, (sig.orbPresence - 0.9) / 0.3));
+      return x * x * (3 - 2 * x);
+    })();
+    const nearClipGuard = eased * heroGate * 0.16;
     const targetZ =
       0.72 -
       eased * (0.22 + sig.latticeReveal * 0.48) +
