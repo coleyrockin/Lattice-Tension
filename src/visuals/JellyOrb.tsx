@@ -155,6 +155,7 @@ export function JellyOrb() {
     u.lattice.value =
       0.42 + sample.visual.stressIntensity * 0.4 + sample.simulation.order * 0.12;
 
+    if (!mesh.current) return;
     const scale =
       (0.55 + sample.visual.membraneScale * 0.1) * (0.35 + sig.orbPresence * 0.65);
     mesh.current.scale.setScalar(scale);
