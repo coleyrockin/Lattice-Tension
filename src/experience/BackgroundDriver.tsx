@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Color } from "three";
 import { sampleExperience } from "../chapters/interpolate";
-import { descent } from "./store";
+import { descent, frameSample } from "./store";
 
 /** Lerp scene void color from the active chapter palette. */
 export function BackgroundDriver() {
@@ -17,7 +17,7 @@ export function BackgroundDriver() {
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 1 / 30);
-    const sample = sampleExperience(descent.value);
+    const sample = frameSample.current ?? sampleExperience(descent.value);
     target.current.set(sample.palette.void);
     current.current.lerp(target.current, 1 - Math.exp(-3.5 * dt));
     if (scene.background instanceof Color) {

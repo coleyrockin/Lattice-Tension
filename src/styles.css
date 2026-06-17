@@ -1353,8 +1353,6 @@ button {
   *::before,
   *::after {
     scroll-behavior: auto !important;
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
   }
 
   .loading-screen__signal i {

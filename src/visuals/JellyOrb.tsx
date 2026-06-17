@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Color, Vector3, type Mesh } from "three";
 import { sampleExperience } from "../chapters/interpolate";
@@ -48,6 +48,7 @@ export function JellyOrb() {
   const addResonance = useExperienceStore((s) => s.addResonance);
 
   const u = useMemo(() => createJellyOrbMaterial(STEPS[tier] ?? 110), [tier]);
+  useEffect(() => () => u.material.dispose(), [u]);
 
   useFrame((state, delta) => {
     const dt = Math.min(delta, 1 / 30);

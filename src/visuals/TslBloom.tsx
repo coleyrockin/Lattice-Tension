@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import type { WebGPURenderer } from "three/webgpu";
 import { RenderPipeline } from "three/webgpu";
@@ -7,7 +7,7 @@ import { bloom } from "three/examples/jsm/tsl/display/BloomNode.js";
 import { chromaticAberration } from "three/examples/jsm/tsl/display/ChromaticAberrationNode.js";
 import { film } from "three/examples/jsm/tsl/display/FilmNode.js";
 import { sampleExperience } from "../chapters/interpolate";
-import { descent } from "../experience/store";
+import { descent, frameSample } from "../experience/store";
 
 /**
  * Full TSL post stack: bloom → chromatic aberration → film grain → vignette.
@@ -68,11 +68,12 @@ export function TslBloom() {
       saturation,
     };
   }, [gl, scene, camera]);
+  useEffect(() => () => { post.pipeline.dispose?.(); }, [post]);
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 1 / 30);
     const progress = descent.value;
-    const sample = sampleExperience(progress);
+    const sample = frameSample.current ?? sampleExperience(progress);
     const sig = sample.signature;
 
     post.bloomPass.strength.value =

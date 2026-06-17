@@ -72,6 +72,7 @@ export function AetherExperience() {
 
     const tick = (now: number) => {
       if (document.hidden) {
+        lastTime = now;
         frameId = requestAnimationFrame(tick);
         return;
       }

@@ -20,7 +20,6 @@ import {
   normalize,
   positionGeometry,
   screenUV,
-  sign,
   sin,
   smoothstep,
   sqrt,
@@ -240,7 +239,9 @@ export function createEchoMaterial(steps: number) {
           .mul(dens.mul(float(2.9).add(stress.mul(1.4)).add(veil.mul(1.4))))
           .add(mix(tint, highlight, 0.62).mul(surfaceCore.mul(0.64)))
           .add(highlight.mul(stressLine.mul(1.4)))
-          .add(echo.mul(0.85));
+          .add(echo.mul(0.85))
+          .max(vec3(0))
+          .clamp(vec3(0), vec3(10)); // prevent NaN (parity with gyroid)
 
         const resonanceBoost = resonance.mul(0.6).mul(dens);
         glow.addAssign(surfaceLight.mul(trans).mul(STEP).add(resonanceBoost.mul(STEP)));
@@ -304,9 +305,13 @@ export function createEchoMaterial(steps: number) {
             .mul(childSeed.mul(5.2));
 
           If(childSurf.greaterThan(0.0015), () => {
-            const cg = cgg.g.mul(sign(cgg.f));
+            // Two-sided lighting (parity with the main march, lines ~200): use the
+            // unsigned gradient + abs() lambert. The old sign(cgg.f) flip zeroed the
+            // normal at f=0 crossings (reintroducing the seam) and crushed backlit
+            // child shells to black.
+            const cg = cgg.g;
             const cN = cg.div(length(cg).max(0.001));
-            const cNdl = max(dot(cN, key), 0).mul(0.36).add(0.28);
+            const cNdl = abs(dot(cN, key)).mul(0.36).add(0.28);
             // child color leans cooler/self-referential toward the viewer's accent
             const childCol = mix(tint, accent, 0.58 + k * 0.12);
             const childLight = childCol
@@ -326,6 +331,7 @@ export function createEchoMaterial(steps: number) {
     });
 
     glow.mulAssign(0.92);
+    glow.assign(glow.max(vec3(0)).clamp(vec3(0), vec3(10))); // prevent NaN (parity with gyroid)
     // Centered + field-gated + in-palette focal (see gyroidLatticeMaterial).
     const fieldEnergy = dot(glow, vec3(0.333)).toVar();
     const focalGate = fieldEnergy.mul(2.2).add(0.25).clamp(0, 1).toVar();

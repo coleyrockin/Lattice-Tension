@@ -2,7 +2,7 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { PerspectiveCamera } from "three";
 import { sampleExperience } from "../chapters/interpolate";
-import { descent, useExperienceStore } from "./store";
+import { descent, frameSample, useExperienceStore } from "./store";
 
 /**
  * Scroll-driven camera: FOV, dolly Z, and gentle drift from chapter definitions
@@ -13,7 +13,7 @@ export function CameraRig() {
 
   useFrame((state, delta) => {
     const dt = Math.min(delta, 1 / 30);
-    const sample = sampleExperience(descent.value);
+    const sample = frameSample.current ?? sampleExperience(descent.value);
     const sig = sample.signature;
     const time = state.clock.getElapsedTime();
     const reducedMotion = useExperienceStore.getState().reducedMotion;

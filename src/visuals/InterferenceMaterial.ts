@@ -251,7 +251,9 @@ export function createInterferenceMaterial(steps: number) {
           .add(mix(tint, highlight, 0.62).mul(surfaceCore.mul(0.64)))
           .add(highlight.mul(stressLine.mul(1.4)))
           .add(echo.mul(0.85))
-          .add(fringeGlow); // crossed fringes contribute emissive trace
+          .add(fringeGlow) // crossed fringes contribute emissive trace
+          .max(vec3(0))
+          .clamp(vec3(0), vec3(10)); // prevent NaN (parity with gyroid)
         const resonanceBoost = resonance.mul(0.6).mul(dens);
         glow.addAssign(surfaceLight.mul(trans).mul(STEP).add(resonanceBoost.mul(STEP)));
         // AETHER veil absorption (reused for depth continuity)
@@ -271,6 +273,7 @@ export function createInterferenceMaterial(steps: number) {
     });
 
     glow.mulAssign(0.92);
+    glow.assign(glow.max(vec3(0)).clamp(vec3(0), vec3(10))); // prevent NaN (parity with gyroid)
     // Centered + field-gated + in-palette focal (see gyroidLatticeMaterial).
     const fieldEnergy = dot(glow, vec3(0.333)).toVar();
     const focalGate = fieldEnergy.mul(2.2).add(0.25).clamp(0, 1).toVar();

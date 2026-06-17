@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Vector3, type Mesh } from "three";
 import { sampleExperience } from "../chapters/interpolate";
@@ -52,6 +52,7 @@ export function EchoLayer({ standalone = false }: Props) {
   const tier = useExperienceStore((s) => s.profile?.tier ?? "high");
   const reducedMotion = useExperienceStore((s) => s.reducedMotion);
   const u = useMemo(() => createEchoMaterial(STEPS[tier] ?? 168), [tier]);
+  useEffect(() => () => u.material.dispose(), [u]);
 
   const pos = useRef(new Vector3().copy(HEADING).multiplyScalar(1.2));
   const travel = useRef(1.2);
