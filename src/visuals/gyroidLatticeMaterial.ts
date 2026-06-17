@@ -208,8 +208,14 @@ export function createGyroidLatticeMaterial(steps: number) {
         .mul(fringeAmp)
         .mul(interference.mul(0.85).add(0.18));
       const scarredDist = distanceToSurface.sub(scar.mul(0.6)).add(fringe.mul(0.78));
+      // Sample-band floor: the fixed march STEP is 0.032, so when `thickness`
+      // (the lit band around each sheet) is thinner than a step, an edge-on sheet
+      // at frame-center gets stepped clean over → the hard vertical seam. Floor
+      // the band to ≳ STEP so every sheet is sampled. Only widens the thin
+      // (ordered) chapters where the seam shows; thicker realms are unaffected.
+      const sampleBand = thickness.max(0.04);
       const surface = float(1)
-        .sub(smoothstep(float(0), thickness, scarredDist))
+        .sub(smoothstep(float(0), sampleBand, scarredDist))
         .max(0.0)
         .min(1.0)
         .toVar();
