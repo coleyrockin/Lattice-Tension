@@ -6,9 +6,18 @@ const sixth = 1 / 6;
 function withSignature(
   chapter: Omit<ChapterDefinition, "signature">,
 ): ChapterDefinition {
+  const signature = CHAPTER_SIGNATURES[chapter.id];
+  // Hard fail on a missing/typo'd id instead of spreading `undefined` into the
+  // signature — that silently feeds NaN into every shader uniform and renders a
+  // black/garbage chapter with no error.
+  if (!signature) {
+    throw new Error(
+      `No ChapterSignature defined for chapter id "${chapter.id}"`,
+    );
+  }
   return {
     ...chapter,
-    signature: CHAPTER_SIGNATURES[chapter.id],
+    signature,
   };
 }
 
