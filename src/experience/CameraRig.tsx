@@ -65,9 +65,18 @@ export function CameraRig() {
     // Orb proximity dolly — single owner so JellyOrb doesn't fight this rig
     const enter = sig.orbPresence;
     const eased = enter * enter * (3 - 2 * enter);
+    // Near-clip guard: when the orb is the hero (high presence) AND there's no
+    // lit lattice backdrop (very low latticeReveal — i.e. Origin), the dolly
+    // parks the camera so close that the orb's bounding box crosses the camera
+    // near plane and is clipped to nothing — Origin rendered black. Push the
+    // camera back into the zone where the raymarched orb actually rasterizes.
+    // Gated to latticeReveal < 0.3, so only Origin is affected (origin_core at
+    // 0.32 and every other realm get exactly 0).
+    const nearClipGuard = eased * Math.max(0, 0.3 - sig.latticeReveal) * 2.7;
     const targetZ =
       0.72 -
-      eased * (0.22 + sig.latticeReveal * 0.48) -
+      eased * (0.22 + sig.latticeReveal * 0.48) +
+      nearClipGuard -
       sample.visual.cameraProximity * 0.022 +
       sample.simulation.birth * 0.04;
     const zBlend = 1 - Math.exp(-5 * dt);
