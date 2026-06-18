@@ -26,7 +26,7 @@ export const CHAPTERS: ChapterDefinition[] = [
     id: "origin",
     index: 0,
     title: "Origin",
-    statement: "Aether is the space between all things.",
+    statement: "Nothing has crossed yet. The field is whole.",
     fragment:
       "In the beginning was the word, and the word was a pattern — a point defined by everything it might touch.",
     range: [0, sixth],
@@ -71,7 +71,7 @@ export const CHAPTERS: ChapterDefinition[] = [
     id: "tension",
     index: 1,
     title: "Tension",
-    statement: "Lattice Tension is the hidden pressure of connection.",
+    statement: "The space between is never empty. It is force.",
     fragment:
       "Every bond is a negotiation between distance and the memory of being near.",
     range: [sixth, sixth * 2],
@@ -206,9 +206,9 @@ export const CHAPTERS: ChapterDefinition[] = [
     id: "emergence",
     index: 4,
     title: "Emergence",
-    statement: "The universe is not still. It is breathing.",
+    statement: "Every new form carries the tension that made it possible.",
     fragment:
-      "Nothing returns unchanged. The new form carries the pressure that made it possible.",
+      "The shape of what collapsed became the mold for what emerged. Bloom is not the opposite of tension — it is tension rearranged.",
     range: [sixth * 4, sixth * 5],
     camera: { position: [-1.9, 0.95, 9.15], target: [0.25, 0.1, -0.6], fov: 46 },
     palette: {
@@ -251,7 +251,7 @@ export const CHAPTERS: ChapterDefinition[] = [
     id: "aether",
     index: 5,
     title: "Aether",
-    statement: "The answer is not a number. It is a pattern.",
+    statement: "The lattice does not arrive. It is always arriving.",
     fragment:
       "The answer was never a thing to be held — it is blowing in the wind, an agreement to keep becoming.",
     range: [sixth * 5, 1],
@@ -296,7 +296,7 @@ export const CHAPTERS: ChapterDefinition[] = [
     id: "interference",
     index: 6,
     title: "Interference",
-    statement: "Every crossing leaves a trace that was not there before.",
+    statement: "Every crossing rewrites the lattice that allowed it.",
     fragment: "Interference is not noise. It is the lattice learning the shape of its own questions.",
     range: [1.0, 1.166],
     camera: { position: [0.8, 0.5, 9.5], target: [0.1, 0.1, -0.3], fov: 47 },
@@ -428,7 +428,7 @@ export const CHAPTERS: ChapterDefinition[] = [
     id: "nebula",
     index: 9,
     title: "Nebula Veil",
-    statement: "The largest patterns breathe slowest.",
+    statement: "At this scale, a pulse takes a thousand years.",
     fragment: "Stars are not points. They are slow negotiations written in gas and gravity.",
     range: [1.5, 1.666],
     camera: { position: [1.2, 0.75, 11.8], target: [0.08, 0.12, -0.7], fov: 49 },
@@ -474,8 +474,8 @@ export const CHAPTERS: ChapterDefinition[] = [
     id: "echo",
     index: 10,
     title: "Echo",
-    statement: "The aether does not forget the one who pressed.",
-    fragment: "What you leave here changes what returns. The pattern now contains your question.",
+    statement: "What you leave here is what the aether becomes.",
+    fragment: "The lattice does not record. It reshapes. Every mark of yours changed the channels through which the next crossing runs.",
     range: [1.666, 1.833],
     camera: { position: [0.05, 0.28, 14.2], target: [0.02, 0.03, -0.95], fov: 46 },
     palette: {
@@ -518,7 +518,7 @@ export const CHAPTERS: ChapterDefinition[] = [
     id: "origin_core",
     index: 11,
     title: "Origin Core",
-    statement: "The soft beginning pulses eternal.",
+    statement: "The field was always this. The crossing was yours.",
     fragment:
       "Every descent ends where it began — not as repetition, but as recognition. The lattice remembers the first breath.",
     range: [1.833, 2.0],

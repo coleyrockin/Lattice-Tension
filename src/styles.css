@@ -172,9 +172,6 @@ button {
   font-family: var(--serif);
   font-size: clamp(17px, 1.55vw, 27px);
   letter-spacing: 0.45em;
-  text-shadow:
-    0 0 18px color-mix(in srgb, var(--chapter-primary) 55%, transparent),
-    0 2px 32px rgba(0, 0, 0, 0.7);
   transition: text-shadow 600ms ease;
 }
 
@@ -528,6 +525,7 @@ button {
     var(--chapter-secondary)
   );
   box-shadow: 0 0 9px color-mix(in srgb, var(--chapter-accent) 65%, transparent);
+  transition: transform 200ms ease;
 }
 
 .chapter-rail button {
