@@ -213,7 +213,7 @@ export const CHAPTERS: ChapterDefinition[] = [
     camera: { position: [-1.9, 0.95, 9.15], target: [0.25, 0.1, -0.6], fov: 46 },
     palette: {
       void: "#00070a",
-      primary: "#48f5b0",
+      primary: "#72f5c0",
       secondary: "#ff9d6b",
       accent: "#f4fff9",
     },
@@ -435,7 +435,7 @@ export const CHAPTERS: ChapterDefinition[] = [
     palette: {
       // Blue-led: pure gold as primary skews crimson under ACES in this dim realm.
       // Keep blue dominant, magenta luminous, and gold as the restrained glint.
-      void: "#020308",
+      void: "#01030b",
       primary: "#3f7bff",
       secondary: "#ff6fd0",
       accent: "#ffd87a",
@@ -525,8 +525,8 @@ export const CHAPTERS: ChapterDefinition[] = [
     camera: { position: [0.2, 0.25, 13.5], target: [0.0, 0.0, -0.4], fov: 38 },
     palette: {
       void: "#020205",
-      primary: "#ffe4c4",
-      secondary: "#9fd6ff",
+      primary: "#ffd2a6",
+      secondary: "#7ec8ff",
       accent: "#ffb6c4",
     },
     simulation: {

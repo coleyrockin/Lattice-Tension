@@ -10,7 +10,7 @@
   --mono: "Spline Sans Mono", "SFMono-Regular", ui-monospace, monospace;
   --ivory: #f5f1eb;
   --ink: #eceae4;
-  --ink-dim: rgba(236, 234, 228, 0.46);
+  --ink-dim: rgba(236, 234, 228, 0.58);
   --ink-faint: rgba(236, 234, 228, 0.24);
   --muted: rgba(236, 232, 228, 0.5);
   --gold: #efc77d;
@@ -168,6 +168,7 @@ button {
 }
 
 .brand__mark {
+  margin: 0;
   font-family: var(--serif);
   font-size: clamp(17px, 1.55vw, 27px);
   letter-spacing: 0.45em;
@@ -433,16 +434,6 @@ button {
   letter-spacing: 0.3em;
 }
 
-.chapter h1 {
-  margin: 0;
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--ink-dim);
-}
-
 /* The statement is the hero. Its weight + tracking strain under the live field
    tension (--field-tension), and the single accent glow scales with tension +
    the user's resonance imprint — the one bold light in an otherwise quiet UI. */
@@ -637,8 +628,8 @@ button {
     linear-gradient(90deg, rgba(99, 79, 180, 0.04) 1px, transparent 1px);
   background-size: 60px 60px;
   transition:
-    opacity 1.5s ease 450ms,
-    visibility 1.5s ease 450ms;
+    opacity 0.7s ease 200ms,
+    visibility 0.7s ease 200ms;
 }
 
 .loading-screen.is-ready {
@@ -977,6 +968,19 @@ button {
   letter-spacing: 0.26em;
 }
 
+.enter-btn:focus-visible,
+.fragment button:focus-visible,
+.chapter-rail button:focus-visible {
+  outline: 2px solid var(--chapter-accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.chapter-rail button:focus-visible .chapter-rail__tooltip {
+  opacity: 1;
+  transform: translateX(0);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1004,4 +1008,36 @@ button {
   .resonance-meter__fill {
     transition: none !important;
   }
+
+  .chapter p {
+    transition: none !important;
+    transform: none !important;
+  }
+
+  .interaction-cue i,
+  .sound-control[aria-pressed="true"] i,
+  .loading-screen__signal i:nth-child(3) {
+    animation: none !important;
+  }
+
+  .fragment {
+    animation: none !important;
+  }
+
+  .chapter-rail__tooltip {
+    transition: none !important;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

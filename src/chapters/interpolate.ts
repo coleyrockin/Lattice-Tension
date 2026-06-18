@@ -1,7 +1,6 @@
 import { Color, LinearSRGBColorSpace, MathUtils } from "three";
 import { CHAPTERS } from "./definitions";
 import { ATLAS_MAX, clampAtlasProgress } from "./atlas";
-import { useExperienceStore } from "../experience/store";
 import type {
   ChapterPalette,
   ChapterSignature,
@@ -256,11 +255,6 @@ export function sampleExperience(rawProgress: number): SampledExperience {
       ),
     },
   };
-
-  const manualTension = useExperienceStore.getState().manualTension;
-  if (manualTension !== null) {
-    sampled.simulation.tension = manualTension;
-  }
 
   return sampled;
 }

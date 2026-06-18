@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CHAPTERS, PHILOSOPHICAL_FRAGMENTS } from "../chapters/definitions";
 import {
   ATLAS_MAX,
@@ -7,7 +7,6 @@ import {
   normalizeAtlasForShare,
   scrollYForAtlasProgress,
 } from "../chapters/atlas";
-import { sampleExperience } from "../chapters/interpolate";
 import { useExperienceStore } from "../experience/store";
 import { useSmoothedDescent } from "../experience/useSmoothedDescent";
 import { ResonanceImprint } from "./ResonanceImprint";
@@ -20,7 +19,7 @@ const REALM_LABELS: Record<string, string> = {
   pattern: "Lattice",
   collapse: "Implosion",
   emergence: "Bloom",
-  aether: "Drift",
+  aether: "Field",
   interference: "Wave",
   singularity: "Horizon",
   quantum: "Fold",
@@ -52,10 +51,10 @@ export function InterfaceOverlay() {
     const params = new URLSearchParams(window.location.search);
     return params.has("p");
   });
+  const fragmentCloseRef = useRef<HTMLButtonElement>(null);
 
   const activeIndex = getActiveChapterIndex(progress);
   const chapter = CHAPTERS[activeIndex];
-  const sampled = sampleExperience(progress);
   const atlasDepth = progress / ATLAS_MAX;
   const inExtendedRealm = progress >= 1;
   const realmLabel = REALM_LABELS[chapter.id] ?? "Realm";
@@ -67,15 +66,10 @@ export function InterfaceOverlay() {
     );
   }, [resonance]);
 
-  // The headline strains under the field: normalize the interpolated chapter
-  // tension (~0.05–1.5) to 0–1 and feed it to --field-tension, which drives the
-  // statement's weight + tracking in CSS (the typographic signature).
+  // Move focus into the fragment dialog when it opens (Escape closes it).
   useEffect(() => {
-    document.documentElement.style.setProperty(
-      "--field-tension",
-      Math.max(0, Math.min(1, (sampled.simulation.tension - 0.05) / 1.45)).toFixed(3),
-    );
-  }, [sampled.simulation.tension]);
+    if (selectedFragment) fragmentCloseRef.current?.focus();
+  }, [selectedFragment]);
 
   useEffect(() => {
     if (shareState !== "copied") return;
@@ -92,7 +86,7 @@ export function InterfaceOverlay() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if ((event.target as HTMLElement).closest("[data-aether-ui] input")) return;
+      if ((event.target as HTMLElement).closest("input, textarea, select, [contenteditable]")) return;
       if (event.key === "ArrowDown" || event.key === "j" || event.key === "J") {
         event.preventDefault();
         navigateToChapter(Math.min(CHAPTERS.length - 1, activeIndex + 1));
@@ -110,7 +104,7 @@ export function InterfaceOverlay() {
       if (event.key === "Escape") {
         setSelectedFragment(null);
       }
-      if (event.key === " " && !(event.target as HTMLElement).closest("input")) {
+      if (event.key === " ") {
         event.preventDefault();
         setAutoplay(!autoplay);
       }
@@ -135,7 +129,7 @@ export function InterfaceOverlay() {
       <ResonanceImprint />
 
       <header className="brand">
-        <span className="brand__mark">TENSION&nbsp;LATTICE</span>
+        <h1 className="brand__mark">TENSION&nbsp;LATTICE</h1>
         <span className="brand__subtitle">Aether Atlas</span>
       </header>
 
@@ -184,16 +178,21 @@ export function InterfaceOverlay() {
         <button
           className="share-control"
           type="button"
-          aria-label="Copy link to your resonant descent"
           onClick={copyShareLink}
         >
-          <span>{shareState === "copied" ? "Link copied" : "Share Atlas"}</span>
+          <span aria-live="polite">
+            {shareState === "copied" ? "Link copied" : "Share Atlas"}
+          </span>
         </button>
       </div>
 
       <div
         className="resonance-meter"
-        aria-label={`Resonance imprint ${Math.round(resonance * 100)} percent`}
+        role="meter"
+        aria-label="Resonance imprint"
+        aria-valuenow={Math.round(resonance * 100)}
+        aria-valuemin={0}
+        aria-valuemax={100}
       >
         <svg viewBox="0 0 36 36" aria-hidden="true">
           <circle className="resonance-meter__track" cx="18" cy="18" r="15.5" />
@@ -207,22 +206,19 @@ export function InterfaceOverlay() {
             }}
           />
         </svg>
-        <span>Imprint</span>
+        <span>Resonance</span>
       </div>
 
-      <section
-        className={`chapter chapter--${chapter.id}`}
-        key={chapter.id}
-        aria-live="polite"
-      >
+      <section className={`chapter chapter--${chapter.id}`} key={chapter.id}>
         <div className="chapter__meta">
           <span className="chapter__index">
             {String(chapter.index + 1).padStart(2, "0")}
           </span>
           <span className="chapter__realm">{realmLabel}</span>
-          <h1 className="chapter__title">{chapter.title}</h1>
         </div>
-        <p className="chapter__statement">{chapter.statement}</p>
+        <p className="chapter__statement" role="heading" aria-level={2}>
+          {chapter.statement}
+        </p>
         <button
           className="chapter__fragment"
           type="button"
@@ -236,6 +232,10 @@ export function InterfaceOverlay() {
           Read the fragment
         </button>
       </section>
+
+      <div className="sr-only" aria-live="polite">
+        {realmLabel} — {chapter.title}. {chapter.statement}
+      </div>
 
       <nav className="chapter-rail" aria-label="Aether chapters">
         <div className="chapter-rail__zones" aria-hidden="true">
@@ -280,7 +280,7 @@ export function InterfaceOverlay() {
 
       <div
         className={`loading-screen ${ready && entered ? "is-ready" : ""}`}
-        aria-hidden={ready && entered}
+        aria-hidden={ready && entered ? true : undefined}
       >
         <div className="loading-screen__signal">
           <i />
@@ -289,7 +289,7 @@ export function InterfaceOverlay() {
         </div>
         <div className="loading-screen__copy">
           <span>TENSION&nbsp;LATTICE</span>
-          <p>
+          <p role="status">
             {ready
               ? "Lattice calibration complete"
               : "Initializing the gyroid descent"}
@@ -315,8 +315,15 @@ export function InterfaceOverlay() {
           role="dialog"
           aria-modal="true"
           aria-label="Philosophical fragment"
+          onKeyDown={(event) => {
+            if (event.key === "Tab") {
+              event.preventDefault();
+              fragmentCloseRef.current?.focus();
+            }
+          }}
         >
           <button
+            ref={fragmentCloseRef}
             type="button"
             aria-label="Close fragment"
             onClick={() => setSelectedFragment(null)}

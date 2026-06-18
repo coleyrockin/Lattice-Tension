@@ -15,6 +15,7 @@ export function useSmoothedDescent(throttleMs = 72) {
     let lastPaletteChapter = -1;
     let lastAtm = "";
     let lastVig = "";
+    let lastFt = "";
     let lastUpdate = 0;
     let frame = 0;
     const root = document.documentElement;
@@ -58,6 +59,19 @@ export function useSmoothedDescent(throttleMs = 72) {
       if (vig !== lastVig) {
         lastVig = vig;
         root.style.setProperty("--vignette-strength", vig);
+      }
+
+      // Typographic signature: the statement's weight + tracking strain with the
+      // field's tension. Driven here off the same per-chapter value the tick
+      // already uses for palette/realm (reliable + in lockstep with them); the
+      // 520ms CSS transition on the statement glides it between chapters.
+      const ft = Math.max(
+        0,
+        Math.min(1, (chapter.simulation.tension - 0.05) / 1.45),
+      ).toFixed(3);
+      if (ft !== lastFt) {
+        lastFt = ft;
+        root.style.setProperty("--field-tension", ft);
       }
 
       if (chapterIndex !== lastChapter || now - lastUpdate > throttleMs) {

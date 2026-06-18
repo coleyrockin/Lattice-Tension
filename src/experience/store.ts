@@ -48,8 +48,6 @@ type ExperienceStore = {
   profile: PerformanceProfile | null;
   resonance: number;
   autoplay: boolean;
-  telemetryOpen: boolean;
-  manualTension: number | null;
   renderError: boolean;
   setReady: (ready: boolean) => void;
   setScrollProgress: (progress: number) => void;
@@ -62,8 +60,6 @@ type ExperienceStore = {
   setProfile: (profile: PerformanceProfile) => void;
   addResonance: (delta: number) => void;
   setAutoplay: (autoplay: boolean) => void;
-  setTelemetryOpen: (open: boolean) => void;
-  setManualTension: (val: number | null) => void;
   setRenderError: (failed: boolean) => void;
 };
 
@@ -79,8 +75,6 @@ export const useExperienceStore = create<ExperienceStore>((set) => ({
   profile: null,
   resonance: 0,
   autoplay: false,
-  telemetryOpen: false,
-  manualTension: null,
   renderError: false,
   setReady: (ready) => set({ ready }),
   setScrollProgress: (scrollProgress) => set({ scrollProgress }),
@@ -95,8 +89,6 @@ export const useExperienceStore = create<ExperienceStore>((set) => ({
   addResonance: (delta) =>
     set((state) => ({ resonance: Math.max(0, Math.min(2.2, state.resonance + delta)) })),
   setAutoplay: (autoplay) => set({ autoplay }),
-  setTelemetryOpen: (telemetryOpen) => set({ telemetryOpen }),
-  setManualTension: (manualTension) => set({ manualTension }),
   setRenderError: (renderError) => set({ renderError }),
 }));
 
