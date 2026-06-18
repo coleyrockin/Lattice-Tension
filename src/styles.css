@@ -802,6 +802,7 @@ button {
 .fallback > p {
   font-size: 10px;
   letter-spacing: 0.48em;
+  margin-right: -0.48em;
 }
 
 .fallback h1 {
