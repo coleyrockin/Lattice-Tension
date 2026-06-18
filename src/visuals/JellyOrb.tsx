@@ -12,7 +12,7 @@ import { descent, frameSample, useExperienceStore } from "../experience/store";
 const K_LEAN = 3.0776; // ≈ -60*ln(1-0.05)
 const K_DRAG = 5.0029; // ≈ -60*ln(1-0.08)
 
-const STEPS: Record<string, number> = { high: 120, medium: 80, low: 44 };
+const STEPS: Record<string, number> = { high: 96, medium: 64, low: 40 };
 
 // scratch colors — avoid per-frame allocation
 const PRIMARY = new Color();
