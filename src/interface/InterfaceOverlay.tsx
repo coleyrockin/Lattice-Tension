@@ -12,13 +12,15 @@ import { useExperienceStore } from "../experience/store";
 import { useSmoothedDescent } from "../experience/useSmoothedDescent";
 import { ResonanceImprint } from "./ResonanceImprint";
 
+// Each realm names its own character — the label encodes what the place IS,
+// not a flat "Core" category (the Core/Atlas region split lives in the rail zones).
 const REALM_LABELS: Record<string, string> = {
-  origin: "Core",
-  tension: "Core",
-  pattern: "Core",
-  collapse: "Core",
-  emergence: "Core",
-  aether: "Core",
+  origin: "Genesis",
+  tension: "Strain",
+  pattern: "Lattice",
+  collapse: "Implosion",
+  emergence: "Bloom",
+  aether: "Drift",
   interference: "Wave",
   singularity: "Horizon",
   quantum: "Fold",

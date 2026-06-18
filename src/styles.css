@@ -463,6 +463,16 @@ button {
     color 520ms ease;
 }
 
+/* The ethereal, low-tension realms drift in italic — a second expressive axis
+   (voice) beside tension (weight). Structural/charged realms stay upright. */
+.chapter--aether p,
+.chapter--nebula p,
+.chapter--echo p,
+.chapter--origin_core p {
+  font-style: italic;
+  font-weight: 400;
+}
+
 @keyframes chapter-enter {
   from {
     opacity: 0;
