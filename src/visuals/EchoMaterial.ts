@@ -186,8 +186,12 @@ export function createEchoMaterial(steps: number) {
         .div(gradientLength)
         .div(localFreq);
       const scarredDist = distanceToSurface.sub(scar.mul(0.6));
+      // Floor the band to ≳ STEP — Echo's high veil+order combination can push
+      // thickness below 0.032 (≈ 0.021), producing the hard center seam.
+      // Same fix as gyroid (5c90143) + InterferenceMaterial.
+      const sampleBand = thickness.max(0.04);
       const surface = float(1)
-        .sub(smoothstep(float(0), thickness, scarredDist))
+        .sub(smoothstep(float(0), sampleBand, scarredDist))
         .toVar();
       const nearFade = smoothstep(0.08, 0.42, t);
       const dens = surface.mul(nearFade).toVar();

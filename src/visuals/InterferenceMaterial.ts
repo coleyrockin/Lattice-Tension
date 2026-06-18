@@ -190,8 +190,11 @@ export function createInterferenceMaterial(steps: number) {
       const fringe = crossed.mul(fringeAmp).mul(fringeBoost);
       // scars amplify the fringes/echoes; interference displaces the band
       const scarredDist = distanceToSurface.sub(scar.mul(0.55)).add(fringe.mul(0.82));
+      // Floor the band to ≳ STEP so an edge-on sheet at frame-center is sampled
+      // and doesn't produce the hard vertical seam (parity with gyroid fix 5c90143).
+      const sampleBand = thickness.max(0.04);
       const surface = float(1)
-        .sub(smoothstep(float(0), thickness, scarredDist))
+        .sub(smoothstep(float(0), sampleBand, scarredDist))
         .toVar();
       // Prevent the first few samples from becoming a luminous windshield.
       const nearFade = smoothstep(0.08, 0.42, t);
