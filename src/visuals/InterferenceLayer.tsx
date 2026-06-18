@@ -8,7 +8,7 @@ import {
 } from "./InterferenceMaterial";
 import { descent, frameSample, useExperienceStore } from "../experience/store";
 
-const STEPS: Record<string, number> = { high: 150, medium: 96, low: 52 };
+const STEPS: Record<string, number> = { high: 128, medium: 84, low: 48 };
 
 // frame-rate-independent damping decay rates (exact reuse from GyroidLattice/EchoLayer)
 const K_STEER = 3.0776; // ≈ -60*ln(1-0.05)
