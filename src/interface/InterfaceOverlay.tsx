@@ -41,14 +41,9 @@ export function InterfaceOverlay() {
     (state) => state.setSelectedFragment,
   );
   const resonance = useExperienceStore((state) => state.resonance);
-  const profile = useExperienceStore((state) => state.profile);
-  
+
   const autoplay = useExperienceStore((state) => state.autoplay);
   const setAutoplay = useExperienceStore((state) => state.setAutoplay);
-  const telemetryOpen = useExperienceStore((state) => state.telemetryOpen);
-  const setTelemetryOpen = useExperienceStore((state) => state.setTelemetryOpen);
-  const manualTension = useExperienceStore((state) => state.manualTension);
-  const setManualTension = useExperienceStore((state) => state.setManualTension);
 
   const [shareState, setShareState] = useState<"idle" | "copied">("idle");
   const [entered, setEntered] = useState(() => {
@@ -69,6 +64,16 @@ export function InterfaceOverlay() {
       resonance.toFixed(3),
     );
   }, [resonance]);
+
+  // The headline strains under the field: normalize the interpolated chapter
+  // tension (~0.05–1.5) to 0–1 and feed it to --field-tension, which drives the
+  // statement's weight + tracking in CSS (the typographic signature).
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--field-tension",
+      Math.max(0, Math.min(1, (sampled.simulation.tension - 0.05) / 1.45)).toFixed(3),
+    );
+  }, [sampled.simulation.tension]);
 
   useEffect(() => {
     if (shareState !== "copied") return;
@@ -213,9 +218,9 @@ export function InterfaceOverlay() {
             {String(chapter.index + 1).padStart(2, "0")}
           </span>
           <span className="chapter__realm">{realmLabel}</span>
+          <h1 className="chapter__title">{chapter.title}</h1>
         </div>
-        <h1>{chapter.title}</h1>
-        <p>{chapter.statement}</p>
+        <p className="chapter__statement">{chapter.statement}</p>
         <button
           className="chapter__fragment"
           type="button"
@@ -226,13 +231,8 @@ export function InterfaceOverlay() {
             })
           }
         >
-          Read fragment
+          Read the fragment
         </button>
-        {inExtendedRealm ? (
-          <div className="chapter__depth" aria-hidden="true">
-            Depth {(atlasDepth * 100).toFixed(0)}%
-          </div>
-        ) : null}
       </section>
 
       <nav className="chapter-rail" aria-label="Aether chapters">
@@ -264,93 +264,6 @@ export function InterfaceOverlay() {
           </button>
         ))}
       </nav>
-
-      <div className="atlas-bar" aria-hidden="true">
-        <span
-          className="atlas-bar__fill"
-          style={{ transform: `scaleX(${Math.max(0.01, atlasDepth)})` }}
-        />
-      </div>
-
-      <button
-        className="telemetry-toggle-btn"
-        type="button"
-        onClick={() => setTelemetryOpen(!telemetryOpen)}
-        aria-label={telemetryOpen ? "Hide telemetry panel" : "Show telemetry panel"}
-      >
-        {telemetryOpen ? "[ DIAGNOSTICS ]" : "[ TELEMETRY ]"}
-      </button>
-
-      <div className={`telemetry-panel ${telemetryOpen ? "is-open" : "is-collapsed"}`} aria-hidden={!telemetryOpen}>
-        <div className="telemetry-header">
-          <span>FIELD TELEMETRY</span>
-          <span className="telemetry-badge">ACTIVE</span>
-        </div>
-        <div className="telemetry-grid">
-          <div className="telemetry-row telemetry-row--tension">
-            <span className="telemetry-label">Tension</span>
-            <span className="telemetry-value">
-              {(sampled.simulation.tension * 100).toFixed(0)}%
-              {manualTension !== null && " (Manual)"}
-            </span>
-            <div className="telemetry-slider-container">
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={manualTension ?? sampled.simulation.tension}
-                onChange={(e) => setManualTension(parseFloat(e.target.value))}
-                className="telemetry-slider"
-                style={{
-                  background: `linear-gradient(90deg, var(--chapter-primary) 0%, var(--chapter-accent) ${sampled.simulation.tension * 100}%, rgba(255, 255, 255, 0.06) ${sampled.simulation.tension * 100}%)`
-                }}
-                aria-label="Manual tension override slider"
-              />
-              {manualTension !== null && (
-                <button
-                  type="button"
-                  className="telemetry-reset-btn"
-                  onClick={() => setManualTension(null)}
-                  aria-label="Reset tension"
-                >
-                  [ RESET ]
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="telemetry-row">
-            <span className="telemetry-label">Order</span>
-            <span className="telemetry-value">{(sampled.simulation.order * 100).toFixed(0)}%</span>
-            <div className="telemetry-bar">
-              <span style={{ width: `${sampled.simulation.order * 100}%` }} />
-            </div>
-          </div>
-          <div className="telemetry-row">
-            <span className="telemetry-label">Singularity</span>
-            <span className="telemetry-value">{(sampled.simulation.singularity * 100).toFixed(0)}%</span>
-            <div className="telemetry-bar">
-              <span style={{ width: `${sampled.simulation.singularity * 100}%` }} />
-            </div>
-          </div>
-          <div className="telemetry-row">
-            <span className="telemetry-label">Imprint</span>
-            <span className="telemetry-value">{(resonance * 100).toFixed(0)}%</span>
-            <div className="telemetry-bar">
-              <span style={{ width: `${Math.min(100, (resonance / 2.2) * 100)}%` }} />
-            </div>
-          </div>
-        </div>
-        <div className="telemetry-footer">
-          <span>GPU TIER: {profile?.tier.toUpperCase() ?? "N/A"}</span>
-          <span>DPR: {profile?.maxDpr.toFixed(2) ?? "1.00"}x</span>
-        </div>
-        <div className="telemetry-oscilloscope">
-          {Array.from({ length: 10 }).map((_, i) => (
-            <span key={i} className="wave-bar" style={{ animationDelay: `${i * -150}ms` }} />
-          ))}
-        </div>
-      </div>
 
       <div className="interaction-cue" aria-hidden="true">
         <span>

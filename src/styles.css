@@ -1,15 +1,20 @@
 :root {
   color: #f5f1eb;
   background: #020207;
-  font-family: "JetBrains Mono", "SFMono-Regular", ui-monospace, monospace;
+  font-family: "Spline Sans Mono", "SFMono-Regular", ui-monospace, monospace;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  --serif: "Cormorant Garamond", "Iowan Old Style", "Palatino Linotype", serif;
-  --mono: "JetBrains Mono", "SFMono-Regular", ui-monospace, monospace;
+  --display: "Fraunces", "Iowan Old Style", "Palatino Linotype", serif;
+  --serif: var(--display);
+  --mono: "Spline Sans Mono", "SFMono-Regular", ui-monospace, monospace;
   --ivory: #f5f1eb;
+  --ink: #eceae4;
+  --ink-dim: rgba(236, 234, 228, 0.46);
+  --ink-faint: rgba(236, 234, 228, 0.24);
   --muted: rgba(236, 232, 228, 0.5);
   --gold: #efc77d;
+  --field-tension: 0;
   --chapter-primary: #62d7ff;
   --chapter-secondary: #8757ff;
   --chapter-accent: #ffc66d;
@@ -111,11 +116,8 @@ button {
 .interface:not(.is-entered) .hud-controls,
 .interface:not(.is-entered) .chapter,
 .interface:not(.is-entered) .chapter-rail,
-.interface:not(.is-entered) .atlas-bar,
 .interface:not(.is-entered) .interaction-cue,
-.interface:not(.is-entered) .resonance-meter,
-.interface:not(.is-entered) .telemetry-panel,
-.interface:not(.is-entered) .telemetry-toggle-btn {
+.interface:not(.is-entered) .resonance-meter {
   visibility: hidden;
   pointer-events: none;
 }
@@ -373,14 +375,10 @@ button {
 .chapter {
   position: absolute;
   left: clamp(28px, 5.9vw, 104px);
-  top: 54%;
-  width: min(510px, 42vw);
+  top: 52%;
+  width: min(620px, 46vw);
   transform: translateY(-50%);
   animation: chapter-enter 900ms cubic-bezier(0.2, 0.85, 0.25, 1) both;
-  /* Rich drop-shadow to separate text from the 3D world without a background box */
-  text-shadow:
-    0 2px 38px rgba(0, 0, 0, 0.98),
-    0 1px 8px rgba(0, 0, 0, 0.85);
 }
 
 .chapter__meta {
@@ -391,43 +389,33 @@ button {
 }
 
 .chapter__index {
-  color: var(--chapter-accent);
-  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--chapter-primary);
+  font-size: 11px;
   letter-spacing: 0.24em;
 }
 
 .chapter__realm {
   padding: 3px 9px;
-  border: 1px solid color-mix(in srgb, var(--chapter-primary) 35%, transparent);
-  color: color-mix(in srgb, var(--chapter-primary) 88%, var(--ivory));
-  font-size: 7px;
+  border: 1px solid color-mix(in srgb, var(--chapter-primary) 26%, transparent);
+  color: color-mix(in srgb, var(--chapter-primary) 80%, var(--ink));
+  font-family: var(--mono);
+  font-size: 10px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  background: color-mix(in srgb, var(--chapter-void) 62%, transparent);
-  backdrop-filter: blur(12px) saturate(140%);
-  box-shadow:
-    inset 0 0 12px color-mix(in srgb, var(--chapter-primary) 8%, transparent),
-    0 0 8px color-mix(in srgb, var(--chapter-primary) 14%, transparent);
-  transition: border-color 500ms ease, box-shadow 500ms ease;
-}
-
-.chapter__depth {
-  margin-top: 18px;
-  color: color-mix(in srgb, var(--chapter-secondary) 70%, var(--ivory));
-  font-size: 8px;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
+  transition: border-color 500ms ease, color 500ms ease;
 }
 
 .chapter__fragment {
-  margin-top: 22px;
+  display: inline-block;
+  margin-top: 30px;
   padding: 0;
   border: 0;
   background: transparent;
-  color: color-mix(in srgb, var(--chapter-accent) 80%, var(--ivory));
+  color: var(--ink-dim);
   font-family: var(--mono);
-  font-size: 8px;
-  letter-spacing: 0.24em;
+  font-size: 10px;
+  letter-spacing: 0.26em;
   text-transform: uppercase;
   cursor: pointer;
   pointer-events: auto;
@@ -442,82 +430,37 @@ button {
 
 .chapter h1 {
   margin: 0;
-  font-family: var(--serif);
-  font-size: clamp(44px, 5vw, 82px);
+  font-family: var(--mono);
+  font-size: 11px;
   font-weight: 400;
-  letter-spacing: 0.08em;
-  line-height: 0.94;
+  letter-spacing: 0.3em;
   text-transform: uppercase;
-  text-shadow:
-    0 0 60px color-mix(in srgb, var(--chapter-primary) 45%, transparent),
-    0 4px 20px rgba(0, 0, 0, 0.4);
-  transition: text-shadow 600ms ease;
+  color: var(--ink-dim);
 }
 
+/* The statement is the hero. Its weight + tracking strain under the live field
+   tension (--field-tension), and the single accent glow scales with tension +
+   the user's resonance imprint — the one bold light in an otherwise quiet UI. */
 .chapter p {
-  max-width: 480px;
-  margin: 20px 0 0;
-  color: color-mix(in srgb, var(--chapter-accent) 78%, var(--ivory));
-  font-family: var(--mono);
-  font-size: clamp(10px, 0.85vw, 14px);
-  line-height: 1.8;
-  letter-spacing: 0.055em;
-}
-
-.chapter--interference h1,
-.chapter--singularity h1,
-.chapter--quantum h1,
-.chapter--nebula h1,
-.chapter--echo h1,
-.chapter--origin_core h1 {
+  max-width: 600px;
+  margin: 22px 0 0;
+  color: var(--ink);
+  font-family: var(--display);
+  font-optical-sizing: auto;
+  font-size: clamp(34px, 4.6vw, 66px);
+  font-weight: calc(360 + var(--field-tension) * 300);
+  line-height: 1.03;
+  letter-spacing: calc(0.02em - var(--field-tension) * 0.075em);
+  text-wrap: balance;
   text-shadow:
-    0 0 60px color-mix(in srgb, var(--chapter-primary) 45%, transparent),
-    0 2px 36px rgba(0, 0, 0, 0.96),
-    0 1px 6px rgba(0, 0, 0, 0.9);
-}
-
-.chapter--singularity p,
-.chapter--collapse p {
-  color: color-mix(in srgb, var(--chapter-primary) 65%, var(--ivory));
-}
-
-.chapter--echo .chapter__realm,
-.chapter--origin_core .chapter__realm {
-  border-color: color-mix(in srgb, var(--chapter-accent) 40%, transparent);
-  color: var(--chapter-accent);
-}
-
-.chapter--origin {
-  top: 48%;
-  width: min(560px, 38vw);
-}
-
-.chapter--origin h1 {
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.28em;
-}
-
-.chapter--origin p {
-  margin-top: 22px;
-  color: var(--ivory);
-  font-family: var(--serif);
-  font-size: clamp(42px, 4.5vw, 76px);
-  letter-spacing: -0.035em;
-  line-height: 0.96;
-}
-
-.chapter--aether {
-  top: 50%;
-}
-
-.chapter--aether p {
-  max-width: 580px;
-  color: var(--ivory);
-  font-family: var(--serif);
-  font-size: clamp(25px, 2.7vw, 45px);
-  letter-spacing: -0.025em;
-  line-height: 1.05;
+    0 2px 30px rgba(0, 0, 0, 0.92),
+    0 0 calc(36px + var(--field-tension) * 28px + var(--resonance-intensity, 0) * 20px)
+      color-mix(in srgb, var(--chapter-primary) calc(26% + var(--field-tension) * 18%), transparent);
+  transition:
+    font-weight 520ms cubic-bezier(0.2, 0.8, 0.25, 1),
+    letter-spacing 520ms cubic-bezier(0.2, 0.8, 0.25, 1),
+    text-shadow 520ms ease,
+    color 520ms ease;
 }
 
 @keyframes chapter-enter {
@@ -628,33 +571,6 @@ button {
 
 .chapter-rail button:nth-of-type(n + 7) span {
   color: color-mix(in srgb, var(--chapter-secondary) 55%, rgba(245, 241, 235, 0.48));
-}
-
-.atlas-bar {
-  position: absolute;
-  left: clamp(28px, 5.9vw, 104px);
-  right: clamp(90px, 8vw, 140px);
-  bottom: 14px;
-  height: 1px;
-  overflow: hidden;
-  background: rgba(245, 241, 235, 0.1);
-}
-
-.atlas-bar__fill {
-  display: block;
-  width: 100%;
-  height: 100%;
-  transform-origin: left;
-  background: linear-gradient(
-    90deg,
-    var(--chapter-accent),
-    var(--chapter-primary),
-    var(--chapter-secondary)
-  );
-  box-shadow:
-    0 0 14px color-mix(in srgb, var(--chapter-accent) 60%, transparent),
-    0 0 4px color-mix(in srgb, var(--chapter-primary) 40%, transparent);
-  transition: transform 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .interaction-cue {
@@ -926,29 +842,14 @@ button {
   }
 
   .chapter h1 {
-    font-size: clamp(34px, 12vw, 56px);
+    font-size: 11px;
   }
 
   .chapter p {
-    max-width: 86%;
-    margin-top: 13px;
-    line-height: 1.55;
-  }
-
-  .chapter--origin,
-  .chapter--aether {
-    top: auto;
-    width: auto;
-  }
-
-  .chapter--origin p {
     max-width: 92%;
-    font-size: clamp(35px, 11vw, 54px);
-    line-height: 0.98;
-  }
-
-  .chapter--aether p {
-    font-size: clamp(25px, 7.5vw, 38px);
+    margin-top: 14px;
+    font-size: clamp(30px, 9vw, 46px);
+    line-height: 1.05;
   }
 
   .chapter-rail {
@@ -984,298 +885,17 @@ button {
   }
 }
 
-/* --- Telemetry Panel --- */
-.telemetry-panel {
-  position: absolute;
-  left: clamp(28px, 5.9vw, 104px);
-  bottom: clamp(44px, 8vh, 88px);
-  width: 240px;
-  padding: 16px 20px;
-  background: rgba(4, 3, 10, 0.52);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-top-color: color-mix(in srgb, var(--chapter-primary) 22%, rgba(255,255,255,0.1));
-  border-radius: 4px;
-  backdrop-filter: blur(20px) saturate(140%);
-  color: var(--ivory);
-  font-family: var(--mono);
-  font-size: 8px;
-  text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-  pointer-events: auto;
-  animation: telemetry-enter 900ms cubic-bezier(0.2, 0.85, 0.25, 1) both;
-  transition: border-color 300ms ease, box-shadow 300ms ease, transform 350ms cubic-bezier(0.25, 1, 0.5, 1), opacity 300ms ease, max-height 350ms ease, padding 350ms ease;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 10px 40px rgba(0, 0, 0, 0.5),
-    0 0 14px color-mix(in srgb, var(--chapter-primary) 6%, transparent);
-  overflow: hidden;
-}
-
-.telemetry-panel.is-collapsed {
-  opacity: 0;
-  transform: translateY(15px) scale(0.96);
-  max-height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-  border-color: transparent;
-  pointer-events: none;
-  box-shadow: none;
-}
-
-.telemetry-panel.is-open {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  max-height: 450px;
-}
-
-.telemetry-panel:hover {
-  border-color: rgba(255, 255, 255, 0.16);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 12px 48px rgba(0, 0, 0, 0.6), 0 0 12px color-mix(in srgb, var(--chapter-primary) 12%, transparent);
-}
-
-/* --- Diagnostics/Telemetry Toggle Button --- */
-.telemetry-toggle-btn {
-  position: absolute;
-  left: clamp(28px, 5.9vw, 104px);
-  bottom: clamp(20px, 4vh, 44px);
-  font-family: var(--mono);
-  font-size: 8px;
-  letter-spacing: 0.16em;
-  color: var(--muted);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  pointer-events: auto;
-  transition: color 250ms ease, opacity 250ms ease;
-  z-index: 12;
-  padding: 4px 8px;
-}
-
-.telemetry-toggle-btn:hover {
-  color: var(--chapter-accent);
-}
-
-/* --- Interactive Telemetry Slider & Reset Button --- */
-.telemetry-slider-container {
-  grid-column: span 2;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-}
-
-.telemetry-slider {
-  -webkit-appearance: none;
-  appearance: none;
-  flex: 1;
-  height: 2px;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 1px;
-  outline: none;
-  cursor: pointer;
-  pointer-events: auto;
-  margin: 6px 0;
-  border: none;
-}
-
-/* Chrome, Safari, Opera, Edge */
-.telemetry-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 4px;
-  height: 10px;
-  border-radius: 1px;
-  background: var(--ivory);
-  box-shadow: 0 0 8px var(--chapter-accent);
-  cursor: pointer;
-  transition: transform 150ms ease, background-color 150ms ease;
-}
-
-.telemetry-slider::-webkit-slider-thumb:hover {
-  transform: scaleY(1.3);
-  background: var(--chapter-accent);
-}
-
-/* Firefox */
-.telemetry-slider::-moz-range-thumb {
-  width: 4px;
-  height: 10px;
-  border-radius: 1px;
-  background: var(--ivory);
-  box-shadow: 0 0 8px var(--chapter-accent);
-  cursor: pointer;
-  border: none;
-  transition: transform 150ms ease, background-color 150ms ease;
-}
-
-.telemetry-slider::-moz-range-thumb:hover {
-  transform: scaleY(1.3);
-  background: var(--chapter-accent);
-}
-
-.telemetry-reset-btn {
-  font-family: var(--mono);
-  font-size: 7px;
-  color: var(--chapter-accent);
-  background: transparent;
-  border: none;
-  padding: 2px 4px;
-  cursor: pointer;
-  pointer-events: auto;
-  letter-spacing: 0.15em;
-  white-space: nowrap;
-  transition: color 200ms ease, opacity 200ms ease;
-  opacity: 0.8;
-}
-
-.telemetry-reset-btn:hover {
-  color: var(--ivory);
-  opacity: 1;
-}
-
-.telemetry-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 14px;
-  letter-spacing: 0.16em;
-  color: var(--muted);
-  font-weight: 600;
-}
-
-.telemetry-badge {
-  font-size: 7px;
-  letter-spacing: 0.12em;
-  color: #36ffa0;
-  text-shadow: 0 0 6px rgba(54, 255, 160, 0.4);
-  animation: pulse-glow 2s infinite alternate;
-}
-
-.telemetry-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.telemetry-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  row-gap: 4px;
-}
-
-.telemetry-label {
-  letter-spacing: 0.12em;
-  color: var(--muted);
-  text-transform: uppercase;
-}
-
-.telemetry-value {
-  font-weight: bold;
-  letter-spacing: 0.08em;
-  color: var(--chapter-accent);
-}
-
-.telemetry-bar {
-  grid-column: span 2;
-  height: 2px;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 1px;
-  overflow: hidden;
-}
-
-.telemetry-bar span {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, var(--chapter-primary), var(--chapter-accent));
-  transition: width 350ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  box-shadow: 0 0 6px var(--chapter-primary);
-}
-
-.telemetry-footer {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 14px;
-  padding-top: 10px;
-  border-top: 1px dashed rgba(255, 255, 255, 0.08);
-  font-size: 7px;
-  letter-spacing: 0.14em;
-  color: rgba(245, 241, 235, 0.35);
-}
-
-.telemetry-oscilloscope {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 3px;
-  height: 14px;
-  margin-top: 12px;
-  padding-top: 4px;
-}
-
-.telemetry-oscilloscope .wave-bar {
-  display: block;
-  width: 1px;
-  height: 3px;
-  background: var(--chapter-primary);
-  border-radius: 0.5px;
-  animation: osc-wave 800ms ease-in-out infinite alternate;
-}
-
-@keyframes osc-wave {
-  from {
-    height: 3px;
-    background: var(--chapter-primary);
-    opacity: 0.45;
-  }
-  to {
-    height: 14px;
-    background: var(--chapter-accent);
-    opacity: 0.95;
-    box-shadow: 0 0 4px var(--chapter-accent);
-  }
-}
-
-@keyframes pulse-glow {
-  from {
-    opacity: 0.6;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes telemetry-enter {
-  from {
-    opacity: 0;
-    filter: blur(6px);
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    filter: blur(0);
-    transform: translateY(0);
-  }
-}
-
 /* --- Resonance-Responsive UI Scaling --- */
 .brand__mark,
-.chapter h1,
 .chapter p {
-  transform: scale(calc(1 + var(--resonance-intensity, 0) * 0.012));
+  transform: scale(calc(1 + var(--resonance-intensity, 0) * 0.01));
   transition: transform 250ms cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .brand__mark {
   text-shadow:
-    0 0 calc(18px + var(--resonance-intensity, 0) * 16px) var(--chapter-primary),
+    0 0 calc(14px + var(--resonance-intensity, 0) * 14px) color-mix(in srgb, var(--chapter-primary) 55%, transparent),
     0 2px 28px rgba(0, 0, 0, 0.8);
-}
-
-.chapter h1 {
-  text-shadow:
-    0 0 calc(42px + var(--resonance-intensity, 0) * 24px) color-mix(in srgb, var(--chapter-primary) 45%, transparent),
-    0 2px 36px rgba(0, 0, 0, 0.96),
-    0 1px 6px rgba(0, 0, 0, 0.9);
 }
 
 .resonance-meter__fill {
@@ -1340,14 +960,6 @@ button {
   letter-spacing: 0.26em;
 }
 
-/* Hide telemetry on mobile or small viewports */
-@media (max-width: 900px) {
-  .telemetry-panel,
-  .telemetry-toggle-btn {
-    display: none;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1372,7 +984,6 @@ button {
   }
 
   .chapter-rail__line span,
-  .atlas-bar__fill,
   .resonance-meter__fill {
     transition: none !important;
   }
