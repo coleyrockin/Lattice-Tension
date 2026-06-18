@@ -396,12 +396,17 @@ button {
 }
 
 .chapter__realm {
-  padding: 3px 9px;
+  display: inline-block;
+  padding: 4px 9px;
   border: 1px solid color-mix(in srgb, var(--chapter-primary) 26%, transparent);
   color: color-mix(in srgb, var(--chapter-primary) 80%, var(--ink));
   font-family: var(--mono);
   font-size: 10px;
+  /* line-height:1 removes the descender slack that floats all-caps high;
+     text-indent cancels the trailing tracking so the caps sit truly centered. */
+  line-height: 1;
   letter-spacing: 0.2em;
+  text-indent: 0.1em;
   text-transform: uppercase;
   transition: border-color 500ms ease, color 500ms ease;
 }
@@ -449,8 +454,8 @@ button {
   font-optical-sizing: auto;
   font-size: clamp(34px, 4.6vw, 66px);
   font-weight: calc(360 + var(--field-tension) * 300);
-  line-height: 1.03;
-  letter-spacing: calc(0.02em - var(--field-tension) * 0.075em);
+  line-height: 1.05;
+  letter-spacing: calc(0.015em - var(--field-tension) * 0.057em);
   text-wrap: balance;
   text-shadow:
     0 2px 30px rgba(0, 0, 0, 0.92),
@@ -656,6 +661,8 @@ button {
   font-family: var(--serif);
   font-size: 11px;
   letter-spacing: 0.48em;
+  /* cancel the trailing tracking so a centered wordmark is optically centered */
+  margin-right: -0.48em;
 }
 
 .loading-screen__copy > p {
