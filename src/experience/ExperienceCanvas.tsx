@@ -1,5 +1,5 @@
-import { Canvas, useThree } from "@react-three/fiber";
-import { Suspense, useEffect } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Suspense, useEffect, useRef } from "react";
 import { ACESFilmicToneMapping, SRGBColorSpace } from "three";
 import { WebGPURenderer } from "three/webgpu";
 import { useExperienceStore } from "./store";
@@ -20,6 +20,61 @@ function VisibilityPause() {
     onVis();
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [setFrameloop]);
+  return null;
+}
+
+/**
+ * Adaptive resolution: the scene is four full-screen raymarches whose cost is
+ * quadratic in DPR. On a GPU that can't hold frame rate, step DPR down until it
+ * can — render resolution is the cheapest quality to spend, and the emissive
+ * glow + bloom hide the drop almost entirely (same rationale as profile.maxDpr).
+ *
+ * Design choices that keep this safe to ship without live FPS telemetry:
+ *  - ONE-DIRECTIONAL: only ever steps down, never back up, so it cannot
+ *    oscillate/thrash the swapchain. Worst case it settles a notch low.
+ *  - WARMUP IGNORE: skips the first ~2s so first-frame shader-compile spikes
+ *    don't trigger a needless drop.
+ *  - EMA + COOLDOWN: decides on a smoothed frame time and waits after each step
+ *    for the resize to settle before measuring again.
+ *  - No-op on reduced-motion / low tier (already at minimum) and on fast GPUs
+ *    (frame time never crosses the threshold).
+ */
+function AdaptiveResolution() {
+  const setDpr = useThree((s) => s.setDpr);
+  const gl = useThree((s) => s.gl);
+  const profile = useExperienceStore((s) => s.profile);
+  const reducedMotion = useExperienceStore((s) => s.reducedMotion);
+
+  const ema = useRef(0);
+  const warmup = useRef(0);
+  const cooldown = useRef(0);
+  const dpr = useRef<number | null>(null);
+  const floorReached = useRef(false);
+
+  useFrame((_, delta) => {
+    if (reducedMotion || profile?.tier === "low" || floorReached.current) return;
+    const dt = Math.min(delta, 0.1);
+    if (warmup.current < 2) {
+      warmup.current += dt;
+      return;
+    }
+    if (dpr.current === null) dpr.current = gl.getPixelRatio();
+    // smoothed frame time so a single GC/scroll spike can't trip a drop
+    ema.current = ema.current === 0 ? dt : ema.current + (dt - ema.current) * 0.05;
+    if (cooldown.current > 0) {
+      cooldown.current -= dt;
+      return;
+    }
+    const fps = 1 / ema.current;
+    const floor = Math.max(0.85, (profile?.maxDpr ?? 1) * 0.6);
+    if (fps < 48 && dpr.current > floor + 0.001) {
+      dpr.current = Math.max(floor, dpr.current - 0.12);
+      setDpr(dpr.current);
+      ema.current = 0; // re-measure cleanly once the resize settles
+      cooldown.current = 1.5;
+      if (dpr.current <= floor + 0.001) floorReached.current = true;
+    }
+  });
   return null;
 }
 
@@ -62,6 +117,7 @@ export function ExperienceCanvas() {
     >
       <Suspense fallback={null}>
         <VisibilityPause />
+        <AdaptiveResolution />
         <AetherWorld />
         {!reducedMotion && profile?.postprocessing ? <TslBloom /> : null}
       </Suspense>
