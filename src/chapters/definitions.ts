@@ -253,7 +253,7 @@ export const CHAPTERS: ChapterDefinition[] = [
     title: "Aether",
     statement: "The lattice does not arrive. It is always arriving.",
     fragment:
-      "The answer was never a thing to be held — it is blowing in the wind, an agreement to keep becoming.",
+      "The answer was never a fixed point. It is what the lattice does when no one is asking — the field, continuous, always already arriving.",
     range: [sixth * 5, 1],
     camera: { position: [0.15, 0.42, 12.4], target: [0.05, 0.05, -0.8], fov: 48 },
     palette: {
@@ -385,7 +385,7 @@ export const CHAPTERS: ChapterDefinition[] = [
     index: 8,
     title: "Quantum Fold",
     statement: "Beneath the continuous lies the fold that chooses.",
-    fragment: "The smallest pattern still pulls. Its memory is the first tension.",
+    fragment: "The quantum fold does not break the lattice into parts. It shows where the lattice was always choosing.",
     range: [1.333, 1.5],
     camera: { position: [-0.6, 0.35, 8.2], target: [-0.05, 0.08, -0.55], fov: 44 },
     palette: {

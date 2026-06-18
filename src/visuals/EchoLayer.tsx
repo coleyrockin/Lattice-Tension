@@ -26,28 +26,9 @@ function smoothstep(a: number, b: number, x: number) {
 
 type Props = { standalone?: boolean };
 
-/**
- * ECHO LAYER (WITNESS) — the meta final evolution, layered atop the atlas.
- *
- * Drives strictly from:
- * - sampleExperience(descent) for chapter palette / simulation / visual
- * - userResonance accumulator (shared store)
- * - effectiveRes = min(2.2, baseRes + userResonance)  (full reuse)
- *
- * Reveal is gated: only appears as the final layer when scroll progress
- * reaches deep echo territory (raw d > ~1.62) AND user imprint is high.
- * Generative offspring filaments (in material) become brighter/structured
- * ONLY for high userResonance contribution — "the pattern now contains
- * your question" is literal: user marks seed the children.
- *
- * Full pattern reuse:
- * - descent/store/interp/fieldFG (via material)
- * - resonance decay + addResonance on impulse/drag/pointer
- * - tiered STEPS (higher fidelity for the witness detail)
- * - identical travel/steer/pulse/pos/fwd math
- * - same uniform wiring for continuity of atlas language
- * - click fires impulse + fragment (participation continues in the echo)
- */
+// Double-gated reveal: sig.echoLayer keeps it absent in all but the echo chapter;
+// the resonance smoothstep (threshold 0.55-1.35) means chapter-base resonance
+// alone never reaches it — the user's own interaction must contribute.
 export function EchoLayer({ standalone = false }: Props) {
   const tier = useExperienceStore((s) => s.profile?.tier ?? "high");
   const reducedMotion = useExperienceStore((s) => s.reducedMotion);

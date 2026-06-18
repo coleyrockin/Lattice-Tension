@@ -21,24 +21,9 @@ const UP = new Vector3().crossVectors(RIGHT, HEADING).normalize();
 
 type Props = { standalone?: boolean };
 
-/**
- * INTERFERENCE LAYER — crossed-wave realm driver.
- *
- * Modeled 1:1 on GyroidLattice.tsx:
- * - useMemo material per tier (STEPS high/medium/low)
- * - useFrame: sampleExperience(d) + userResonance → effectiveRes
- * - drive new uniforms (interference, fringeAmp) + all atlas continuity ones
- * - accumulate resonance on impulse + sustained drag/pointer (K springs)
- * - identical travel/steer/pulse/pos/fwd math + sway
- * - plane mesh, onClick fires impulse + fragment
- * - reveal gated to Interference range (~1.0-1.166) using raw descent
- *   while still factoring sample.simulation.interference so low early
- * - poetic comments, tier respect, full reuse of descent/store/addResonance
- *
- * Renders as a distinct visual layer (renderOrder 11) between lattice and echo.
- * Fringes are geometric (distanceToSurface modulation in material) so they
- * integrate with the gyroid shells rather than float on top.
- */
+// Reveal gates on `sig.interferenceLayer * sig.latticeReveal` so the layer is
+// only visible in its chapter (~1.0-1.166) but still fades with the gyroid's
+// latticeReveal instead of cutting in hard.
 export function InterferenceLayer({ standalone = false }: Props) {
   const tier = useExperienceStore((s) => s.profile?.tier ?? "high");
   const reducedMotion = useExperienceStore((s) => s.reducedMotion);
