@@ -877,8 +877,12 @@ button {
   }
 
   .fragment {
-    bottom: 24px;
-    padding: 34px 26px 30px;
+    bottom: max(24px, env(safe-area-inset-bottom) + 12px);
+    padding: 34px 26px max(30px, env(safe-area-inset-bottom));
+  }
+
+  .chapter {
+    bottom: max(78px, env(safe-area-inset-bottom) + 60px);
   }
 
   @keyframes chapter-enter-mobile {
@@ -1042,4 +1046,19 @@ button {
   clip: rect(0 0 0 0);
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* --- Autoplay Loop Fade --- */
+.atlas-loop-fade {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  background: #020207;
+  opacity: 0;
+  transition: opacity 500ms ease;
+}
+
+.atlas-loop-fade--active {
+  opacity: 1;
 }

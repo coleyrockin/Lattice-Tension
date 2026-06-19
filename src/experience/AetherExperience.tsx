@@ -63,6 +63,8 @@ export function AetherExperience() {
 
   // Autoplay driver
   const autoplay = useExperienceStore((state) => state.autoplay);
+  const loopingRef = useRef(false);
+  const loopFadeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!autoplay) return;
@@ -79,16 +81,28 @@ export function AetherExperience() {
       const dt = (now - lastTime) / 1000;
       lastTime = now;
 
-      // Cap delta time to prevent large jumps on frame drops/tab backgrounding
-      const delta = Math.min(dt, 0.1);
+      if (loopingRef.current) {
+        frameId = requestAnimationFrame(tick);
+        return;
+      }
 
-      // Read current progress from store to avoid stale closure
+      const delta = Math.min(dt, 0.1);
       const currentProgress = useExperienceStore.getState().scrollProgress;
-      const speed = 0.05; // 0.05 units per second (takes 40 seconds to go from 0 to 2.0)
-      let nextProgress = currentProgress + speed * delta;
+      const speed = 0.05;
+      const nextProgress = currentProgress + speed * delta;
 
       if (nextProgress >= ATLAS_MAX) {
-        nextProgress = 0;
+        loopingRef.current = true;
+        loopFadeRef.current?.classList.add("atlas-loop-fade--active");
+        window.setTimeout(() => {
+          window.scrollTo({ top: 0, behavior: "auto" });
+          window.setTimeout(() => {
+            loopFadeRef.current?.classList.remove("atlas-loop-fade--active");
+            window.setTimeout(() => { loopingRef.current = false; }, 520);
+          }, 80);
+        }, 520);
+        frameId = requestAnimationFrame(tick);
+        return;
       }
 
       window.scrollTo({
@@ -102,6 +116,9 @@ export function AetherExperience() {
     frameId = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(frameId);
+      loopingRef.current = false;
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      loopFadeRef.current?.classList.remove("atlas-loop-fade--active");
     };
   }, [autoplay]);
 
@@ -220,6 +237,7 @@ export function AetherExperience() {
         <ExperienceCanvas />
         <InterfaceOverlay />
       </div>
+      <div ref={loopFadeRef} className="atlas-loop-fade" aria-hidden="true" />
       <div className="scroll-depth" style={{ height: scrollHeight }} />
     </div>
   );

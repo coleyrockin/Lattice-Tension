@@ -185,6 +185,22 @@ export function useAetherAudio() {
         );
       });
 
+      // Gain breathes with the chapter — singularity/collapse are louder,
+      // nebula/aether are quieter. Range kept narrow (0.028–0.058) so it never
+      // feels like a volume jump, only a presence shift.
+      const targetGain =
+        0.04 +
+        sig.singularity * 0.018 +
+        sig.twist * 0.008 -
+        sig.nebula * 0.012 -
+        sig.veil * 0.008 +
+        imprint * 0.006;
+      gain.gain.setTargetAtTime(
+        Math.max(0.012, Math.min(0.065, targetGain)),
+        context.currentTime,
+        0.8,
+      );
+
       graph.raf = requestAnimationFrame(tick);
     };
 
