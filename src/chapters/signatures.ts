@@ -7,7 +7,7 @@ import type { ChapterSignature } from "./types";
 export const CHAPTER_SIGNATURES: Record<string, ChapterSignature> = {
   origin: {
     latticeReveal: 0.24,
-    orbPresence: 1.2,
+    orbPresence: 1.30,
     twist: 0,
     swell: 0,
     veil: 0,
@@ -22,10 +22,10 @@ export const CHAPTER_SIGNATURES: Record<string, ChapterSignature> = {
     shellThickness: 0.48,
     cellDensity: 0.35,
     absorption: 0.68,
-    focalGlow: 0.24,
+    focalGlow: 0.52,
     chromatic: 0.02,
     orbDistortion: 0,
-    interiorCrystalline: 0.52,
+    interiorCrystalline: 0.35,
   },
   tension: {
     latticeReveal: 0.78,

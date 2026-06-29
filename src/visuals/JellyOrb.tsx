@@ -136,7 +136,7 @@ export function JellyOrb() {
       (py.current - dragY.current * 2.1) * lead,
     );
 
-    u.speed.value = reducedMotion ? 0.14 : 0.6;
+    u.speed.value = reducedMotion ? 0.14 : 0.45 + sample.simulation.tension * 0.25;
     u.tension.value = sample.simulation.tension;
     u.order.value =
       sig.interiorCrystalline * 0.85 + sample.simulation.order * 0.25;

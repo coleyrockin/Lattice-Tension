@@ -28,7 +28,7 @@ export const CHAPTERS: ChapterDefinition[] = [
     title: "Origin",
     statement: "Nothing has crossed yet. The field is whole.",
     fragment:
-      "In the beginning was the word, and the word was a pattern — a point defined by everything it might touch.",
+      "Before the first crossing, every point in the lattice is defined by what it might reach. The field is whole because nothing has named the distance yet.",
     range: [0, sixth],
     camera: { position: [0.25, 0.28, 11.9], target: [0.0, 0, -0.45], fov: 42 },
     palette: {
@@ -53,10 +53,10 @@ export const CHAPTERS: ChapterDefinition[] = [
     },
     visual: {
       membraneOpacity: 0.58,
-      membraneScale: 0.82,
+      membraneScale: 0.90,
       contourDensity: 0.28,
       particleDensity: 0.34,
-      stressIntensity: 0.34,
+      stressIntensity: 0.50,
       collapseDistortion: 0,
       cameraProximity: 0.18,
       ribbonDepth: 0.36,
@@ -65,7 +65,7 @@ export const CHAPTERS: ChapterDefinition[] = [
       haloDepth: 0.62,
       spectralLift: 0.58,
     },
-    post: { bloom: 0.7, aberration: 0.0001, vignette: 0.72, depthOfField: 0.18 },
+    post: { bloom: 0.82, aberration: 0.0001, vignette: 0.60, depthOfField: 0.14 },
   }),
   withSignature({
     id: "tension",
