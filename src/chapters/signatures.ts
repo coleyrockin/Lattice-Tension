@@ -264,9 +264,9 @@ export const CHAPTER_SIGNATURES: Record<string, ChapterSignature> = {
     shellThickness: 0.45,
     cellDensity: 0.28,
     absorption: 0.58,
-    focalGlow: 0.72,
+    focalGlow: 0.88,
     chromatic: 0.04,
     orbDistortion: 0,
-    interiorCrystalline: 0.58,
+    interiorCrystalline: 0.36,
   },
 };

@@ -163,7 +163,7 @@ export const CHAPTERS: ChapterDefinition[] = [
     title: "Collapse",
     statement: "What breaks does not disappear. It changes relation.",
     fragment:
-      "A system folding inward may be ending, or merely discovering another dimension.",
+      "A system folding inward may be ending, or discovering a dimension it could not reach from outside.",
     range: [sixth * 3, sixth * 4],
     camera: { position: [0.35, -0.25, 6.4], target: [0.15, 0.05, 0.2], fov: 52 },
     palette: {
@@ -253,7 +253,7 @@ export const CHAPTERS: ChapterDefinition[] = [
     title: "Aether",
     statement: "The lattice does not arrive. It is always arriving.",
     fragment:
-      "The answer was never a fixed point. It is what the lattice does when no one is asking — the field, continuous, always already arriving.",
+      "The answer was never a fixed point. It is what the lattice does when no one is asking — process mistaken for destination, motion through every stillness.",
     range: [sixth * 5, 1],
     camera: { position: [0.15, 0.42, 12.4], target: [0.05, 0.05, -0.8], fov: 48 },
     palette: {
@@ -385,7 +385,7 @@ export const CHAPTERS: ChapterDefinition[] = [
     index: 8,
     title: "Quantum Fold",
     statement: "Beneath the continuous lies the fold that chooses.",
-    fragment: "The quantum fold does not break the lattice into parts. It shows where the lattice was always choosing.",
+    fragment: "The quantum fold does not break the lattice into parts. It shows where the lattice was always branching.",
     range: [1.333, 1.5],
     camera: { position: [-0.6, 0.35, 8.2], target: [-0.05, 0.08, -0.55], fov: 44 },
     palette: {
@@ -520,7 +520,7 @@ export const CHAPTERS: ChapterDefinition[] = [
     title: "Origin Core",
     statement: "The field was always this. The crossing was yours.",
     fragment:
-      "Every descent ends where it began — not as repetition, but as recognition. The lattice remembers the first breath.",
+      "Every descent reshapes what receives it. The field you return to is not the one you left — it carries the geometry of your crossing.",
     range: [1.833, 2.0],
     camera: { position: [0.2, 0.25, 13.5], target: [0.0, 0.0, -0.4], fov: 38 },
     palette: {
@@ -548,7 +548,7 @@ export const CHAPTERS: ChapterDefinition[] = [
       membraneScale: 0.9,
       contourDensity: 0.2,
       particleDensity: 0.5,
-      stressIntensity: 0.3,
+      stressIntensity: 0.58,
       collapseDistortion: 0.0,
       cameraProximity: 0.1,
       ribbonDepth: 0.3,
@@ -557,7 +557,7 @@ export const CHAPTERS: ChapterDefinition[] = [
       haloDepth: 1.25,
       spectralLift: 1.05,
     },
-    post: { bloom: 0.92, aberration: 0.0001, vignette: 0.65, depthOfField: 0.15 },
+    post: { bloom: 1.10, aberration: 0.0001, vignette: 0.48, depthOfField: 0.12 },
   }),
 ];
 
