@@ -257,6 +257,29 @@ export function createJellyOrbMaterial(steps: number) {
         ).toVar();
         const refl = reflect(rd, n).toVar();
 
+        // Chromatic dispersion: real glass bends blue more than red (higher
+        // IOR). Three etas → three refraction directions. The green ray
+        // above still drives the expensive interior march (cost stays flat —
+        // no tripling the 10-step loop); R/B divergence FROM it becomes a
+        // real per-channel absorption depth below, so the deep body itself
+        // separates color toward the rim, not just a thin dispersive ring.
+        const dispSpread = float(0.026);
+        const etaR = eta.sub(dispSpread);
+        const etaB = eta.add(dispSpread);
+        const rrR = refract(rd, n, etaR);
+        const rrB = refract(rd, n, etaB);
+        const refrDirR = normalize(
+          mix(rd, rrR.add(vec3(0, 0, -0.0001)), step(0.001, length(rrR))),
+        ).toVar();
+        const refrDirB = normalize(
+          mix(rd, rrB.add(vec3(0, 0, -0.0001)), step(0.001, length(rrB))),
+        ).toVar();
+        // unsigned divergence from the primary ray — ~0 head-on (all etas
+        // converge dead-center), growing toward the grazing silhouette where
+        // Snell's law bends each wavelength apart the most.
+        const dispMagR = length(refrDirR.sub(refrDir)).toVar();
+        const dispMagB = length(refrDirB.sub(refrDir)).toVar();
+
         // Fresnel-Schlick (F0 = 0.02, water) + a small 3-probe procedural
         // environment sampled by the reflected ray → mirror-bright wet rim and a
         // moving sun-glint sweep, while the centre stays clear deep water.
@@ -383,10 +406,16 @@ export function createJellyOrbMaterial(steps: number) {
         // Gentler absorption so light carries deep into the body → luminous,
         // translucent tropical water rather than an opaque marble.
         const absorb = vec3(1.0).sub(tint).mul(float(0.9).add(tension.mul(0.25)));
+        // Dispersed thickness: red's shallower bend reads as a longer optical
+        // path (more absorbed), blue's sharper bend as shorter (less
+        // absorbed) — real chromatic separation in the transmitted body
+        // color, strongest exactly where refraction bends hardest (the rim).
+        const thicknessR = thickness.mul(float(1).add(dispMagR.mul(1.8)));
+        const thicknessB = thickness.mul(float(1).sub(dispMagB.mul(1.8)));
         const transmit = vec3(
-          exp(absorb.x.mul(thickness).negate()),
+          exp(absorb.x.mul(thicknessR).negate()),
           exp(absorb.y.mul(thickness).negate()),
-          exp(absorb.z.mul(thickness).negate()),
+          exp(absorb.z.mul(thicknessB).negate()),
         ).toVar();
         const clearInterior = mix(accent, tint, smoothstep(0.0, 1.2, thickness));
         const deepBody = clearInterior
@@ -457,7 +486,11 @@ export function createJellyOrbMaterial(steps: number) {
           .mul(latSoft.mul(latSoft).mul(1.4))
           .mul(lattice)
           .mul(float(0.95).add(tension.mul(0.45)))
-          .add(resonance.mul(0.22).mul(latSoft)); // resonance memory brightens the remembered web
+          .add(resonance.mul(0.22).mul(latSoft)) // resonance memory brightens the remembered web
+          // a whisper of the same dispersion in the suspended web itself, so
+          // the fringing near the rim reads as one continuous glass effect
+          // rather than the shell doing one thing and the interior another.
+          .add(vec3(dispMagR, 0, dispMagB.negate()).mul(latSoft).mul(0.4));
 
         // Tight sun-glint that twinkles on wave crests (gated by a wavelet mask)
         // — sparkles like sun on water, additive on the light highlight colour.
