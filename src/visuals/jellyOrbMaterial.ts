@@ -64,9 +64,43 @@ export function createJellyOrbMaterial(steps: number) {
   const slosh = uniform(new Vector3()); // delayed liquid mass moving inside shell
   const stepCount = uniform(steps);
 
+  // Fluid memory: a 4-slot ring buffer of the last touches. Each slot is a
+  // direction on the orb (where the touch landed) + how long ago it fired.
+  // Age is accumulated on the CPU side every frame (JellyOrb.tsx), not from
+  // shader `time`, so it stays correct regardless of when the material was
+  // created relative to the renderer's own clock. An untouched slot sits at
+  // a large age forever — its contribution underflows to exactly 0 below,
+  // so idle orbs pay only the (cheap) uniform reads, no visible cost.
+  const rippleOrigin0 = uniform(new Vector3(0, 0, 1));
+  const rippleAge0 = uniform(999);
+  const rippleOrigin1 = uniform(new Vector3(0, 0, 1));
+  const rippleAge1 = uniform(999);
+  const rippleOrigin2 = uniform(new Vector3(0, 0, 1));
+  const rippleAge2 = uniform(999);
+  const rippleOrigin3 = uniform(new Vector3(0, 0, 1));
+  const rippleAge3 = uniform(999);
+
   // gyroid field — the hidden geometry suspended inside the jelly
   const gyroid = (x: ReturnType<typeof vec3>) =>
     sin(x.x).mul(cos(x.y)).add(sin(x.y).mul(cos(x.z))).add(sin(x.z).mul(cos(x.x)));
+
+  // A single traveling wavefront: an expanding ring (front = age * speed)
+  // that fades both with age and with distance from the current front, so
+  // it reads as a ring crossing the surface rather than a ripple that fills
+  // the whole orb at once. Summing four of these lets old and new touches
+  // genuinely interfere — real superposition, not a fake blend.
+  const rippleWave = (
+    dir: ReturnType<typeof vec3>,
+    origin: ReturnType<typeof vec3>,
+    age: ReturnType<typeof float>,
+  ) => {
+    const dist = length(dir.sub(origin));
+    const front = age.mul(0.85);
+    const delta = dist.sub(front);
+    const envelope = exp(age.mul(0.55).add(delta.mul(delta).mul(38)).negate());
+    const wave = sin(dist.mul(16).sub(age.mul(3.1)));
+    return wave.mul(envelope);
+  };
 
   const map = (p: ReturnType<typeof vec3>) => {
     // jiggle physics: squash-and-stretch the sample space along the wobble axis
@@ -155,12 +189,22 @@ export function createJellyOrbMaterial(steps: number) {
       .add(sin(q.x.mul(1.8).sub(time.mul(0.37))))
       .mul(0.005);
 
+    // fluid memory: four touch-ripples superposed as real SDF displacement
+    // (not a shading trick) — the surface actually bulges where rings cross.
+    const rippleDir = normalize(p);
+    const ripple = rippleWave(rippleDir, rippleOrigin0, rippleAge0)
+      .add(rippleWave(rippleDir, rippleOrigin1, rippleAge1))
+      .add(rippleWave(rippleDir, rippleOrigin2, rippleAge2))
+      .add(rippleWave(rippleDir, rippleOrigin3, rippleAge3))
+      .mul(0.05);
+
     return core
       .sub(r1)
       .sub(r2)
       .sub(surfaceQuiver)
       .sub(gelatinSwell)
-      .sub(pulse.mul(0.05));
+      .sub(pulse.mul(0.05))
+      .sub(ripple);
   };
 
   const raymarch = Fn(() => {
@@ -597,5 +641,13 @@ export function createJellyOrbMaterial(steps: number) {
     squash,
     slosh,
     stepCount,
+    rippleOrigin0,
+    rippleAge0,
+    rippleOrigin1,
+    rippleAge1,
+    rippleOrigin2,
+    rippleAge2,
+    rippleOrigin3,
+    rippleAge3,
   };
 }

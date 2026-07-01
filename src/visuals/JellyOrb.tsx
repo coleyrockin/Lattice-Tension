@@ -43,6 +43,19 @@ export function JellyOrb() {
   const sloshDelta = useRef(new Vector3());
   const flickImpulse = useRef(new Vector3());
 
+  // Fluid memory: a 4-slot ring buffer of touch ripples. Each touch writes
+  // its direction + resets its age to 0; age then accumulates every frame.
+  // A slot that's never fired sits at a large age forever (contributes ~0 in
+  // the shader — see jellyOrbMaterial's rippleWave underflow note).
+  const rippleOrigins = useRef([
+    new Vector3(0, 0, 1),
+    new Vector3(0, 0, 1),
+    new Vector3(0, 0, 1),
+    new Vector3(0, 0, 1),
+  ]);
+  const rippleAges = useRef([999, 999, 999, 999]);
+  const rippleCursor = useRef(0);
+
   const tier = useExperienceStore((s) => s.profile?.tier ?? "high");
   const reducedMotion = useExperienceStore((s) => s.reducedMotion);
   const addResonance = useExperienceStore((s) => s.addResonance);
@@ -75,6 +88,10 @@ export function JellyOrb() {
       jv.current += 4.15 * jig;
       jaxis.current.set(px.current, py.current, 0.5).normalize();
       sloshVelocity.current.addScaledVector(jaxis.current, -2.8 * jig);
+      // touch memory: file this contact into the ring buffer, oldest slot first
+      rippleOrigins.current[rippleCursor.current].copy(jaxis.current);
+      rippleAges.current[rippleCursor.current] = 0;
+      rippleCursor.current = (rippleCursor.current + 1) % 4;
     }
     pulseAmp.current = Math.max(0, pulseAmp.current - dt * 1.05);
     u.pulse.value = pulseAmp.current;
@@ -135,6 +152,22 @@ export function JellyOrb() {
       (px.current + dragX.current * 2.1) * lead,
       (py.current - dragY.current * 2.1) * lead,
     );
+
+    // fluid memory: age every ripple slot and push it to the shader. Capped
+    // so a session left open for hours can't grow the float unboundedly —
+    // by 40s a ripple has long since decayed below visibility anyway.
+    rippleAges.current[0] = Math.min(rippleAges.current[0] + dt, 40);
+    rippleAges.current[1] = Math.min(rippleAges.current[1] + dt, 40);
+    rippleAges.current[2] = Math.min(rippleAges.current[2] + dt, 40);
+    rippleAges.current[3] = Math.min(rippleAges.current[3] + dt, 40);
+    u.rippleOrigin0.value.copy(rippleOrigins.current[0]);
+    u.rippleOrigin1.value.copy(rippleOrigins.current[1]);
+    u.rippleOrigin2.value.copy(rippleOrigins.current[2]);
+    u.rippleOrigin3.value.copy(rippleOrigins.current[3]);
+    u.rippleAge0.value = rippleAges.current[0];
+    u.rippleAge1.value = rippleAges.current[1];
+    u.rippleAge2.value = rippleAges.current[2];
+    u.rippleAge3.value = rippleAges.current[3];
 
     u.speed.value = reducedMotion ? 0.14 : 0.45 + sample.simulation.tension * 0.25;
     u.tension.value = sample.simulation.tension;
