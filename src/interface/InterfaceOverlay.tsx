@@ -37,7 +37,6 @@ export function InterfaceOverlay() {
 
   const activeIndex = getActiveChapterIndex(progress);
   const chapter = CHAPTERS[activeIndex];
-  const inExtendedRealm = progress >= 1;
   const realmLabel = REALM_LABELS[chapter.id] ?? "Realm";
 
   useEffect(() => {
@@ -176,13 +175,7 @@ export function InterfaceOverlay() {
       </div>
 
       <div className="interaction-cue" aria-hidden="true">
-        <span>
-          {progress < 0.08
-            ? "Scroll to enter the atlas"
-            : inExtendedRealm
-              ? "Your imprint shapes what returns"
-              : "Drag — leave your mark on the aether"}
-        </span>
+        <span>Touch the orb — the field remembers</span>
         <i />
       </div>
 

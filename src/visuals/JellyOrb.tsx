@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Color, Vector3, type Mesh } from "three";
+import { Color, Quaternion, Vector3, type Mesh } from "three";
 import { sampleExperience } from "../chapters/interpolate";
 import { createJellyOrbMaterial } from "./jellyOrbMaterial";
 import { descent, frameSample, useExperienceStore } from "../experience/store";
@@ -21,6 +21,8 @@ const DEEP = new Color();
 const LIGHT = new Color();
 const DEEP_ANCHOR = new Color("#020d24");
 const WHITE = new Color("#ffffff");
+// scratch quaternion — maps a view-space click direction into object space
+const RIPPLE_QUAT = new Quaternion();
 
 export function JellyOrb() {
   const mesh = useRef<Mesh>(null!);
@@ -88,10 +90,20 @@ export function JellyOrb() {
       jv.current += 4.15 * jig;
       jaxis.current.set(px.current, py.current, 0.5).normalize();
       sloshVelocity.current.addScaledVector(jaxis.current, -2.8 * jig);
-      // touch memory: file this contact into the ring buffer, oldest slot first
-      rippleOrigins.current[rippleCursor.current].copy(jaxis.current);
-      rippleAges.current[rippleCursor.current] = 0;
-      rippleCursor.current = (rippleCursor.current + 1) % 4;
+      // touch memory: file this contact into the ring buffer, oldest slot
+      // first. The click direction is view-space but the shader compares it
+      // against normalize(p) in OBJECT space — the mesh tumbles, so without
+      // the inverse-quaternion transform a ring spawned after ~60s of
+      // rotation would land on the far side of the orb from the click.
+      // Filed origins then correctly ride the surface as the orb turns.
+      if (!reducedMotion && mesh.current) {
+        RIPPLE_QUAT.copy(mesh.current.quaternion).invert();
+        rippleOrigins.current[rippleCursor.current]
+          .copy(jaxis.current)
+          .applyQuaternion(RIPPLE_QUAT);
+        rippleAges.current[rippleCursor.current] = 0;
+        rippleCursor.current = (rippleCursor.current + 1) % 4;
+      }
     }
     pulseAmp.current = Math.max(0, pulseAmp.current - dt * 1.05);
     u.pulse.value = pulseAmp.current;

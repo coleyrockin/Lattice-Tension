@@ -98,7 +98,7 @@ export function createJellyOrbMaterial(steps: number) {
     const front = age.mul(0.85);
     const delta = dist.sub(front);
     const envelope = exp(age.mul(0.55).add(delta.mul(delta).mul(38)).negate());
-    const wave = sin(dist.mul(16).sub(age.mul(3.1)));
+    const wave = sin(dist.mul(12).sub(age.mul(3.1)));
     return wave.mul(envelope);
   };
 
@@ -191,12 +191,17 @@ export function createJellyOrbMaterial(steps: number) {
 
     // fluid memory: four touch-ripples superposed as real SDF displacement
     // (not a shading trick) — the surface actually bulges where rings cross.
-    const rippleDir = normalize(p);
+    // Length-guarded direction: rays through the orb center would hit
+    // normalize(0)=NaN and poison the whole pixel (same guard as the
+    // gradient normalize). Amplitude 0.03 keeps the added SDF gradient
+    // (~12·0.03 per ring) inside what the sphere-trace already tolerates
+    // from the domain warps — 0.05 caused overstep risk at crossing fronts.
+    const rippleDir = p.div(max(length(p), float(1e-4)));
     const ripple = rippleWave(rippleDir, rippleOrigin0, rippleAge0)
       .add(rippleWave(rippleDir, rippleOrigin1, rippleAge1))
       .add(rippleWave(rippleDir, rippleOrigin2, rippleAge2))
       .add(rippleWave(rippleDir, rippleOrigin3, rippleAge3))
-      .mul(0.05);
+      .mul(0.03);
 
     return core
       .sub(r1)
@@ -453,9 +458,13 @@ export function createJellyOrbMaterial(steps: number) {
         // Dispersed thickness: red's shallower bend reads as a longer optical
         // path (more absorbed), blue's sharper bend as shorter (less
         // absorbed) — real chromatic separation in the transmitted body
-        // color, strongest exactly where refraction bends hardest (the rim).
-        const thicknessR = thickness.mul(float(1).add(dispMagR.mul(1.8)));
-        const thicknessB = thickness.mul(float(1).sub(dispMagB.mul(1.8)));
+        // color. Gain 7: dispMag peaks ~0.04 at grazing but thickness→0
+        // there, so the product needs this much drive for the mid-band
+        // cool-shift to survive bloom+ACES (at 1.8 the whole effect was a
+        // ≤2% transmit delta — invisible). Floor guards keep thicknessB
+        // positive even if a pathological normal spikes dispMag.
+        const thicknessR = thickness.mul(float(1).add(dispMagR.mul(7)));
+        const thicknessB = thickness.mul(max(float(0.5), float(1).sub(dispMagB.mul(7))));
         const transmit = vec3(
           exp(absorb.x.mul(thicknessR).negate()),
           exp(absorb.y.mul(thickness).negate()),
@@ -531,10 +540,13 @@ export function createJellyOrbMaterial(steps: number) {
           .mul(lattice)
           .mul(float(0.95).add(tension.mul(0.45)))
           .add(resonance.mul(0.22).mul(latSoft)) // resonance memory brightens the remembered web
-          // a whisper of the same dispersion in the suspended web itself, so
-          // the fringing near the rim reads as one continuous glass effect
-          // rather than the shell doing one thing and the interior another.
-          .add(vec3(dispMagR, 0, dispMagB.negate()).mul(latSoft).mul(0.4));
+          // the same dispersion in the suspended web itself, so the fringing
+          // near the rim reads as one continuous glass effect rather than
+          // the shell doing one thing and the interior another. (1.2, not a
+          // whisper: dispMag is ~0.01–0.04, so this lands as a few-percent
+          // warm/cool split on the bright filaments — audit found 0.4
+          // vanished entirely under the grade.)
+          .add(vec3(dispMagR, 0, dispMagB.negate()).mul(latSoft).mul(1.2));
 
         // Tight sun-glint that twinkles on wave crests (gated by a wavelet mask)
         // — sparkles like sun on water, additive on the light highlight colour.

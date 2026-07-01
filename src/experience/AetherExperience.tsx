@@ -1,7 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  ATLAS_MAX,
-  SCROLL_VH_PER_UNIT,
   atlasFromShareParam,
   atlasProgressFromScroll,
   getActiveChapterIndex,
@@ -82,11 +80,6 @@ export function AetherExperience() {
     }
   }, []);
 
-  const scrollHeight = useMemo(
-    () => `${ATLAS_MAX * SCROLL_VH_PER_UNIT}vh`,
-    [],
-  );
-
   if (!webglAvailable || renderError) {
     return <WebGLFallback />;
   }
@@ -155,7 +148,6 @@ export function AetherExperience() {
         <ExperienceCanvas />
         <InterfaceOverlay />
       </div>
-      <div className="scroll-depth" style={{ height: scrollHeight }} />
     </div>
   );
 }
