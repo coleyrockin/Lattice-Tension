@@ -1,31 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { CHAPTERS, PHILOSOPHICAL_FRAGMENTS } from "../chapters/definitions";
 import {
-  ATLAS_MAX,
-  getChapterCenterProgress,
   getActiveChapterIndex,
   normalizeAtlasForShare,
-  scrollYForAtlasProgress,
 } from "../chapters/atlas";
 import { useExperienceStore } from "../experience/store";
 import { useSmoothedDescent } from "../experience/useSmoothedDescent";
 import { ResonanceImprint } from "./ResonanceImprint";
 
-// Each realm names its own character — the label encodes what the place IS,
-// not a flat "Core" category (the Core/Atlas region split lives in the rail zones).
+// Each realm names its own character — the label encodes what the place IS.
 const REALM_LABELS: Record<string, string> = {
   origin: "Genesis",
-  tension: "Strain",
-  pattern: "Lattice",
-  collapse: "Implosion",
-  emergence: "Bloom",
-  aether: "Field",
-  interference: "Wave",
-  singularity: "Horizon",
-  quantum: "Fold",
-  nebula: "Veil",
-  echo: "Memory",
-  origin_core: "Return",
 };
 
 export function InterfaceOverlay() {
@@ -43,9 +28,6 @@ export function InterfaceOverlay() {
   );
   const resonance = useExperienceStore((state) => state.resonance);
 
-  const autoplay = useExperienceStore((state) => state.autoplay);
-  const setAutoplay = useExperienceStore((state) => state.setAutoplay);
-
   const [shareState, setShareState] = useState<"idle" | "copied">("idle");
   const [entered, setEntered] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -55,7 +37,6 @@ export function InterfaceOverlay() {
 
   const activeIndex = getActiveChapterIndex(progress);
   const chapter = CHAPTERS[activeIndex];
-  const atlasDepth = progress / ATLAS_MAX;
   const inExtendedRealm = progress >= 1;
   const realmLabel = REALM_LABELS[chapter.id] ?? "Realm";
 
@@ -77,24 +58,9 @@ export function InterfaceOverlay() {
     return () => window.clearTimeout(timer);
   }, [shareState]);
 
-  const navigateToChapter = (index: number) => {
-    window.scrollTo({
-      top: scrollYForAtlasProgress(getChapterCenterProgress(index)),
-      behavior: "smooth",
-    });
-  };
-
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.target as HTMLElement).closest("input, textarea, select, [contenteditable]")) return;
-      if (event.key === "ArrowDown" || event.key === "j" || event.key === "J") {
-        event.preventDefault();
-        navigateToChapter(Math.min(CHAPTERS.length - 1, activeIndex + 1));
-      }
-      if (event.key === "ArrowUp" || event.key === "k" || event.key === "K") {
-        event.preventDefault();
-        navigateToChapter(Math.max(0, activeIndex - 1));
-      }
       if (event.key === "f" || event.key === "F") {
         setSelectedFragment({
           nodeId: activeIndex,
@@ -104,17 +70,13 @@ export function InterfaceOverlay() {
       if (event.key === "Escape") {
         setSelectedFragment(null);
       }
-      if (event.key === " ") {
-        event.preventDefault();
-        setAutoplay(!autoplay);
-      }
       if (event.key === "m" || event.key === "M") {
         setAudioEnabled(!audioEnabled);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeIndex, audioEnabled, autoplay, setAudioEnabled, setAutoplay, setSelectedFragment]);
+  }, [activeIndex, audioEnabled, setAudioEnabled, setSelectedFragment]);
 
   const copyShareLink = () => {
     const url = `${window.location.origin}${window.location.pathname}?p=${normalizeAtlasForShare(progress).toFixed(3)}&r=${resonance.toFixed(2)}`;
@@ -148,30 +110,6 @@ export function InterfaceOverlay() {
             {Array.from({ length: 7 }, (_, index) => (
               <i key={index} />
             ))}
-          </span>
-        </button>
-
-        <button
-          className="autoplay-control"
-          type="button"
-          aria-pressed={autoplay}
-          aria-label={autoplay ? "Pause autoplay descent" : "Start autoplay descent"}
-          onClick={() => setAutoplay(!autoplay)}
-        >
-          <span className="autoplay-control__label">
-            {autoplay ? "Autoplay on" : "Autoplay off"}
-          </span>
-          <span className="autoplay-control__icon" aria-hidden="true">
-            {autoplay ? (
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="4" width="4" height="16" rx="1" />
-                <rect x="14" y="4" width="4" height="16" rx="1" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            )}
           </span>
         </button>
 
@@ -236,36 +174,6 @@ export function InterfaceOverlay() {
       <div className="sr-only" aria-live="polite">
         {realmLabel} — {chapter.title}. {chapter.statement}
       </div>
-
-      <nav className="chapter-rail" aria-label="Aether chapters">
-        <div className="chapter-rail__zones" aria-hidden="true">
-          <span>Core</span>
-          <span>Atlas</span>
-        </div>
-        <div className="chapter-rail__line">
-          <span
-            style={{
-              transform: `scaleY(${Math.max(0.02, atlasDepth)})`,
-            }}
-          />
-        </div>
-        {CHAPTERS.map((item, index) => (
-          <button
-            key={item.id}
-            type="button"
-            className={index === activeIndex ? "is-active" : ""}
-            onClick={() => navigateToChapter(index)}
-            aria-label={`Go to ${item.title}`}
-            aria-current={index === activeIndex ? "step" : undefined}
-          >
-            <span className="chapter-rail__index">
-              {String(index + 1).padStart(2, "0")}
-            </span>
-            <span className="chapter-rail__tooltip">{item.title}</span>
-            <i />
-          </button>
-        ))}
-      </nav>
 
       <div className="interaction-cue" aria-hidden="true">
         <span>

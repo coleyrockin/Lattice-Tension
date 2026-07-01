@@ -47,7 +47,6 @@ type ExperienceStore = {
   reducedMotion: boolean;
   profile: PerformanceProfile | null;
   resonance: number;
-  autoplay: boolean;
   renderError: boolean;
   setReady: (ready: boolean) => void;
   setScrollProgress: (progress: number) => void;
@@ -59,7 +58,6 @@ type ExperienceStore = {
   setReducedMotion: (enabled: boolean) => void;
   setProfile: (profile: PerformanceProfile) => void;
   addResonance: (delta: number) => void;
-  setAutoplay: (autoplay: boolean) => void;
   setRenderError: (failed: boolean) => void;
 };
 
@@ -74,7 +72,6 @@ export const useExperienceStore = create<ExperienceStore>((set) => ({
   reducedMotion: false,
   profile: null,
   resonance: 0,
-  autoplay: false,
   renderError: false,
   setReady: (ready) => set({ ready }),
   setScrollProgress: (scrollProgress) => set({ scrollProgress }),
@@ -88,7 +85,6 @@ export const useExperienceStore = create<ExperienceStore>((set) => ({
   setProfile: (profile) => set({ profile }),
   addResonance: (delta) =>
     set((state) => ({ resonance: Math.max(0, Math.min(2.2, state.resonance + delta)) })),
-  setAutoplay: (autoplay) => set({ autoplay }),
   setRenderError: (renderError) => set({ renderError }),
 }));
 

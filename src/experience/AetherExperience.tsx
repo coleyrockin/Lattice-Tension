@@ -61,89 +61,7 @@ export function AetherExperience() {
     };
   }, [reducedMotion, setProfile, setScrollProgress]);
 
-  // Autoplay driver
-  const autoplay = useExperienceStore((state) => state.autoplay);
-  const loopingRef = useRef(false);
-  const loopFadeRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!autoplay) return;
-
-    let lastTime = performance.now();
-    let frameId: number;
-
-    const tick = (now: number) => {
-      if (document.hidden) {
-        lastTime = now;
-        frameId = requestAnimationFrame(tick);
-        return;
-      }
-      const dt = (now - lastTime) / 1000;
-      lastTime = now;
-
-      if (loopingRef.current) {
-        frameId = requestAnimationFrame(tick);
-        return;
-      }
-
-      const delta = Math.min(dt, 0.1);
-      const currentProgress = useExperienceStore.getState().scrollProgress;
-      const speed = 0.05;
-      const nextProgress = currentProgress + speed * delta;
-
-      if (nextProgress >= ATLAS_MAX) {
-        loopingRef.current = true;
-        loopFadeRef.current?.classList.add("atlas-loop-fade--active");
-        window.setTimeout(() => {
-          window.scrollTo({ top: 0, behavior: "auto" });
-          window.setTimeout(() => {
-            loopFadeRef.current?.classList.remove("atlas-loop-fade--active");
-            window.setTimeout(() => { loopingRef.current = false; }, 520);
-          }, 80);
-        }, 520);
-        frameId = requestAnimationFrame(tick);
-        return;
-      }
-
-      window.scrollTo({
-        top: scrollYForAtlasProgress(nextProgress),
-        behavior: "auto",
-      });
-
-      frameId = requestAnimationFrame(tick);
-    };
-
-    frameId = requestAnimationFrame(tick);
-    return () => {
-      cancelAnimationFrame(frameId);
-      loopingRef.current = false;
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      loopFadeRef.current?.classList.remove("atlas-loop-fade--active");
-    };
-  }, [autoplay]);
-
-  // User scroll/wheel interrupts autoplay so manual descent stays in control.
-  useEffect(() => {
-    const stopAutoplay = () => {
-      if (useExperienceStore.getState().autoplay) {
-        useExperienceStore.getState().setAutoplay(false);
-      }
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "ArrowUp" || event.key === "ArrowDown") stopAutoplay();
-    };
-
-    window.addEventListener("wheel", stopAutoplay, { passive: true });
-    window.addEventListener("touchmove", stopAutoplay, { passive: true });
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("wheel", stopAutoplay);
-      window.removeEventListener("touchmove", stopAutoplay);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, []);
-
-  // load shared atlas state from ?p= &r= (from share button)
+  // load shared state from ?p= &r= (from share button)
   useEffect(() => {
     if ("scrollRestoration" in window.history) {
       window.history.scrollRestoration = "manual";
@@ -237,7 +155,6 @@ export function AetherExperience() {
         <ExperienceCanvas />
         <InterfaceOverlay />
       </div>
-      <div ref={loopFadeRef} className="atlas-loop-fade" aria-hidden="true" />
       <div className="scroll-depth" style={{ height: scrollHeight }} />
     </div>
   );
