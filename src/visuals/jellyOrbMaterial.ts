@@ -344,12 +344,25 @@ export function createJellyOrbMaterial(steps: number) {
         ).toVar();
         // ambient reflection floor → the grazing rim always reflects a faint
         // sky instead of going black where no probe happens to align.
+        // Procedural sky: give the mirror rim a PLACE to reflect instead of
+        // a flat constant — a graded world (deep void below, luminous zenith
+        // above, a thin bright horizon band between). Continuous over the
+        // whole reflection sphere, so the rim reflection slides believably
+        // as the orb tumbles; this is most of what separates "real glass"
+        // from "shaded ball". A few ALU on top of the existing probes.
+        const upness = refl.y.mul(0.5).add(0.5);
+        const skyGrad = mix(
+          tint.mul(0.35),
+          mix(accent, highlight, 0.45),
+          pow(upness, 1.6),
+        );
+        const horizonBand = accent.mul(exp(abs(refl.y).mul(-5.5)).mul(0.5));
         const envCol = highlight
           .mul(env)
           .add(accent.mul(pow(max(dot(refl, sky), 0), 6.0).mul(0.12)))
-          // luminous ambient floor → the reflective rim catches a bright sky
+          // graded ambient floor → the reflective rim catches the sky
           // instead of mirroring the empty black void as a dark crescent.
-          .add(mix(accent, highlight, 0.5).mul(0.42));
+          .add(skyGrad.add(horizonBand).mul(0.85));
         // Schlick, but capped so the body always shows through the rim (a fully
         // mirror rim against an empty environment reads as a black crescent).
         const F0 = float(0.02);
