@@ -548,8 +548,25 @@ export function createJellyOrbMaterial(steps: number) {
           // vanished entirely under the grade.)
           .add(vec3(dispMagR, 0, dispMagB.negate()).mul(latSoft).mul(1.2));
 
+        // Fluid memory made visible: recompute the ripple field ONCE at the
+        // hit point (the march already paid for the displacement per-step;
+        // this shading term is at-hit only, 4 waves per pixel). Crests emit
+        // light like lit water — without this the rings exist but read as a
+        // faint dent; with it a click leaves a glowing wake and crossings
+        // flare where two rings superpose. Bloom (threshold 0.92) lifts a
+        // fresh crest into a soft flash for free.
+        const rippleHitDir = p.div(max(length(p), float(1e-4)));
+        const crest = abs(
+          rippleWave(rippleHitDir, rippleOrigin0, rippleAge0)
+            .add(rippleWave(rippleHitDir, rippleOrigin1, rippleAge1))
+            .add(rippleWave(rippleHitDir, rippleOrigin2, rippleAge2))
+            .add(rippleWave(rippleHitDir, rippleOrigin3, rippleAge3)),
+        ).toVar();
+        const rippleGlow = mix(accent, highlight, 0.5).mul(crest).mul(0.75);
+
         // Tight sun-glint that twinkles on wave crests (gated by a wavelet mask)
         // — sparkles like sun on water, additive on the light highlight colour.
+        // Ripple crests boost the mask so remembered rings twinkle as they pass.
         const sparkMask = smoothstep(
           0.6,
           1.0,
@@ -561,7 +578,8 @@ export function createJellyOrbMaterial(steps: number) {
         const sunGlint = highlight.mul(
           pow(max(dot(nW, half), 0), 180.0)
             .mul(0.9)
-            .mul(float(0.35).add(sparkMask.mul(0.65))),
+            .mul(float(0.35).add(sparkMask.mul(0.65)))
+            .mul(float(1).add(crest.mul(1.5))),
         );
 
         // Energy-conserving glass: Fresnel mixes the transmitted water body
@@ -595,6 +613,7 @@ export function createJellyOrbMaterial(steps: number) {
           .add(movingSheen.mul(0.6))
           .add(sunGlint)
           .add(rimGlow)
+          .add(rippleGlow)
           .toVar();
         // Hue-preserving floor keeps overlaps inside the chapter palette; a
         // Reinhard soft-knee then compresses only the brights, so mids and the
