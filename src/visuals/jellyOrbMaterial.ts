@@ -519,6 +519,17 @@ export function createJellyOrbMaterial(steps: number) {
           const band = smoothstep(bandWidth, 0.0, abs(g));
           const falloff = float(1).sub(float(i).mul(0.085));
           latGlow.addAssign(band.mul(float(0.32).add(order.mul(0.12))).mul(falloff));
+          // depth stack: a second, coarser gyroid octave (0.45× scale,
+          // slower phase) weighted by a ramp that GROWS with march depth —
+          // opposite of the fine web's falloff. The fine structure lives
+          // near the surface, a larger structure looms from the deep, and
+          // refraction parallax separates them as the orb turns → real
+          // interior depth instead of one flat suspended pattern.
+          const g2 = gyroid(
+            lp.mul(gscale.mul(0.45)).add(gphase.mul(0.6)) as ReturnType<typeof vec3>,
+          );
+          const band2 = smoothstep(bandWidth.mul(1.6), 0.0, abs(g2));
+          latGlow.addAssign(band2.mul(0.14).mul(float(i).mul(0.085)));
           // resonance memory: imprints make the suspended gyroid web inside the orb
           // develop brighter nodes and slight fractures — the viewer "marked" it
           const mem = band.mul(resonance.mul(0.55)).mul(falloff.mul(0.7));
@@ -541,9 +552,17 @@ export function createJellyOrbMaterial(steps: number) {
             smoothstep(0.45, 1.0, cA.mul(cB)).mul(0.12).mul(falloff),
           );
         });
+        // Light shafts: caustics brighten when the refracted view ray looks
+        // back toward the key light — the bands align into light streaming
+        // THROUGH the body from one direction, instead of an isotropic
+        // interior shimmer. 0.35 floor keeps off-axis caustics alive.
+        const shaft = float(0.35).add(
+          pow(max(dot(refrDir, lightDir), 0.0), 3.0).mul(0.65),
+        );
         const caustic = min(causAccum, float(1.0))
           .mul(float(0.18).add(tension.mul(0.1)))
-          .mul(float(0.55).add(fresnel.mul(0.45)));
+          .mul(float(0.55).add(fresnel.mul(0.45)))
+          .mul(shaft);
         // soft-cap the accumulated glow so the web reads as filaments instead
         // of flooding the body with a flat saturated fill at high tension
         const latSoft = min(latGlow, float(1.25));
