@@ -57,6 +57,15 @@ export function JellyOrb() {
   ]);
   const rippleAges = useRef([999, 999, 999, 999]);
   const rippleCursor = useRef(0);
+  const lastStir = useRef(-1);
+
+  // Real angular momentum: flicks feed a spin velocity that decays and
+  // integrates into a persistent rotation offset — the orb coasts after a
+  // throw instead of snapping back to its scripted tumble.
+  const spinVX = useRef(0);
+  const spinVY = useRef(0);
+  const spinX = useRef(0);
+  const spinY = useRef(0);
 
   const tier = useExperienceStore((s) => s.profile?.tier ?? "high");
   const reducedMotion = useExperienceStore((s) => s.reducedMotion);
@@ -83,6 +92,23 @@ export function JellyOrb() {
     const sig = sample.signature;
     const jig = reducedMotion ? 0.25 : 1;
 
+    // touch memory: file a contact into the ripple ring buffer, oldest slot
+    // first. The contact point is view-space but the shader compares it
+    // against normalize(p) in OBJECT space — the mesh tumbles, so without
+    // the inverse-quaternion transform a ring spawned after ~60s of
+    // rotation would land on the far side of the orb from the touch.
+    // Filed origins then correctly ride the surface as the orb turns.
+    const fileRipple = (x: number, y: number) => {
+      if (reducedMotion || !mesh.current) return;
+      RIPPLE_QUAT.copy(mesh.current.quaternion).invert();
+      rippleOrigins.current[rippleCursor.current]
+        .set(x, y, 0.5)
+        .normalize()
+        .applyQuaternion(RIPPLE_QUAT);
+      rippleAges.current[rippleCursor.current] = 0;
+      rippleCursor.current = (rippleCursor.current + 1) % 4;
+    };
+
     // click / impulse → pulse + a hard jiggle kick (overshoot)
     if (impulse && impulse.startedAt !== lastImpulse.current) {
       lastImpulse.current = impulse.startedAt;
@@ -90,20 +116,7 @@ export function JellyOrb() {
       jv.current += 4.15 * jig;
       jaxis.current.set(px.current, py.current, 0.5).normalize();
       sloshVelocity.current.addScaledVector(jaxis.current, -2.8 * jig);
-      // touch memory: file this contact into the ring buffer, oldest slot
-      // first. The click direction is view-space but the shader compares it
-      // against normalize(p) in OBJECT space — the mesh tumbles, so without
-      // the inverse-quaternion transform a ring spawned after ~60s of
-      // rotation would land on the far side of the orb from the click.
-      // Filed origins then correctly ride the surface as the orb turns.
-      if (!reducedMotion && mesh.current) {
-        RIPPLE_QUAT.copy(mesh.current.quaternion).invert();
-        rippleOrigins.current[rippleCursor.current]
-          .copy(jaxis.current)
-          .applyQuaternion(RIPPLE_QUAT);
-        rippleAges.current[rippleCursor.current] = 0;
-        rippleCursor.current = (rippleCursor.current + 1) % 4;
-      }
+      fileRipple(px.current, py.current);
     }
     pulseAmp.current = Math.max(0, pulseAmp.current - dt * 1.05);
     u.pulse.value = pulseAmp.current;
@@ -122,7 +135,34 @@ export function JellyOrb() {
         .multiplyScalar(Math.min(flick * 11, 2.4) * jig);
       sloshVelocity.current.add(flickImpulse.current);
       addResonance(Math.min(flick * 0.9, 0.11));
+
+      // stirring: a sustained drag paints a trail of rings at the pointer's
+      // path. Rate-limited so a swipe deposits 3–4 rings instead of
+      // flushing the whole 4-slot buffer in a handful of frames.
+      if (flick > 0.06 && t - lastStir.current > 0.15) {
+        lastStir.current = t;
+        fileRipple(pointer.x, pointer.y);
+      }
+
+      // momentum transfer: the swipe torques the orb (horizontal → yaw,
+      // vertical → pitch; signs match the existing drag-lean mapping).
+      spinVY.current = Math.max(
+        -3.5,
+        Math.min(3.5, spinVY.current + vx * 1.2 * jig),
+      );
+      spinVX.current = Math.max(
+        -3.5,
+        Math.min(3.5, spinVX.current - vy * 1.0 * jig),
+      );
     }
+
+    // spin coasts: exponential decay (τ ≈ 1.25s) + integrate into the
+    // persistent offsets added to the scripted tumble below.
+    const spinDecay = Math.exp(-0.8 * dt);
+    spinVX.current *= spinDecay;
+    spinVY.current *= spinDecay;
+    spinX.current += spinVX.current * dt;
+    spinY.current += spinVY.current * dt;
 
     // The shell never fully rests: two slow, incommensurate compression waves
     // keep the mass breathing while interaction adds larger overshoot.
@@ -208,13 +248,18 @@ export function JellyOrb() {
     mesh.current.position.x = 0.0;
     mesh.current.position.y = 0.015;
 
-    // multi-axis incommensurate tumble — never repeats
+    // multi-axis incommensurate tumble — never repeats. Flick spin offsets
+    // (spinX/spinY) accumulate on top; drag-lean terms stay untouched.
     const rot = reducedMotion ? 0.2 : 1;
     mesh.current.rotation.y =
-      t * 0.052 * rot + Math.sin(t * 0.19) * 0.07 * rot + dragX.current * 1.3;
+      t * 0.052 * rot +
+      Math.sin(t * 0.19) * 0.07 * rot +
+      dragX.current * 1.3 +
+      spinY.current;
     mesh.current.rotation.x =
       (Math.sin(t * 0.11) * 0.14 + Math.sin(t * 0.37) * 0.025) * rot +
-      dragY.current * 1.1;
+      dragY.current * 1.1 +
+      spinX.current;
     mesh.current.rotation.z =
       Math.cos(t * 0.083) * 0.08 * rot +
       sample.simulation.collapse * Math.sin(t * 1.7) * 0.045;
