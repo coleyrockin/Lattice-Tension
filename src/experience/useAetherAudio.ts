@@ -73,10 +73,43 @@ export function useAetherAudio() {
       closing: false,
     };
 
+    // One-shot "water drop" on touch: a short sine pluck with a falling
+    // pitch (the classic droplet contour) and a fast-attack/exp-decay
+    // envelope, routed straight to the destination so the drone's lowpass
+    // doesn't muffle it. Seeded with the current impulse timestamp so
+    // toggling sound on doesn't replay a stale click.
+    let lastPluckAt = useExperienceStore.getState().impulse?.startedAt ?? 0;
+    const pluck = () => {
+      const osc = context.createOscillator();
+      const pluckGain = context.createGain();
+      const now = context.currentTime;
+      const f0 = 540 + Math.random() * 140;
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(f0, now);
+      osc.frequency.exponentialRampToValueAtTime(f0 * 0.55, now + 0.22);
+      pluckGain.gain.setValueAtTime(0, now);
+      pluckGain.gain.linearRampToValueAtTime(0.055, now + 0.008);
+      pluckGain.gain.exponentialRampToValueAtTime(0.0004, now + 0.42);
+      osc.connect(pluckGain);
+      pluckGain.connect(context.destination);
+      osc.start(now);
+      osc.stop(now + 0.46);
+      osc.onended = () => {
+        osc.disconnect();
+        pluckGain.disconnect();
+      };
+    };
+
     const tick = () => {
       if (document.hidden || graph.closing) {
         graph.raf = requestAnimationFrame(tick);
         return;
+      }
+
+      const impulse = useExperienceStore.getState().impulse;
+      if (impulse && impulse.startedAt !== lastPluckAt) {
+        lastPluckAt = impulse.startedAt;
+        pluck();
       }
 
       const progress = descent.value;

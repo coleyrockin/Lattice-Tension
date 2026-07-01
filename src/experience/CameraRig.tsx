@@ -44,6 +44,16 @@ export function CameraRig() {
     let targetX = cx * 0.014 + sig.twist * 0.04;
     let targetY = cy * 0.014 - sample.simulation.collapse * 0.025;
 
+    // The stage never sits dead-still: a gentle pointer parallax (the
+    // camera leans toward where you're looking) plus a slow idle drift on
+    // two incommensurate sines. Both ride the existing blend smoothing and
+    // motionScale, so reduced-motion damps them like every other term.
+    const { pointer } = useExperienceStore.getState();
+    targetX += pointer.x * 0.045 * motionScale;
+    targetY += pointer.y * 0.032 * motionScale;
+    targetX += Math.sin(time * 0.075) * 0.022 * motionScale;
+    targetY += Math.cos(time * 0.057 + 1.2) * 0.02 * motionScale;
+
     const gravity = sig.singularity + sig.twist;
     if (gravity > 0.05) {
       const shakeFreq = 42;

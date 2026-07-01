@@ -19,9 +19,21 @@ export function ResonanceImprint() {
   // imperatively inside the tick instead.
   const dragActive = useExperienceStore((s) => s.drag.active);
   const reducedMotion = useExperienceStore((s) => s.reducedMotion);
+  const impulse = useExperienceStore((s) => s.impulse);
   const [ripples, setRipples] = useState<Ripple[]>([]);
   const nextId = useRef(0);
   const lastSpawn = useRef(0);
+
+  // Clicks echo in the DOM layer too: one full-strength ring at the pointer,
+  // matching the shader-side touch ripple filed by the same impulse.
+  useEffect(() => {
+    if (!impulse || reducedMotion) return;
+    const { pointer } = useExperienceStore.getState();
+    const px = ((pointer.x + 1) / 2) * window.innerWidth;
+    const py = ((1 - pointer.y) / 2) * window.innerHeight;
+    const id = nextId.current++;
+    setRipples((prev) => [...prev.slice(-11), { id, x: px, y: py, strength: 1 }]);
+  }, [impulse, reducedMotion]);
 
   useEffect(() => {
     if (!dragActive || reducedMotion) return;
