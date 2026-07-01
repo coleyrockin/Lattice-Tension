@@ -296,7 +296,43 @@ export function createJellyOrbMaterial(steps: number) {
           .mul(sin(n.y.mul(11.5).sub(time.mul(0.3))))
           .mul(0.5)
           .add(0.5);
-        const iriCol = mix(tint, accent, pow(float(1).sub(ndv), 1.5).mul(0.94));
+        // Thin-film interference: a soap-bubble/beetle-shell shimmer at the
+        // grazing rim. Real thin films shift hue with both the coating
+        // thickness and the viewing angle — here the "thickness" breathes
+        // slowly over time and varies across the surface (dot with an
+        // arbitrary axis), and the angle term comes from the fresnel falloff
+        // already in hand. (u,v) trace a circle inscribed in the unit square
+        // as filmPhase advances, walking smoothly through all four corner
+        // colors in a loop — cheap (pure mix/cos/sin, no branching) and it
+        // shimmers as the orb turns because the object-space normal a given
+        // screen pixel samples changes every frame.
+        const filmThickness = float(1.0)
+          .add(sin(time.mul(0.09)).mul(0.4))
+          .add(dot(n, vec3(0.4, 0.7, 0.3)).mul(0.6));
+        const filmPhase = filmThickness
+          .mul(2.2)
+          .add(pow(float(1).sub(ndv), 1.1).mul(4.4));
+        const filmU = cos(filmPhase).mul(0.5).add(0.5);
+        const filmV = sin(filmPhase).mul(0.5).add(0.5);
+        // Cool quartet only — blue, cyan, violet, magenta. No warm stop, so
+        // the sweep never drifts toward gold.
+        const filmBlue = vec3(0.1, 0.28, 1.0);
+        const filmCyan = vec3(0.15, 0.95, 1.0);
+        const filmViolet = vec3(0.55, 0.12, 1.0);
+        const filmMagenta = vec3(1.0, 0.14, 0.85);
+        const filmColor = mix(
+          mix(filmBlue, filmCyan, filmU),
+          mix(filmMagenta, filmViolet, filmU),
+          filmV,
+        );
+        // fresnel is already 0 at center / 1 at the silhouette — the film
+        // takes over increasingly toward the rim, leaving the belly (and the
+        // existing tint/accent glass read) untouched.
+        const iriCol = mix(
+          mix(tint, accent, pow(float(1).sub(ndv), 1.5).mul(0.94)),
+          filmColor,
+          fresnel.mul(0.85),
+        );
         const rimSoft = pow(float(1).sub(ndv), 3.0);
         const rim = iriCol
           .mul(rimSoft)
