@@ -12,7 +12,11 @@ import { descent, frameSample, useExperienceStore } from "../experience/store";
 const K_LEAN = 3.0776; // ≈ -60*ln(1-0.05)
 const K_DRAG = 5.0029; // ≈ -60*ln(1-0.08)
 
-const STEPS: Record<string, number> = { high: 96, medium: 64, low: 40 };
+// high raised 96→128 with the single-slide teardown: the budget freed by
+// dropping 11 chapters is spent on the hero orb's march (smoother
+// silhouette, cleaner interior). AdaptiveResolution's one-way DPR
+// step-down is the safety net on GPUs that can't hold it.
+const STEPS: Record<string, number> = { high: 128, medium: 64, low: 40 };
 
 // scratch colors — avoid per-frame allocation
 const PRIMARY = new Color();
