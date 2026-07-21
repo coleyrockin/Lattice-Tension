@@ -1,103 +1,64 @@
 /* eslint-disable react-hooks/immutability -- R3F useFrame drives the live camera */
+import { useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { PerspectiveCamera } from "three";
-import { sampleExperience } from "../chapters/interpolate";
-import { descent, frameSample, useExperienceStore } from "./store";
+import { PerspectiveCamera, Vector3 } from "three";
+import { organismController } from "../simulation/organismController";
+import { useExperienceStore } from "./store";
 
-/**
- * Scroll-driven camera: FOV, dolly Z, and gentle drift from chapter definitions
- * so each realm frames differently — wide cathedral vs tight vortex vs soft origin.
- */
+const LOOK_TARGET = new Vector3();
+
+/** A quiet observer: motion responds to the organism rather than directing it. */
 export function CameraRig() {
   const camera = useThree((state) => state.camera) as PerspectiveCamera;
+  const initialized = useRef(false);
 
-  useFrame((state, delta) => {
+  useFrame((_, delta) => {
+    const snapshot = organismController.snapshot;
+    const { reducedMotion, profile } = useExperienceStore.getState();
+    const lowTier = profile?.tier === "low";
+    const motion = reducedMotion ? 0.1 : 1;
     const dt = Math.min(delta, 1 / 30);
-    const sample = frameSample.current ?? sampleExperience(descent.value);
-    const sig = sample.signature;
-    const time = state.clock.getElapsedTime();
-    const reducedMotion = useExperienceStore.getState().reducedMotion;
-    const motionScale = reducedMotion ? 0.12 : 1;
+    const blend = 1 - Math.exp(-4.2 * dt);
 
-    let zoomOffset = 0;
-    if (sig.crystalline > 0.1) {
-      zoomOffset = -6.5 * sig.crystalline;
-    }
-    if (sig.nebula > 0.1) {
-      zoomOffset = 9.0 * sig.nebula;
-    }
-
-    const baseBlendSpeed = 4.2;
-    const crystallineRigidifier = sig.crystalline * 6.5;
-    const veilDriftSlower = sig.veil * 2.2;
-    const activeBlendRate = Math.max(
-      1.5,
-      baseBlendSpeed + crystallineRigidifier - veilDriftSlower,
+    const parallaxX = snapshot.dragging ? snapshot.pointer[0] * 0.018 : 0;
+    const parallaxY = snapshot.dragging ? snapshot.pointer[1] * 0.013 : 0;
+    const targetX = snapshot.position[0] * 0.16 + snapshot.slosh[0] * 0.018 + parallaxX;
+    const targetY = snapshot.position[1] * 0.12 + snapshot.slosh[1] * 0.014 + parallaxY;
+    // The camera yields a little space as the volume stretches, so a strong
+    // pull never turns the organism into a cropped shape at the viewport edge.
+    const deformation = Math.min(
+      0.18,
+      Math.abs(snapshot.strain) * 0.22 +
+        Math.hypot(...snapshot.bend) * 0.055 +
+        snapshot.contactPressure * 0.055 +
+        Math.min(snapshot.energy, 1) * 0.035,
     );
-    const blend = 1 - Math.exp(-activeBlendRate * dt);
+    const targetZ = (lowTier ? 0.8 : 0.7) + deformation;
+    const targetFov = lowTier ? 51 : 48;
 
-    const targetFov =
-      sample.camera.fov + sig.singularity * 9 - sig.orbPresence * 4 + zoomOffset;
+    if (!initialized.current) {
+      camera.position.set(targetX, targetY, targetZ);
+      camera.fov = targetFov;
+      initialized.current = true;
+    } else {
+      camera.position.x += (targetX - camera.position.x) * blend;
+      camera.position.y += (targetY - camera.position.y) * blend;
+      camera.position.z += (targetZ - camera.position.z) * blend;
+    }
     camera.fov += (targetFov - camera.fov) * blend;
-
-    const [cx, cy] = sample.camera.position;
-    let targetX = cx * 0.014 + sig.twist * 0.04;
-    let targetY = cy * 0.014 - sample.simulation.collapse * 0.025;
-
-    // The stage never sits dead-still: a gentle pointer parallax (the
-    // camera leans toward where you're looking) plus a slow idle drift on
-    // two incommensurate sines. Both ride the existing blend smoothing and
-    // motionScale, so reduced-motion damps them like every other term.
-    const { pointer } = useExperienceStore.getState();
-    targetX += pointer.x * 0.045 * motionScale;
-    targetY += pointer.y * 0.032 * motionScale;
-    targetX += Math.sin(time * 0.075) * 0.022 * motionScale;
-    targetY += Math.cos(time * 0.057 + 1.2) * 0.02 * motionScale;
-
-    const gravity = sig.singularity + sig.twist;
-    if (gravity > 0.05) {
-      const shakeFreq = 42;
-      const shakeAmp = 0.02 * gravity * motionScale;
-      targetX += Math.sin(time * shakeFreq) * shakeAmp;
-      targetY += Math.cos(time * shakeFreq * 0.95) * shakeAmp;
-    }
-
-    if (sig.veil > 0.05) {
-      const floatFreq = 0.95;
-      const floatAmp = 0.018 * sig.veil * motionScale;
-      targetX += Math.sin(time * floatFreq) * floatAmp;
-      targetY += Math.cos(time * floatFreq * 0.72) * floatAmp;
-    }
-
-    camera.position.x += (targetX - camera.position.x) * blend;
-    camera.position.y += (targetY - camera.position.y) * blend;
-
-    // Orb proximity dolly — single owner so JellyOrb doesn't fight this rig
-    const enter = sig.orbPresence;
-    const eased = enter * enter * (3 - 2 * enter);
-    // Near-clip guard: the two "hero orb" chapters (Origin & Origin Core, the
-    // only ones with orbPresence ≈ 1.2) get the dolly pulled so far in that the
-    // orb's bounding box crosses the camera near plane (0.1) and clips to
-    // nothing — both rendered black. Push the camera back into the zone where
-    // the raymarched orb actually rasterizes (verified by a cam-z sweep: orb is
-    // black for z ≤ 0.45, renders at z ≥ 0.55 → target ≈ 0.57). Gated on
-    // presence so ONLY those two bookend chapters move; every other realm = 0.
-    const heroGate = (() => {
-      const x = Math.min(1, Math.max(0, (sig.orbPresence - 0.9) / 0.3));
-      return x * x * (3 - 2 * x);
-    })();
-    const nearClipGuard = eased * heroGate * 0.16;
-    const targetZ =
-      0.72 -
-      eased * (0.22 + sig.latticeReveal * 0.48) +
-      nearClipGuard -
-      sample.visual.cameraProximity * 0.022 +
-      sample.simulation.birth * 0.04;
-    const zBlend = 1 - Math.exp(-5 * dt);
-    camera.position.z += (targetZ - camera.position.z) * zBlend;
-
     camera.updateProjectionMatrix();
-  });
+
+    LOOK_TARGET.set(
+      snapshot.position[0] + snapshot.slosh[0] * 0.012,
+      snapshot.position[1] + snapshot.slosh[1] * 0.01,
+      0,
+    );
+    if (!reducedMotion) {
+      LOOK_TARGET.x += Math.sin(snapshot.phase * 0.13) * 0.006 * motion;
+      LOOK_TARGET.y += Math.cos(snapshot.phase * 0.11) * 0.005 * motion;
+    }
+    camera.lookAt(LOOK_TARGET);
+  }, -4);
 
   return null;
 }

@@ -5,21 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta
       name="description"
-      content="Tension Lattice — a scroll-driven WebGPU atlas exploring hidden geometry, resonance, and the pressure of connection across twelve realms."
+      content="Aesther — an ocean-blue living glass organism that remembers every touch."
     />
-    <meta name="theme-color" content="#020207" />
-    <meta property="og:title" content="Tension Lattice — Aether Atlas" />
+    <meta name="theme-color" content="#010716" />
+    <meta property="og:title" content="Aesther — Living Water" />
     <meta
       property="og:description"
-      content="Descend through the gyroid lattice. Leave your imprint. Share your aether."
+      content="Touch the ocean-blue organism. Watch glass, water, and light return to equilibrium."
     />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://lattice-tension.vercel.app" />
+    <meta property="og:url" content="https://aesther.vercel.app" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Tension Lattice — Aether Atlas" />
+    <meta name="twitter:title" content="Aesther — Living Water" />
     <meta
       name="twitter:description"
-      content="Descend through the gyroid lattice. Leave your imprint. Share your aether."
+      content="Touch the ocean-blue organism. Watch glass, water, and light return to equilibrium."
     />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -28,10 +28,46 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,400&family=Spline+Sans+Mono:wght@300;400;500&display=swap"
       rel="stylesheet"
     />
-    <title>Tension Lattice — Aether Atlas</title>
+    <style>
+      html,
+      body,
+      #root {
+        min-height: 100%;
+        margin: 0;
+        background: #010716;
+      }
+
+      .preboot {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        gap: 28px;
+        color: rgba(170, 222, 255, 0.62);
+        font: 8px/1.4 "Spline Sans Mono", ui-monospace, monospace;
+        letter-spacing: 0.34em;
+        text-align: center;
+        text-transform: uppercase;
+      }
+
+      .preboot__point {
+        width: 7px;
+        height: 7px;
+        margin: auto;
+        border-radius: 50%;
+        background: #78d8ff;
+        box-shadow: 0 0 18px #78d8ff, 0 0 56px rgba(31, 136, 255, 0.9);
+      }
+    </style>
+    <title>Aesther — Living Water</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main class="preboot" role="status">
+        <div class="preboot__point" aria-hidden="true"></div>
+        <span>Forming Aesther</span>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

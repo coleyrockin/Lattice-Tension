@@ -11,8 +11,28 @@ export type PerformanceProfile = {
   antialias: boolean;
 };
 
+export function arePerformanceProfilesEqual(
+  left: PerformanceProfile | null,
+  right: PerformanceProfile | null,
+): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+
+  return (
+    left.tier === right.tier &&
+    left.maxDpr === right.maxDpr &&
+    left.particleCount === right.particleCount &&
+    left.nodeCount === right.nodeCount &&
+    left.membraneSegments === right.membraneSegments &&
+    left.postprocessing === right.postprocessing &&
+    left.depthOfField === right.depthOfField &&
+    left.antialias === right.antialias
+  );
+}
+
 type ProfileInput = {
   width: number;
+  height: number;
   devicePixelRatio: number;
   hardwareConcurrency: number;
   deviceMemory?: number;
@@ -22,9 +42,12 @@ type ProfileInput = {
 export function choosePerformanceProfile(
   input: ProfileInput,
 ): PerformanceProfile {
+  const isNarrowPortrait = input.width < 900 && input.height > input.width;
+
   if (
     input.reducedMotion ||
     input.width < 700 ||
+    isNarrowPortrait ||
     input.hardwareConcurrency <= 4 ||
     (input.deviceMemory !== undefined && input.deviceMemory <= 4)
   ) {
@@ -81,6 +104,7 @@ export function detectPerformanceProfile(
 
   return choosePerformanceProfile({
     width: window.innerWidth,
+    height: window.innerHeight,
     devicePixelRatio: window.devicePixelRatio || 1,
     hardwareConcurrency: navigator.hardwareConcurrency || 4,
     deviceMemory: navigatorWithMemory.deviceMemory,

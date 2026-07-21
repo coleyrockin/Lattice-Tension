@@ -1,286 +1,99 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Color, Quaternion, Vector3, type Mesh } from "three";
-import { sampleExperience } from "../chapters/interpolate";
+import { Color, type Intersection, type Mesh, type Raycaster } from "three";
+import { useExperienceStore } from "../experience/store";
+import { organismController } from "../simulation/organismController";
 import { createJellyOrbMaterial } from "./jellyOrbMaterial";
-import { descent, frameSample, useExperienceStore } from "../experience/store";
 
-// frame-rate-independent damping decay rates: a per-frame lerp of `c` at 60fps
-// has decay k = -60*ln(1-c). Lerp factor each frame = 1 - exp(-k*dt), so the
-// feel matches the old constants at 60fps but stays stable when frames vary.
-// (Inlined as plain numbers — matches today's 0.05 / 0.08 per-frame eases.)
-const K_LEAN = 3.0776; // ≈ -60*ln(1-0.05)
-const K_DRAG = 5.0029; // ≈ -60*ln(1-0.08)
+const STEPS: Record<string, number> = { high: 128, medium: 68, low: 48 };
+const REDUCED_MOTION_SCALE = 0.18;
 
-// high raised 96→128 with the single-slide teardown: the budget freed by
-// dropping 11 chapters is spent on the hero orb's march (smoother
-// silhouette, cleaner interior). AdaptiveResolution's one-way DPR
-// step-down is the safety net on GPUs that can't hold it.
-const STEPS: Record<string, number> = { high: 128, medium: 64, low: 40 };
+// Deliberately cool and low-luminance. The shader does the bright work through
+// wet highlights and bloom; these anchors keep the body from bleaching white.
+const DEEP = new Color("#05478d");
+const OCEAN = new Color("#18afea");
+const BABY_BLUE = new Color("#91e7ff");
+const VIOLET = new Color("#7180ff");
+const ACTIVE_ACCENT = new Color();
 
-// scratch colors — avoid per-frame allocation
-const PRIMARY = new Color();
-const SECONDARY = new Color();
-const DEEP = new Color();
-const LIGHT = new Color();
-const DEEP_ANCHOR = new Color("#020d24");
-const WHITE = new Color("#ffffff");
-// scratch quaternion — maps a view-space click direction into object space
-const RIPPLE_QUAT = new Quaternion();
+// The shader's bounding cube is only a render envelope. ContactSurface is the
+// sole interaction volume, so the cube must never compete for pointer hits.
+const skipRaycast = (...args: [Raycaster, Intersection[]]) => {
+  void args;
+};
+
+function applyWave(
+  origin: { value: { set: (x: number, y: number, z: number) => unknown } },
+  age: { value: number },
+  strength: { value: number },
+  wave: { origin: readonly [number, number, number]; age: number; strength: number } | undefined,
+) {
+  if (!wave) {
+    age.value = 999;
+    strength.value = 0;
+    return;
+  }
+  origin.value.set(wave.origin[0], wave.origin[1], wave.origin[2]);
+  age.value = wave.age;
+  strength.value = wave.strength;
+}
 
 export function JellyOrb() {
   const mesh = useRef<Mesh>(null!);
-  const pulseAmp = useRef(0);
-  const lastImpulse = useRef(0);
-  const px = useRef(0);
-  const py = useRef(0);
+  const tier = useExperienceStore((state) => state.profile?.tier ?? "high");
+  const reducedMotion = useExperienceStore((state) => state.reducedMotion);
+  const uniforms = useMemo(() => createJellyOrbMaterial(STEPS[tier] ?? 110), [tier]);
 
-  // jiggle spring: displacement + velocity, with a wobble axis
-  const jp = useRef(0);
-  const jv = useRef(0);
-  const jaxis = useRef(new Vector3(0, 1, 0));
-  const ppx = useRef(0);
-  const ppy = useRef(0);
-  const dragX = useRef(0);
-  const dragY = useRef(0);
-  const slosh = useRef(new Vector3());
-  const sloshVelocity = useRef(new Vector3());
-  const sloshTarget = useRef(new Vector3());
-  const sloshDelta = useRef(new Vector3());
-  const flickImpulse = useRef(new Vector3());
+  useEffect(() => () => uniforms.material.dispose(), [uniforms]);
 
-  // Fluid memory: a 4-slot ring buffer of touch ripples. Each touch writes
-  // its direction + resets its age to 0; age then accumulates every frame.
-  // A slot that's never fired sits at a large age forever (contributes ~0 in
-  // the shader — see jellyOrbMaterial's rippleWave underflow note).
-  const rippleOrigins = useRef([
-    new Vector3(0, 0, 1),
-    new Vector3(0, 0, 1),
-    new Vector3(0, 0, 1),
-    new Vector3(0, 0, 1),
-  ]);
-  const rippleAges = useRef([999, 999, 999, 999]);
-  const rippleCursor = useRef(0);
-  const lastStir = useRef(-1);
+  useFrame(() => {
+    const snapshot = organismController.snapshot;
+    const energy = snapshot.energy;
+    const resonance = snapshot.resonance;
 
-  // Real angular momentum: flicks feed a spin velocity that decays and
-  // integrates into a persistent rotation offset — the orb coasts after a
-  // throw instead of snapping back to its scripted tumble.
-  const spinVX = useRef(0);
-  const spinVY = useRef(0);
-  const spinX = useRef(0);
-  const spinY = useRef(0);
+    uniforms.phase.value = snapshot.phase;
+    uniforms.motionScale.value = reducedMotion ? REDUCED_MOTION_SCALE : 1;
+    uniforms.squash.value = snapshot.strain;
+    uniforms.jiggle.value.set(...snapshot.axis);
+    uniforms.bend.value.set(...snapshot.bend);
+    uniforms.slosh.value.set(...snapshot.slosh);
+    uniforms.kineticEnergy.value = energy;
+    uniforms.contactOrigin.value.set(...snapshot.contactOrigin);
+    uniforms.contactPressure.value = snapshot.contactPressure;
+    uniforms.secondaryContactOrigin.value.set(...snapshot.secondaryContactOrigin);
+    uniforms.secondaryContactPressure.value = snapshot.secondaryContactPressure;
+    uniforms.pointer.value.set(...snapshot.pointer);
 
-  const tier = useExperienceStore((s) => s.profile?.tier ?? "high");
-  const reducedMotion = useExperienceStore((s) => s.reducedMotion);
-  const addResonance = useExperienceStore((s) => s.addResonance);
+    applyWave(uniforms.rippleOrigin0, uniforms.rippleAge0, uniforms.rippleStrength0, snapshot.surfaceWaves[0]);
+    applyWave(uniforms.rippleOrigin1, uniforms.rippleAge1, uniforms.rippleStrength1, snapshot.surfaceWaves[1]);
+    applyWave(uniforms.rippleOrigin2, uniforms.rippleAge2, uniforms.rippleStrength2, snapshot.surfaceWaves[2]);
+    applyWave(uniforms.rippleOrigin3, uniforms.rippleAge3, uniforms.rippleStrength3, snapshot.surfaceWaves[3]);
 
-  const u = useMemo(() => createJellyOrbMaterial(STEPS[tier] ?? 110), [tier]);
-  useEffect(() => () => u.material.dispose(), [u]);
+    uniforms.speed.value = 0.22 + energy * 0.2;
+    uniforms.tension.value = 0.34 + energy * 0.46 + resonance * 0.12;
+    uniforms.order.value = 0.18 + energy * 0.28 + resonance * 0.11;
+    uniforms.pulse.value = Math.min(0.94, energy * 0.66 + resonance * 0.38);
+    uniforms.resonance.value = resonance;
+    uniforms.presence.value = 1;
+    uniforms.collapseDistort.value = 0;
+    uniforms.fringeRipple.value = energy * 0.045;
+    uniforms.lattice.value = 0.22 + energy * 0.24 + resonance * 0.1;
 
-  useFrame((state, delta) => {
-    const dt = Math.min(delta, 1 / 30);
-    const t = state.clock.elapsedTime;
-    const { pointer, drag, impulse, resonance: userResonance } =
-      useExperienceStore.getState();
-    // read the smoothed descent so camera, palette, tension and structure all
-    // glide together (set once per frame by <DescentDriver/>)
-    const d = descent.value;
-    const sample = frameSample.current ?? sampleExperience(d);
-
-    // resonance: wire effective (chapter base + user imprints) + contribute to decay
-    const baseRes = sample.simulation.resonance;
-    const effectiveRes = Math.min(2.2, baseRes + userResonance);
-    u.resonance.value = effectiveRes;
-
-    const sig = sample.signature;
-    const jig = reducedMotion ? 0.25 : 1;
-
-    // touch memory: file a contact into the ripple ring buffer, oldest slot
-    // first. The contact point is view-space but the shader compares it
-    // against normalize(p) in OBJECT space — the mesh tumbles, so without
-    // the inverse-quaternion transform a ring spawned after ~60s of
-    // rotation would land on the far side of the orb from the touch.
-    // Filed origins then correctly ride the surface as the orb turns.
-    const fileRipple = (x: number, y: number) => {
-      if (reducedMotion || !mesh.current) return;
-      RIPPLE_QUAT.copy(mesh.current.quaternion).invert();
-      rippleOrigins.current[rippleCursor.current]
-        .set(x, y, 0.5)
-        .normalize()
-        .applyQuaternion(RIPPLE_QUAT);
-      rippleAges.current[rippleCursor.current] = 0;
-      rippleCursor.current = (rippleCursor.current + 1) % 4;
-    };
-
-    // click / impulse → pulse + a hard jiggle kick (overshoot)
-    if (impulse && impulse.startedAt !== lastImpulse.current) {
-      lastImpulse.current = impulse.startedAt;
-      pulseAmp.current = 1;
-      jv.current += 4.15 * jig;
-      jaxis.current.set(px.current, py.current, 0.5).normalize();
-      sloshVelocity.current.addScaledVector(jaxis.current, -2.8 * jig);
-      fileRipple(px.current, py.current);
-    }
-    pulseAmp.current = Math.max(0, pulseAmp.current - dt * 1.05);
-    u.pulse.value = pulseAmp.current;
-
-    // fast pointer flicks impart momentum into the jiggle (alive + a little dangerous)
-    const vx = pointer.x - ppx.current;
-    const vy = pointer.y - ppy.current;
-    ppx.current = pointer.x;
-    ppy.current = pointer.y;
-    const flick = Math.hypot(vx, vy);
-    if (flick > 0.04) {
-      jv.current += Math.min(flick * 15, 4.5) * jig;
-      jaxis.current.set(vx, vy, 0.35).normalize();
-      flickImpulse.current
-        .set(vx, -vy, 0.18)
-        .multiplyScalar(Math.min(flick * 11, 2.4) * jig);
-      sloshVelocity.current.add(flickImpulse.current);
-      addResonance(Math.min(flick * 0.9, 0.11));
-
-      // stirring: a sustained drag paints a trail of rings at the pointer's
-      // path. Rate-limited so a swipe deposits 3–4 rings instead of
-      // flushing the whole 4-slot buffer in a handful of frames.
-      if (flick > 0.06 && t - lastStir.current > 0.15) {
-        lastStir.current = t;
-        fileRipple(pointer.x, pointer.y);
-      }
-
-      // momentum transfer: the swipe torques the orb (horizontal → yaw,
-      // vertical → pitch; signs match the existing drag-lean mapping).
-      spinVY.current = Math.max(
-        -3.5,
-        Math.min(3.5, spinVY.current + vx * 1.2 * jig),
-      );
-      spinVX.current = Math.max(
-        -3.5,
-        Math.min(3.5, spinVX.current - vy * 1.0 * jig),
-      );
-    }
-
-    // spin coasts: exponential decay (τ ≈ 1.25s) + integrate into the
-    // persistent offsets added to the scripted tumble below.
-    const spinDecay = Math.exp(-0.8 * dt);
-    spinVX.current *= spinDecay;
-    spinVY.current *= spinDecay;
-    spinX.current += spinVX.current * dt;
-    spinY.current += spinVY.current * dt;
-
-    // The shell never fully rests: two slow, incommensurate compression waves
-    // keep the mass breathing while interaction adds larger overshoot.
-    const idleCompression =
-      (Math.sin(t * 0.72) * 0.026 + Math.sin(t * 0.29 + 1.4) * 0.014) * jig;
-    const k = 17;
-    const damp = 2.45;
-    jv.current += (-k * (jp.current - idleCompression) - damp * jv.current) * dt;
-    jp.current += jv.current * dt;
-    u.squash.value = Math.max(-0.34, Math.min(0.34, jp.current));
-    u.jiggle.value.copy(jaxis.current);
-
-    // The inner mass is a slower spring with less damping, so it visibly lags
-    // behind the outer shell and continues moving after a flick or click.
-    sloshTarget.current.set(
-      -dragX.current * 0.32 - vx * 1.8 + Math.sin(t * 0.41) * 0.045 * jig,
-      dragY.current * 0.32 + vy * 1.8 + Math.cos(t * 0.33) * 0.04 * jig,
-      -jp.current * 0.22 + Math.sin(t * 0.27 + 0.8) * 0.03 * jig,
-    );
-    sloshDelta.current.copy(slosh.current).sub(sloshTarget.current);
-    sloshVelocity.current.addScaledVector(sloshDelta.current, -8.2 * dt);
-    sloshVelocity.current.multiplyScalar(Math.exp(-1.35 * dt));
-    slosh.current.addScaledVector(sloshVelocity.current, dt);
-    slosh.current.clampLength(0, 0.42);
-    u.slosh.value.copy(slosh.current);
-
-    // eased pointer lean (frame-rate-independent)
-    const lead = reducedMotion ? 0.12 : 1;
-    const dragK = 1 - Math.exp(-K_DRAG * dt);
-    const leanK = 1 - Math.exp(-K_LEAN * dt);
-    dragX.current += (drag.x - dragX.current) * dragK;
-    dragY.current += (drag.y - dragY.current) * dragK;
-    px.current += (pointer.x - px.current) * leanK;
-    py.current += (pointer.y - py.current) * leanK;
-
-    // sustained drag deposits handled centrally in InteractionDriver
-
-    u.pointer.value.set(
-      (px.current + dragX.current * 2.1) * lead,
-      (py.current - dragY.current * 2.1) * lead,
-    );
-
-    // fluid memory: age every ripple slot and push it to the shader. Capped
-    // so a session left open for hours can't grow the float unboundedly —
-    // by 40s a ripple has long since decayed below visibility anyway.
-    rippleAges.current[0] = Math.min(rippleAges.current[0] + dt, 40);
-    rippleAges.current[1] = Math.min(rippleAges.current[1] + dt, 40);
-    rippleAges.current[2] = Math.min(rippleAges.current[2] + dt, 40);
-    rippleAges.current[3] = Math.min(rippleAges.current[3] + dt, 40);
-    u.rippleOrigin0.value.copy(rippleOrigins.current[0]);
-    u.rippleOrigin1.value.copy(rippleOrigins.current[1]);
-    u.rippleOrigin2.value.copy(rippleOrigins.current[2]);
-    u.rippleOrigin3.value.copy(rippleOrigins.current[3]);
-    u.rippleAge0.value = rippleAges.current[0];
-    u.rippleAge1.value = rippleAges.current[1];
-    u.rippleAge2.value = rippleAges.current[2];
-    u.rippleAge3.value = rippleAges.current[3];
-
-    u.speed.value = reducedMotion ? 0.14 : 0.45 + sample.simulation.tension * 0.25;
-    u.tension.value = sample.simulation.tension;
-    u.order.value =
-      sig.interiorCrystalline * 0.85 + sample.simulation.order * 0.25;
-    u.presence.value = sig.orbPresence;
-    u.collapseDistort.value = sig.orbDistortion;
-    u.fringeRipple.value = sig.fringe;
-    // chapter palette drives the glass: deep body absorbs toward a darkened
-    // primary, the rim catches the full primary, glints lift toward white.
-    PRIMARY.set(sample.palette.primary);
-    SECONDARY.set(sample.palette.secondary);
-    DEEP.copy(PRIMARY).multiplyScalar(0.24).lerp(DEEP_ANCHOR, 0.42);
-    LIGHT.copy(PRIMARY).lerp(WHITE, 0.72);
-    u.tint.value.copy(DEEP);
-    u.accent.value.copy(PRIMARY).lerp(SECONDARY, 0.18).multiplyScalar(0.78);
-    u.highlight.value.copy(LIGHT);
-    u.lattice.value =
-      0.42 + sample.visual.stressIntensity * 0.4 + sample.simulation.order * 0.12;
+    ACTIVE_ACCENT.copy(OCEAN).lerp(VIOLET, Math.min(0.24, energy * 0.14 + resonance * 0.1));
+    uniforms.tint.value.copy(DEEP);
+    uniforms.accent.value.copy(ACTIVE_ACCENT);
+    uniforms.highlight.value.copy(BABY_BLUE).lerp(VIOLET, energy * 0.045);
 
     if (!mesh.current) return;
-    const scale =
-      (0.55 + sample.visual.membraneScale * 0.1) * (0.35 + sig.orbPresence * 0.65);
-    mesh.current.scale.setScalar(scale);
-    mesh.current.visible = sig.orbPresence > 0.04;
-    mesh.current.position.x = 0.0;
-    mesh.current.position.y = 0.015;
-
-    // multi-axis incommensurate tumble — never repeats. Flick spin offsets
-    // (spinX/spinY) accumulate on top; drag-lean terms stay untouched.
-    const rot = reducedMotion ? 0.2 : 1;
-    mesh.current.rotation.y =
-      t * 0.052 * rot +
-      Math.sin(t * 0.19) * 0.07 * rot +
-      dragX.current * 1.3 +
-      spinY.current;
-    mesh.current.rotation.x =
-      (Math.sin(t * 0.11) * 0.14 + Math.sin(t * 0.37) * 0.025) * rot +
-      dragY.current * 1.1 +
-      spinX.current;
-    mesh.current.rotation.z =
-      Math.cos(t * 0.083) * 0.08 * rot +
-      sample.simulation.collapse * Math.sin(t * 1.7) * 0.045;
+    mesh.current.position.set(...snapshot.position);
+    mesh.current.rotation.set(...snapshot.rotation);
+    mesh.current.scale.setScalar(snapshot.modelScale);
   });
 
   return (
-    <mesh
-      ref={mesh}
-      renderOrder={15}
-      onClick={() => {
-        const state = useExperienceStore.getState();
-        const sample = sampleExperience(state.scrollProgress);
-        state.fireImpulse(sample.chapterIndex);
-      }}
-    >
+    <mesh ref={mesh} renderOrder={15} raycast={skipRaycast}>
       <boxGeometry args={[1, 1, 1]} />
-      <primitive object={u.material} attach="material" />
+      <primitive object={uniforms.material} attach="material" />
     </mesh>
   );
 }

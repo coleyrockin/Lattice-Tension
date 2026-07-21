@@ -8,12 +8,15 @@ import {
   Fn,
   If,
   Loop,
+  acos,
   abs,
   cos,
   cross,
   dot,
   exp,
   float,
+  floor,
+  fract,
   length,
   max,
   min,
@@ -24,13 +27,12 @@ import {
   refract,
   sin,
   smoothstep,
+  screenSize,
+  screenUV,
   step,
   uniform,
-  vec2,
   vec3,
   vec4,
-  time,
-  fract,
   cameraPosition,
   positionGeometry,
   modelWorldMatrixInverse,
@@ -38,31 +40,39 @@ import {
 import { RaymarchingBox } from 'three/examples/jsm/tsl/utils/Raymarching.js';
 
 /**
- * The jelly orb. A raymarched SDF membrane (twin tori + core, smooth-blended)
- * floating on black — living glass. Tuned for motion + trippiness:
+ * A raymarched water-glass organism. It consumes the modal controller snapshot:
  *  - multi-octave domain-warp wobble + twin travelling ripples
  *  - slow independent breathing + a glacial silhouette morph
  *  - ocean-blue absorption, a wet fresnel rim, and moving internal caustics
- *  - a glowing gyroid tension-lattice suspended inside, seen through the shell
+ *  - sparse submerged stress traces, visible only when the organism carries energy
  */
 export function createJellyOrbMaterial(steps: number) {
   const tension = uniform(0.4);
-  const order = uniform(0); // Pattern → crystalline interior; Origin → soft web
+  const order = uniform(0);
   const speed = uniform(0.6);
+  const phase = uniform(0);
+  const motionScale = uniform(1);
   const pulse = uniform(0);
   const tint = uniform(new Color('#003366')); // deeper ocean glass
   const accent = uniform(new Color('#88e0ff')); // brighter rim and caustics
   const highlight = uniform(new Color('#e0faff')); // enhanced wet glints
-  const lattice = uniform(1.8); // brighter internal lattice
+  const lattice = uniform(0.14);
   const resonance = uniform(0);
   const presence = uniform(1);
   const collapseDistort = uniform(0);
   const fringeRipple = uniform(0);
   const pointer = uniform(new Vector2());
   const jiggle = uniform(new Vector3(0, 1, 0)); // wobble axis (spring-driven)
-  const squash = uniform(0); // spring displacement: + stretches along jiggle
+  const squash = uniform(0); // logarithmic axial strain from the jelly solver
+  const bend = uniform(new Vector3()); // low-frequency shear modes
   const slosh = uniform(new Vector3()); // delayed liquid mass moving inside shell
+  const kineticEnergy = uniform(0);
+  const contactOrigin = uniform(new Vector3(0, 0, 1));
+  const contactPressure = uniform(0);
+  const secondaryContactOrigin = uniform(new Vector3(0, 0, 1));
+  const secondaryContactPressure = uniform(0);
   const stepCount = uniform(steps);
+  const animationPhase = phase.mul(motionScale);
 
   // Fluid memory: a 4-slot ring buffer of the last touches. Each slot is a
   // direction on the orb (where the touch landed) + how long ago it fired.
@@ -73,12 +83,16 @@ export function createJellyOrbMaterial(steps: number) {
   // so idle orbs pay only the (cheap) uniform reads, no visible cost.
   const rippleOrigin0 = uniform(new Vector3(0, 0, 1));
   const rippleAge0 = uniform(999);
+  const rippleStrength0 = uniform(0);
   const rippleOrigin1 = uniform(new Vector3(0, 0, 1));
   const rippleAge1 = uniform(999);
+  const rippleStrength1 = uniform(0);
   const rippleOrigin2 = uniform(new Vector3(0, 0, 1));
   const rippleAge2 = uniform(999);
+  const rippleStrength2 = uniform(0);
   const rippleOrigin3 = uniform(new Vector3(0, 0, 1));
   const rippleAge3 = uniform(999);
+  const rippleStrength3 = uniform(0);
 
   // gyroid field — the hidden geometry suspended inside the jelly
   const gyroid = (x: ReturnType<typeof vec3>) =>
@@ -93,44 +107,63 @@ export function createJellyOrbMaterial(steps: number) {
     dir: ReturnType<typeof vec3>,
     origin: ReturnType<typeof vec3>,
     age: ReturnType<typeof float>,
+    strength: ReturnType<typeof float>,
   ) => {
-    const dist = length(dir.sub(origin));
-    const front = age.mul(0.85);
+    // Great-circle distance makes a wave travel around the membrane at a
+    // constant angular speed instead of accelerating across the far side.
+    const dist = acos(max(float(-1), min(float(1), dot(dir, origin))));
+    // A wave needs enough travel time to reach the far hemisphere before its
+    // controller-side memory expires, otherwise a release reads as a local flash.
+    const front = age.mul(0.78);
     const delta = dist.sub(front);
-    const envelope = exp(age.mul(0.55).add(delta.mul(delta).mul(38)).negate());
-    const wave = sin(dist.mul(12).sub(age.mul(3.1)));
-    return wave.mul(envelope);
+    const envelope = exp(age.mul(0.3).add(delta.mul(delta).mul(34)).negate());
+    const wave = sin(dist.mul(10.5).sub(age.mul(3.0)));
+    return wave.mul(envelope).mul(strength);
   };
 
   const map = (p: ReturnType<typeof vec3>) => {
-    // jiggle physics: squash-and-stretch the sample space along the wobble axis
-    // (inverse-deform the query point → the shape stretches with overshoot).
+    // Volume-preserving axial strain. These are inverse scales because an SDF
+    // deforms by transforming its query point. axial * perpendicular² = 1.
     const ax = normalize(jiggle.add(vec3(0.0, 0.0001, 0.0)));
     const al = dot(p, ax);
     const perp = p.sub(ax.mul(al));
-    const pt = perp
-      .mul(float(1).add(squash.mul(0.4)))
-      .add(ax.mul(al.mul(float(1).sub(squash.mul(0.55)))));
-    const t = time.mul(speed.mul(0.35));
+    const axialScale = exp(squash);
+    const perpendicularScale = exp(squash.mul(-0.5));
+    const volumePoint = perp
+      .div(perpendicularScale)
+      .add(ax.mul(al.div(axialScale)));
+    // The first two soft modes bend the volume rather than moving it as a
+    // rigid object. Their quadratic profile pins the centre and exaggerates
+    // the delayed, floppy silhouette at the poles.
+    const bendProfile = volumePoint.z.mul(volumePoint.z).sub(0.12);
+    const pt = volumePoint.add(
+      vec3(
+        bend.x.mul(bendProfile),
+        bend.y.mul(bendProfile),
+        bend.z.mul(volumePoint.x.mul(volumePoint.y)),
+    ).mul(0.92),
+    );
+    const t = animationPhase.mul(speed.mul(0.35));
     const amp = float(0.016)
       .add(tension.mul(0.03))
-      .add(pulse.mul(0.08));
+      .add(pulse.mul(0.06))
+      .add(kineticEnergy.mul(0.018));
 
     // Delayed inner mass bends the membrane differently at opposite poles.
     // The shell begins settling before this term does, creating visible viscosity.
     const sloshWarp = vec3(
-      slosh.x.mul(pt.y.mul(1.25).add(sin(time.mul(0.72)).mul(0.22))),
-      slosh.y.mul(pt.x.mul(-1.1).add(cos(time.mul(0.61)).mul(0.2))),
+      slosh.x.mul(pt.y.mul(1.25).add(sin(animationPhase.mul(0.72)).mul(0.22))),
+      slosh.y.mul(pt.x.mul(-1.1).add(cos(animationPhase.mul(0.61)).mul(0.2))),
       slosh.z.mul(pt.x.add(pt.y).mul(0.55)),
-    ).mul(0.28);
+    ).mul(0.34);
     const jellyPt = pt.add(sloshWarp);
 
     // Multiple slow breathing frequencies keep the volume from inflating uniformly.
     const breathe = sin(t.mul(0.9))
       .mul(0.025)
       .mul(tension)
-      .add(sin(time.mul(0.13)).mul(0.02))
-      .add(sin(time.mul(0.31).add(jellyPt.y.mul(2.2))).mul(0.009));
+      .add(sin(animationPhase.mul(0.13)).mul(0.02))
+      .add(sin(animationPhase.mul(0.31).add(jellyPt.y.mul(2.2))).mul(0.009));
 
     // multi-octave domain warp — slow primary swell + finer secondary shimmer
     const lean = vec3(pointer.x.mul(0.05), pointer.y.mul(-0.05), 0);
@@ -145,36 +178,27 @@ export function createJellyOrbMaterial(steps: number) {
       sin(jellyPt.y.mul(6.6).sub(t.mul(0.9))).mul(amp.mul(0.26)),
     );
     const collapseWarp = vec3(
-      sin(jellyPt.x.mul(8.2).add(time.mul(2.4))).mul(collapseDistort.mul(0.075)),
-      sin(jellyPt.y.mul(7.6).sub(time.mul(2.1))).mul(collapseDistort.mul(0.065)),
-      sin(jellyPt.z.mul(9.1).add(time.mul(1.8))).mul(collapseDistort.mul(0.07)),
+      sin(jellyPt.x.mul(8.2).add(animationPhase.mul(2.4))).mul(collapseDistort.mul(0.075)),
+      sin(jellyPt.y.mul(7.6).sub(animationPhase.mul(2.1))).mul(collapseDistort.mul(0.065)),
+      sin(jellyPt.z.mul(9.1).add(animationPhase.mul(1.8))).mul(collapseDistort.mul(0.07)),
     );
-    const fringeWarp = sin(jellyPt.x.mul(14).add(jellyPt.z.mul(11)).add(time.mul(0.9)))
+    const fringeWarp = sin(jellyPt.x.mul(14).add(jellyPt.z.mul(11)).add(animationPhase.mul(0.9)))
       .mul(fringeRipple.mul(0.04));
     const q = jellyPt.add(warpA).add(warpB).add(collapseWarp).add(vec3(fringeWarp, fringeWarp.mul(0.6), fringeWarp.mul(-0.4)));
 
-    // glacial silhouette morph between a tighter ring-knot and a rounder blob.
-    // Tori radii pulled in so they sit just under the core sphere → the
-    // silhouette stays a clean orb, with the tori as molten interior detail.
-    const morph = sin(time.mul(0.05)).mul(0.5).add(0.5);
-    const major = mix(float(0.28), float(0.25), morph).sub(tension.mul(0.02)).add(breathe);
-    const minor = float(0.05).add(tension.mul(0.015)).add(pulse.mul(0.015));
-
-    const d1 = length(vec2(length(q.xz).sub(major), q.y)).sub(minor);
-
-    const qzx = vec3(q.z, q.y, q.x);
-    const d2 = length(vec2(length(qzx.xz).sub(major.mul(0.82)), qzx.y)).sub(minor.mul(0.78));
-
-    const h12 = max(float(0.11).sub(abs(d1.sub(d2))), 0).div(0.11);
-    const shell = min(d1, d2).sub(h12.mul(h12).mul(0.11).mul(0.25));
-
-    // a DOMINANT core sphere → the silhouette reads as a rounded orb, with the
-    // twin tori kissing the surface as molten detail rather than a flat ring.
-    const d3 = length(q).sub(float(0.51).add(morph.mul(0.025)).add(breathe).add(pulse.mul(0.04)));
-
-    const blend = float(0.16).add(tension.mul(0.04));
-    const hsc = max(blend.sub(abs(shell.sub(d3))), 0).div(blend);
-    const core = min(shell, d3).sub(hsc.mul(hsc).mul(blend).mul(0.25));
+    // One continuous body. The previous twin-torus union cut large cavities
+    // through the orb and made it read as a glass knot. Low, broad modes keep
+    // this volume alive while the actual silhouette is owned by the solver.
+    const morph = sin(animationPhase.mul(0.05)).mul(0.5).add(0.5);
+    const broadMode = sin(q.x.mul(2.2).add(animationPhase.mul(0.12)))
+      .mul(sin(q.y.mul(1.8).sub(animationPhase.mul(0.09))))
+      .mul(float(0.006).add(kineticEnergy.mul(0.004)));
+    const radius = float(0.525)
+      .add(morph.mul(0.008))
+      .add(breathe)
+      .add(pulse.mul(0.028))
+      .add(broadMode);
+    const core = length(q).sub(radius);
 
     // twin travelling ripples crawling over the membrane (interference).
     // Kept gentle so the surface reads as sleek wet glass, not corrugated —
@@ -182,11 +206,11 @@ export function createJellyOrbMaterial(steps: number) {
     const r1 = sin(length(pt.xz).mul(9).sub(t.mul(2.2))).mul(sin(pt.y.mul(7).add(t))).mul(amp.mul(0.15));
     const r2 = sin(length(pt.yz).mul(6).add(t.mul(1.4))).mul(sin(pt.x.mul(5).sub(t.mul(0.7)))).mul(amp.mul(0.1));
 
-    const surfaceQuiver = sin(q.x.mul(3.1).add(time.mul(0.58)))
-      .mul(sin(q.y.mul(2.7).sub(time.mul(0.47))))
+    const surfaceQuiver = sin(q.x.mul(3.1).add(animationPhase.mul(0.58)))
+      .mul(sin(q.y.mul(2.7).sub(animationPhase.mul(0.47))))
       .mul(float(0.006).add(abs(squash).mul(0.016)));
-    const gelatinSwell = sin(q.y.mul(2.15).add(time.mul(0.46)))
-      .add(sin(q.x.mul(1.8).sub(time.mul(0.37))))
+    const gelatinSwell = sin(q.y.mul(2.15).add(animationPhase.mul(0.46)))
+      .add(sin(q.x.mul(1.8).sub(animationPhase.mul(0.37))))
       .mul(0.005);
 
     // fluid memory: four touch-ripples superposed as real SDF displacement
@@ -197,11 +221,25 @@ export function createJellyOrbMaterial(steps: number) {
     // (~12·0.03 per ring) inside what the sphere-trace already tolerates
     // from the domain warps — 0.05 caused overstep risk at crossing fronts.
     const rippleDir = p.div(max(length(p), float(1e-4)));
-    const ripple = rippleWave(rippleDir, rippleOrigin0, rippleAge0)
-      .add(rippleWave(rippleDir, rippleOrigin1, rippleAge1))
-      .add(rippleWave(rippleDir, rippleOrigin2, rippleAge2))
-      .add(rippleWave(rippleDir, rippleOrigin3, rippleAge3))
-      .mul(0.03);
+    const ripple = rippleWave(rippleDir, rippleOrigin0, rippleAge0, rippleStrength0)
+      .add(rippleWave(rippleDir, rippleOrigin1, rippleAge1, rippleStrength1))
+      .add(rippleWave(rippleDir, rippleOrigin2, rippleAge2, rippleStrength2))
+      .add(rippleWave(rippleDir, rippleOrigin3, rippleAge3, rippleStrength3))
+      .mul(0.034);
+    const contactDistance = acos(
+      max(float(-1), min(float(1), dot(rippleDir, contactOrigin))),
+    );
+    const contactDimple = exp(contactDistance.mul(contactDistance).mul(-18))
+      .mul(contactPressure)
+      .mul(0.075);
+    const secondaryContactDistance = acos(
+      max(float(-1), min(float(1), dot(rippleDir, secondaryContactOrigin))),
+    );
+    const secondaryContactDimple = exp(
+      secondaryContactDistance.mul(secondaryContactDistance).mul(-18),
+    )
+      .mul(secondaryContactPressure)
+      .mul(0.075);
 
     return core
       .sub(r1)
@@ -209,7 +247,9 @@ export function createJellyOrbMaterial(steps: number) {
       .sub(surfaceQuiver)
       .sub(gelatinSwell)
       .sub(pulse.mul(0.05))
-      .sub(ripple);
+      .sub(ripple)
+      .add(contactDimple)
+      .add(secondaryContactDimple);
   };
 
   const raymarch = Fn(() => {
@@ -223,16 +263,18 @@ export function createJellyOrbMaterial(steps: number) {
     const rd = normalize(positionGeometry.sub(vOrigin)).toVar();
     const finalColor = vec4(0, 0, 0, 0).toVar(); // transparent void
 
-    // per-pixel blue-noise-ish hash → decorrelates the interior sub-march so the
-    // 10 lattice shells stop landing at the same depth on every ray (the hard
-    // concentric stair-step rings). Hash is stable per fragment.
+    // Screen-pixel-stable hash decorrelates both fixed-step marches without
+    // introducing temporal shimmer. The outer offset stays within a quarter
+    // step, which breaks up low-tier contours without increasing loop count.
+    const pixel = floor(screenUV.mul(screenSize));
     const hash = fract(
-      sin(positionGeometry.x.mul(127.31).add(positionGeometry.y.mul(311.7)))
+      sin(pixel.x.mul(127.31).add(pixel.y.mul(311.7)))
         .mul(43758.5453),
     ).toVar();
+    const marchJitter = hash.sub(0.5).mul(float(0.5).div(stepCount));
 
     RaymarchingBox(stepCount, ({ positionRay }) => {
-      const p = positionRay.mul(2.6);
+      const p = positionRay.add(rd.mul(marchJitter)).mul(2.6);
       const d = map(p as ReturnType<typeof vec3>);
 
       If(d.lessThan(0.0015), () => {
@@ -254,9 +296,12 @@ export function createJellyOrbMaterial(steps: number) {
         const bitan = normalize(cross(n, tangent)).toVar();
 
         // three Gerstner-style wavelet layers → a height gradient (dU, dV).
-        // time is pre-multiplied by speed, so reduced-motion auto-calms the sea.
-        const W = float(0.011).add(tension.mul(0.007));
-        const wt = time.mul(speed.mul(0.9));
+        // Snapshot phase is pre-scaled for reduced motion and then modulated by
+        // energy speed, so every autonomous surface wave follows one clock.
+        const W = float(0.009)
+          .add(tension.mul(0.006))
+          .add(kineticEnergy.mul(0.004));
+        const wt = animationPhase.mul(speed.mul(0.9));
         const uu = dot(p, tangent);
         const vv = dot(p, bitan);
         // incommensurate, non-grid wave directions so the ripple reads as
@@ -353,7 +398,7 @@ export function createJellyOrbMaterial(steps: number) {
         const upness = refl.y.mul(0.5).add(0.5);
         const skyGrad = mix(
           tint.mul(0.35),
-          mix(accent, highlight, 0.45),
+          mix(accent, highlight, 0.24),
           pow(upness, 1.6),
         );
         const horizonBand = accent.mul(exp(abs(refl.y).mul(-5.5)).mul(0.5));
@@ -362,7 +407,7 @@ export function createJellyOrbMaterial(steps: number) {
           .add(accent.mul(pow(max(dot(refl, sky), 0), 6.0).mul(0.12)))
           // graded ambient floor → the reflective rim catches the sky
           // instead of mirroring the empty black void as a dark crescent.
-          .add(skyGrad.add(horizonBand).mul(0.85));
+          .add(skyGrad.add(horizonBand).mul(0.52));
         // Schlick, but capped so the body always shows through the rim (a fully
         // mirror rim against an empty environment reads as a black crescent).
         const F0 = float(0.02);
@@ -373,12 +418,12 @@ export function createJellyOrbMaterial(steps: number) {
         // Zoned frosted glassmorphism rim: clear/refractive across the belly,
         // milky-frosted only at the grazing silhouette (how real frosted-glass
         // spheres behave). milkRim is gated by diff so dark back-rims stay black.
-        const grazeMask = smoothstep(0.55, 0.05, ndv).toVar();
+        const grazeMask = smoothstep(0.05, 0.55, ndv).oneMinus().toVar();
         // Lower-frequency frost so the grazing rim reads as soft frosted glass
         // instead of a buzzing high-frequency moiré (the product of two fast
         // sines over the normal aliased hard on curved silhouettes).
-        const frostN = sin(n.x.mul(13.0).add(time.mul(0.4)))
-          .mul(sin(n.y.mul(11.5).sub(time.mul(0.3))))
+        const frostN = sin(n.x.mul(13.0).add(animationPhase.mul(0.4)))
+          .mul(sin(n.y.mul(11.5).sub(animationPhase.mul(0.3))))
           .mul(0.5)
           .add(0.5);
         // Thin-film interference: a soap-bubble/beetle-shell shimmer at the
@@ -392,8 +437,11 @@ export function createJellyOrbMaterial(steps: number) {
         // shimmers as the orb turns because the object-space normal a given
         // screen pixel samples changes every frame.
         const filmThickness = float(1.0)
-          .add(sin(time.mul(0.09)).mul(0.4))
-          .add(dot(n, vec3(0.4, 0.7, 0.3)).mul(0.6));
+          .add(sin(animationPhase.mul(0.09)).mul(0.4))
+          .add(dot(n, vec3(0.4, 0.7, 0.3)).mul(0.6))
+          .add(resonance.mul(0.18))
+          .add(pulse.mul(0.32))
+          .add(kineticEnergy.mul(0.28));
         const filmPhase = filmThickness
           .mul(2.2)
           .add(pow(float(1).sub(ndv), 1.1).mul(4.4));
@@ -401,10 +449,10 @@ export function createJellyOrbMaterial(steps: number) {
         const filmV = sin(filmPhase).mul(0.5).add(0.5);
         // Cool quartet only — blue, cyan, violet, magenta. No warm stop, so
         // the sweep never drifts toward gold.
-        const filmBlue = vec3(0.1, 0.28, 1.0);
-        const filmCyan = vec3(0.15, 0.95, 1.0);
-        const filmViolet = vec3(0.55, 0.12, 1.0);
-        const filmMagenta = vec3(1.0, 0.14, 0.85);
+        const filmBlue = vec3(0.08, 0.32, 1.0);
+        const filmCyan = vec3(0.08, 0.92, 1.0);
+        const filmViolet = vec3(0.42, 0.14, 1.0);
+        const filmMagenta = vec3(0.68, 0.1, 1.0);
         const filmColor = mix(
           mix(filmBlue, filmCyan, filmU),
           mix(filmMagenta, filmViolet, filmU),
@@ -416,7 +464,7 @@ export function createJellyOrbMaterial(steps: number) {
         const iriCol = mix(
           mix(tint, accent, pow(float(1).sub(ndv), 1.5).mul(0.94)),
           filmColor,
-          fresnel.mul(0.85),
+          min(float(0.96), fresnel.mul(0.78).add(resonance.mul(0.04)).add(pulse.mul(0.08))),
         );
         const rimSoft = pow(float(1).sub(ndv), 3.0);
         const rim = iriCol
@@ -424,10 +472,10 @@ export function createJellyOrbMaterial(steps: number) {
           .mul(float(0.42).add(diff.mul(1.15)).add(fill.mul(0.8)))
           .mul(float(0.85).add(abs(squash).mul(0.32)))
           .mul(mix(float(1.0), float(0.6).add(frostN.mul(0.5)), grazeMask));
-        const milkRim = mix(accent, highlight, 0.6)
+        const milkRim = mix(accent, highlight, 0.32)
           .mul(grazeMask)
           .mul(grazeMask)
-          .mul(0.16)
+          .mul(0.1)
           .mul(float(0.4).add(diff.mul(0.8)));
 
         // Two wet highlights make the membrane feel curved rather than painted.
@@ -449,8 +497,8 @@ export function createJellyOrbMaterial(steps: number) {
                 nW,
                 normalize(
                   vec3(
-                    sin(time.mul(0.17)).mul(0.18).sub(0.38),
-                    cos(time.mul(0.13)).mul(0.12).add(0.68),
+                    sin(animationPhase.mul(0.17)).mul(0.18).sub(0.38),
+                    cos(animationPhase.mul(0.13)).mul(0.12).add(0.68),
                     -0.62,
                   ),
                 ),
@@ -463,11 +511,12 @@ export function createJellyOrbMaterial(steps: number) {
 
         // Beer-Lambert colored absorption: light is absorbed through real mass,
         // so the deep centre saturates toward the palette body colour while the
-        // thin limbs glow clear. absorb = (1−tint) keeps each chapter its own hue
+        // thin limbs glow clear. The restrained coefficient leaves enough light
+        // in the belly for ocean water rather than an empty black shell.
         // in the deep. This is the change that turns a lit shell into a volume.
         // Gentler absorption so light carries deep into the body → luminous,
         // translucent tropical water rather than an opaque marble.
-        const absorb = vec3(1.0).sub(tint).mul(float(0.9).add(tension.mul(0.25)));
+        const absorb = vec3(1.0).sub(tint).mul(float(0.44).add(tension.mul(0.13)));
         // Dispersed thickness: red's shallower bend reads as a longer optical
         // path (more absorbed), blue's sharper bend as shorter (less
         // absorbed) — real chromatic separation in the transmitted body
@@ -487,15 +536,15 @@ export function createJellyOrbMaterial(steps: number) {
         const deepBody = clearInterior
           .mul(transmit)
           .mul(float(0.88).add(diff.mul(0.5)).add(fill.mul(0.35)))
-          .add(mix(tint, accent, 0.5).mul(0.1)) // color floor → core glows, never black
+          .add(mix(tint, accent, 0.58).mul(0.23)) // color floor → core glows, never black
           .toVar();
         // subsurface scatter: a soft turquoise glow lit from within, peaking
         // through the mid-body and backlit limbs → tropical-water translucency
         // (this is what keeps it from reading as an opaque ceramic ball).
         const backlit = pow(max(dot(nW, lightDir.negate()), 0), 1.4).add(0.4);
-        const sss = mix(accent, highlight, 0.4)
+        const sss = mix(accent, highlight, 0.2)
           .mul(smoothstep(0.04, 0.85, thickness).mul(transmit))
-          .mul(backlit.mul(0.85))
+          .mul(backlit.mul(0.76))
           .toVar();
 
         // internal gyroid tension-lattice, seen through the translucent shell:
@@ -506,19 +555,24 @@ export function createJellyOrbMaterial(steps: number) {
         // land at different depths per pixel → the concentric stair-step rings
         // dissolve into fine noise the bloom + output dither smooth away.
         const lp = p.add(refrDir.mul(hash.mul(0.055))).toVar();
-        // Soft wide veils by default; `order` (Pattern chapter) tightens them
-        // into a finer, crisper crystalline lattice — Origin's interior stays a
-        // diffuse glow, Pattern's reads as structured geometry.
-        const gscale = float(4.6).add(tension.mul(2.4)).add(order.mul(3.2));
-        const bandWidth = mix(float(0.55), float(0.2), order);
-        const gphase = vec3(time.mul(0.06), time.mul(-0.04), time.mul(0.05))
+        // Soft wide veils tighten into a finer stress trace only as energy rises;
+        // at rest, the interior remains liquid rather than diagrammatic.
+        // Higher-frequency, narrower bands make the inner field read as a
+        // suspended filament network instead of a few glowing hollow rings.
+        const gscale = float(6.2).add(tension.mul(2.8)).add(order.mul(4.2));
+        const bandWidth = mix(float(0.2), float(0.085), order);
+        const gphase = vec3(
+          animationPhase.mul(0.06),
+          animationPhase.mul(-0.04),
+          animationPhase.mul(0.05),
+        )
           .add(slosh.mul(1.8));
         Loop(10, ({ i }) => {
           lp.addAssign(refrDir.mul(0.055)); // march along the refracted ray
           const g = gyroid(lp.mul(gscale).add(gphase) as ReturnType<typeof vec3>);
-          const band = smoothstep(bandWidth, 0.0, abs(g));
+          const band = smoothstep(0.0, bandWidth, abs(g)).oneMinus();
           const falloff = float(1).sub(float(i).mul(0.085));
-          latGlow.addAssign(band.mul(float(0.32).add(order.mul(0.12))).mul(falloff));
+          latGlow.addAssign(band.mul(float(0.28).add(order.mul(0.1))).mul(falloff));
           // depth stack: a second, coarser gyroid octave (0.45× scale,
           // slower phase) weighted by a ramp that GROWS with march depth —
           // opposite of the fine web's falloff. The fine structure lives
@@ -528,10 +582,9 @@ export function createJellyOrbMaterial(steps: number) {
           const g2 = gyroid(
             lp.mul(gscale.mul(0.45)).add(gphase.mul(0.6)) as ReturnType<typeof vec3>,
           );
-          const band2 = smoothstep(bandWidth.mul(1.6), 0.0, abs(g2));
-          latGlow.addAssign(band2.mul(0.14).mul(float(i).mul(0.085)));
-          // resonance memory: imprints make the suspended gyroid web inside the orb
-          // develop brighter nodes and slight fractures — the viewer "marked" it
+          const band2 = smoothstep(0.0, bandWidth.mul(1.15), abs(g2)).oneMinus();
+          latGlow.addAssign(band2.mul(0.065).mul(float(i).mul(0.085)));
+          // Resonance makes the submerged stress trace briefly resolve.
           const mem = band.mul(resonance.mul(0.55)).mul(falloff.mul(0.7));
           latGlow.addAssign(mem);
           // depth-stacked caustics: broad sweeping light bands at low,
@@ -539,12 +592,20 @@ export function createJellyOrbMaterial(steps: number) {
           // literal checkerboard — the golf-ball artifact — so keep these wide
           // and let their PRODUCT only gate where both swells overlap.
           const cA = sin(
-            lp.x.mul(3.7).add(lp.y.mul(1.4)).add(time.mul(0.52)).add(slosh.x.mul(5.0)),
+            lp.x
+              .mul(3.7)
+              .add(lp.y.mul(1.4))
+              .add(animationPhase.mul(0.52))
+              .add(slosh.x.mul(5.0)),
           )
             .mul(0.5)
             .add(0.5);
           const cB = sin(
-            lp.y.mul(2.9).sub(lp.z.mul(1.7)).sub(time.mul(0.36)).add(slosh.y.mul(4.0)),
+            lp.y
+              .mul(2.9)
+              .sub(lp.z.mul(1.7))
+              .sub(animationPhase.mul(0.36))
+              .add(slosh.y.mul(4.0)),
           )
             .mul(0.5)
             .add(0.5);
@@ -560,15 +621,118 @@ export function createJellyOrbMaterial(steps: number) {
           pow(max(dot(refrDir, lightDir), 0.0), 3.0).mul(0.65),
         );
         const caustic = min(causAccum, float(1.0))
-          .mul(float(0.18).add(tension.mul(0.1)))
+          .mul(float(0.15).add(tension.mul(0.08)).add(kineticEnergy.mul(0.16)))
           .mul(float(0.55).add(fresnel.mul(0.45)))
           .mul(shaft);
+        // A broad, low-frequency liquid veil keeps the belly alive between
+        // sharp lattice filaments. It drifts with the delayed inner mass so
+        // the orb reads as water carrying light, not a hollow neon shell.
+        const veilA = sin(
+          lp.x
+            .mul(2.15)
+            .add(lp.z.mul(1.35))
+            .add(animationPhase.mul(0.22))
+            .add(slosh.x.mul(2.2)),
+        )
+          .mul(0.5)
+          .add(0.5);
+        const veilB = sin(
+          lp.y
+            .mul(1.8)
+            .sub(lp.x.mul(1.1))
+            .sub(animationPhase.mul(0.17))
+            .add(slosh.y.mul(1.8)),
+        )
+          .mul(0.5)
+          .add(0.5);
+        const liquidVeil = smoothstep(0.34, 0.82, veilA.mul(veilB))
+          .mul(float(0.34).add(kineticEnergy.mul(0.22)))
+          .mul(float(0.52).add(fresnel.mul(0.48)));
+        const waterGlow = mix(tint, accent, 0.62)
+          .mul(liquidVeil)
+          .mul(float(0.9).add(tension.mul(0.42)));
+        const interiorBloom = mix(tint, accent, 0.64)
+          .mul(smoothstep(0.08, 0.94, thickness))
+          .mul(float(0.1).add(tension.mul(0.11)).add(kineticEnergy.mul(0.12)));
+
+        // A slower, denser inner mass gives the glass something to contain. The
+        // tilted boundary is driven by the same delayed slosh as the silhouette,
+        // so a pull reads as water finding a new level rather than a separate FX.
+        const fluidAxis = normalize(
+          vec3(
+            slosh.x.mul(0.55).add(sin(animationPhase.mul(0.17)).mul(0.07)),
+            float(0.88).add(cos(animationPhase.mul(0.13)).mul(0.06)),
+            slosh.y.mul(0.45).add(sin(animationPhase.mul(0.11)).mul(0.05)),
+          ),
+        ).toVar();
+        const liquidHeight = dot(lp, fluidAxis)
+          .add(
+            sin(
+              lp.x
+                .mul(4.1)
+                .add(lp.z.mul(2.35))
+                .add(animationPhase.mul(0.31))
+                .add(slosh.x.mul(5.2)),
+            ).mul(0.032),
+          )
+          .add(
+            sin(
+              lp.z
+                .mul(5.4)
+                .sub(lp.y.mul(1.65))
+                .sub(animationPhase.mul(0.22))
+                .add(slosh.y.mul(3.4)),
+            ).mul(0.018),
+          )
+          .toVar();
+        const liquidFill = float(1)
+          .sub(smoothstep(float(-0.42), float(0.38), liquidHeight))
+          .toVar();
+        const currentA = sin(
+          lp.x
+            .mul(3.45)
+            .add(lp.z.mul(2.1))
+            .add(animationPhase.mul(0.34))
+            .add(slosh.x.mul(4.6)),
+        )
+          .mul(0.5)
+          .add(0.5);
+        const currentB = sin(
+          lp.y
+            .mul(2.65)
+            .sub(lp.x.mul(1.85))
+            .sub(animationPhase.mul(0.27))
+            .add(slosh.y.mul(4.2)),
+        )
+          .mul(0.5)
+          .add(0.5);
+        const liquidCurrent = currentA.mul(0.62).add(currentB.mul(0.38));
+        const innerLiquid = mix(tint, accent, float(0.3).add(liquidCurrent.mul(0.24)))
+          .mul(liquidFill)
+          .mul(
+            float(0.09)
+              .add(thickness.mul(0.2))
+              .add(kineticEnergy.mul(0.22))
+              .add(contactPressure.mul(0.16)),
+          );
+        const meniscus = exp(abs(liquidHeight).mul(-20)).mul(
+          float(0.11)
+            .add(kineticEnergy.mul(0.38))
+            .add(contactPressure.mul(0.3))
+            .add(resonance.mul(0.06)),
+        );
+        const meniscusGlow = mix(accent, highlight, 0.14).mul(meniscus);
+        const displacedCore = lp.add(slosh.mul(0.5));
+        const coreLight = mix(tint, accent, 0.48)
+          .mul(exp(length(displacedCore).mul(-3.4)))
+          .mul(float(0.095).add(kineticEnergy.mul(0.2)).add(resonance.mul(0.07)))
+          .mul(float(0.35).add(thickness.mul(0.65)));
         // soft-cap the accumulated glow so the web reads as filaments instead
         // of flooding the body with a flat saturated fill at high tension
         const latSoft = min(latGlow, float(1.25));
         const latticeHue = mix(tint, accent, latSoft.mul(0.72).add(fresnel.mul(0.12)));
         const latticeCol = latticeHue
-          .mul(latSoft.mul(latSoft).mul(1.4))
+          .mul(latSoft.mul(latSoft).mul(0.92))
           .mul(lattice)
           .mul(float(0.95).add(tension.mul(0.45)))
           .add(resonance.mul(0.22).mul(latSoft)) // resonance memory brightens the remembered web
@@ -589,12 +753,12 @@ export function createJellyOrbMaterial(steps: number) {
         // fresh crest into a soft flash for free.
         const rippleHitDir = p.div(max(length(p), float(1e-4)));
         const crest = abs(
-          rippleWave(rippleHitDir, rippleOrigin0, rippleAge0)
-            .add(rippleWave(rippleHitDir, rippleOrigin1, rippleAge1))
-            .add(rippleWave(rippleHitDir, rippleOrigin2, rippleAge2))
-            .add(rippleWave(rippleHitDir, rippleOrigin3, rippleAge3)),
+          rippleWave(rippleHitDir, rippleOrigin0, rippleAge0, rippleStrength0)
+            .add(rippleWave(rippleHitDir, rippleOrigin1, rippleAge1, rippleStrength1))
+            .add(rippleWave(rippleHitDir, rippleOrigin2, rippleAge2, rippleStrength2))
+            .add(rippleWave(rippleHitDir, rippleOrigin3, rippleAge3, rippleStrength3)),
         ).toVar();
-        const rippleGlow = mix(accent, highlight, 0.5).mul(crest).mul(0.75);
+        const rippleGlow = mix(accent, highlight, 0.25).mul(crest).mul(0.84);
 
         // Tight sun-glint that twinkles on wave crests (gated by a wavelet mask)
         // — sparkles like sun on water, additive on the light highlight colour.
@@ -621,6 +785,11 @@ export function createJellyOrbMaterial(steps: number) {
           deepBody
             .add(sss)
             .add(latticeCol)
+            .add(waterGlow)
+            .add(innerLiquid)
+            .add(meniscusGlow)
+            .add(coreLight)
+            .add(interiorBloom)
             .add(accent.mul(caustic))
             .add(rim)
             .add(milkRim),
@@ -647,7 +816,7 @@ export function createJellyOrbMaterial(steps: number) {
           .add(rimGlow)
           .add(rippleGlow)
           .toVar();
-        // Hue-preserving floor keeps overlaps inside the chapter palette; a
+        // Hue-preserving floor keeps overlaps inside the ocean palette; a
         // Reinhard soft-knee then compresses only the brights, so mids and the
         // pure-black void survive ACES + bloom untouched.
         const graded = max(col, vec3(0)).add(tint.mul(0.05));
@@ -690,6 +859,8 @@ export function createJellyOrbMaterial(steps: number) {
     tension,
     order,
     speed,
+    phase,
+    motionScale,
     pulse,
     tint,
     accent,
@@ -702,15 +873,25 @@ export function createJellyOrbMaterial(steps: number) {
     pointer,
     jiggle,
     squash,
+    bend,
     slosh,
+    kineticEnergy,
+    contactOrigin,
+    contactPressure,
+    secondaryContactOrigin,
+    secondaryContactPressure,
     stepCount,
     rippleOrigin0,
     rippleAge0,
+    rippleStrength0,
     rippleOrigin1,
     rippleAge1,
+    rippleStrength1,
     rippleOrigin2,
     rippleAge2,
+    rippleStrength2,
     rippleOrigin3,
     rippleAge3,
+    rippleStrength3,
   };
 }

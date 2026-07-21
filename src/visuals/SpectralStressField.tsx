@@ -11,8 +11,11 @@ import {
   MathUtils,
   MeshBasicMaterial,
 } from "three";
-import { sampleExperience } from "../chapters/interpolate";
-import { descent, frameSample, useExperienceStore } from "../experience/store";
+import { useExperienceStore } from "../experience/store";
+import {
+  organismController,
+  SURFACE_WAVE_LIFETIME,
+} from "../simulation/organismController";
 
 type DetailProfile = {
   filaments: number;
@@ -22,16 +25,14 @@ type DetailProfile = {
 };
 
 const DETAIL: Record<string, DetailProfile> = {
-  high: { filaments: 58, halos: 12, ribbons: 8, segments: 34 },
-  medium: { filaments: 42, halos: 9, ribbons: 6, segments: 28 },
-  low: { filaments: 28, halos: 6, ribbons: 4, segments: 22 },
+  high: { filaments: 42, halos: 9, ribbons: 6, segments: 32 },
+  medium: { filaments: 30, halos: 7, ribbons: 5, segments: 26 },
+  low: { filaments: 18, halos: 4, ribbons: 3, segments: 20 },
 };
 
-const WHITE = new Color("#ffffff");
-const PRIMARY = new Color();
-const SECONDARY = new Color();
-const ACCENT = new Color();
-const RIBBON = new Color();
+const PRIMARY = new Color("#096bd5");
+const SECONDARY = new Color("#31c9f7");
+const RIBBON = new Color("#5e78ff");
 
 function fract(value: number) {
   return value - Math.floor(value);
@@ -178,8 +179,6 @@ function createRibbonGeometry(detail: DetailProfile) {
 
 export function SpectralStressField() {
   const group = useRef<Group>(null!);
-  const pulse = useRef(0);
-  const lastImpulse = useRef(0);
   const tier = useExperienceStore((state) => state.profile?.tier ?? "high");
   const reducedMotion = useExperienceStore((state) => state.reducedMotion);
 
@@ -239,85 +238,93 @@ export function SpectralStressField() {
     [materials],
   );
 
-  useFrame((state, delta) => {
-    const dt = Math.min(delta, 1 / 30);
-    const time = state.clock.elapsedTime;
-    const sample = frameSample.current ?? sampleExperience(descent.value);
-    const { pointer, drag, impulse, resonance } = useExperienceStore.getState();
+  useFrame(() => {
+    const snapshot = organismController.snapshot;
+    const time = snapshot.phase;
     const motion = reducedMotion ? 0.18 : 1;
-    const originBoost = sample.chapterIndex === 0 ? 0.42 : 0;
-    const returnBoost = sample.chapterIndex === 11 ? 0.68 : 0;
+    let waveWake = 0;
+    let newestWave: (typeof snapshot.surfaceWaves)[number] | undefined;
 
-    if (impulse && impulse.startedAt !== lastImpulse.current) {
-      lastImpulse.current = impulse.startedAt;
-      pulse.current = 1;
+    for (const wave of snapshot.surfaceWaves) {
+      if (wave.age >= SURFACE_WAVE_LIFETIME) continue;
+      const life = Math.max(0, 1 - wave.age / SURFACE_WAVE_LIFETIME);
+      waveWake += wave.strength * life;
+      if (!newestWave || wave.age < newestWave.age) newestWave = wave;
     }
-    pulse.current = Math.max(0, pulse.current - dt * 0.8);
 
-    const visual = sample.visual;
-    const sig = sample.signature;
+    const waveProgress = newestWave
+      ? MathUtils.clamp(newestWave.age / SURFACE_WAVE_LIFETIME, 0, 1)
+      : 1;
+    const wavePulse = newestWave
+      ? newestWave.strength * Math.sin(waveProgress * Math.PI) * motion
+      : 0;
     const fieldEnergy = MathUtils.clamp(
-      visual.filamentIntensity *
-        (0.45 + sig.latticeReveal * 0.55 + sig.orbPresence * 0.18) +
-        resonance * 0.12 +
-        pulse.current * 0.38 +
-        originBoost * 0.22 +
-        returnBoost * 0.28,
+      snapshot.energy * 0.85 +
+        snapshot.resonance * 0.42 +
+        waveWake * 0.24 +
+        Math.abs(snapshot.squeeze) * 0.46 +
+        Math.abs(snapshot.torsion) * 0.16,
       0,
-      1.8,
+      1.45,
     );
     const haloEnergy = MathUtils.clamp(
-      visual.haloDepth + pulse.current * 0.34 + originBoost * 0.4 + returnBoost * 0.62,
+      snapshot.resonance * 0.6 + waveWake * 0.42 + snapshot.energy * 0.18,
       0,
-      1.9,
+      1.35,
     );
     const ribbonEnergy = MathUtils.clamp(
-      visual.ribbonDepth * 0.55 + visual.spectralLift * 0.25 + pulse.current * 0.22,
+      snapshot.energy * 0.36 + waveWake * 0.2 + Math.abs(snapshot.squeeze) * 0.24,
       0,
-      1.4,
+      0.8,
     );
 
     if (group.current) {
-      group.current.visible = fieldEnergy > 0.04 || haloEnergy > 0.06;
+      group.current.visible = fieldEnergy > 0.018 || haloEnergy > 0.028;
       group.current.position.x =
-        pointer.x * sample.simulation.pointerForce * 0.055 + drag.x * 0.24;
+        snapshot.position[0] +
+        snapshot.slosh[0] * 0.045 +
+        (newestWave?.origin[0] ?? 0) * wavePulse * 0.035;
       group.current.position.y =
-        pointer.y * sample.simulation.pointerForce * 0.035 - drag.y * 0.2;
-      group.current.rotation.x = drag.y * 0.09 * motion;
-      group.current.rotation.y = -drag.x * 0.11 * motion;
+        snapshot.position[1] +
+        snapshot.slosh[1] * 0.035 +
+        (newestWave?.origin[1] ?? 0) * wavePulse * 0.028;
+      group.current.position.z = -0.08;
+      group.current.rotation.x =
+        snapshot.rotation[0] * 0.14 - (newestWave?.origin[1] ?? 0) * wavePulse * 0.04;
+      group.current.rotation.y =
+        snapshot.rotation[1] * 0.16 + (newestWave?.origin[0] ?? 0) * wavePulse * 0.045;
       group.current.rotation.z =
-        time * 0.018 * motion + Math.sin(time * 0.13) * 0.035 * motion + pointer.x * 0.025;
+        time * 0.012 * motion +
+        snapshot.rotation[2] * 0.34 +
+        snapshot.torsion * 0.18 +
+        wavePulse * 0.025;
       const breathing =
         1 +
-        Math.sin(time * 0.43 + sample.chapterIndex) * 0.025 * motion +
-        visual.haloDepth * 0.045 +
-        pulse.current * 0.035;
+        Math.sin(time * 0.43) * 0.016 * motion +
+        snapshot.energy * 0.035 +
+        waveWake * 0.025 +
+        wavePulse * 0.035;
       group.current.scale.set(
-        breathing * (1 + drag.x * 0.08),
-        breathing * (1 - drag.y * 0.07),
+        breathing * (1 + snapshot.slosh[0] * 0.05),
+        breathing * (1 - snapshot.slosh[1] * 0.05),
         breathing,
       );
     }
-
-    PRIMARY.set(sample.palette.primary).lerp(WHITE, 0.08 + visual.spectralLift * 0.04);
-    SECONDARY.set(sample.palette.secondary).lerp(WHITE, 0.04);
-    ACCENT.set(sample.palette.accent).lerp(WHITE, 0.02);
-    RIBBON.copy(ACCENT).lerp(PRIMARY, 0.28).multiplyScalar(1.18);
 
     materials.filaments.color.copy(PRIMARY);
     materials.halos.color.copy(SECONDARY);
     materials.ribbons.color.copy(RIBBON);
     materials.filaments.opacity = MathUtils.clamp(
-      0.06 + fieldEnergy * 0.2 + originBoost * 0.04 + returnBoost * 0.055,
+      0.008 + fieldEnergy * 0.1,
       0,
-      0.5,
+      0.2,
     );
     materials.halos.opacity = MathUtils.clamp(
-      0.035 + haloEnergy * 0.14 + originBoost * 0.06 + returnBoost * 0.12,
+      0.006 + haloEnergy * 0.085,
       0,
-      0.46,
+      0.16,
     );
-    materials.ribbons.opacity = MathUtils.clamp(0.035 + ribbonEnergy * 0.16, 0, 0.28);
+    materials.ribbons.opacity = MathUtils.clamp(0.003 + ribbonEnergy * 0.075, 0, 0.1);
   });
 
   return (

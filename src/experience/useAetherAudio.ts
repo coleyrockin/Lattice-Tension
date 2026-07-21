@@ -1,36 +1,191 @@
 import { useEffect, useRef } from "react";
-import { sampleExperience } from "../chapters/interpolate";
-import { descent, useExperienceStore } from "./store";
+import type { PerformanceTier } from "../performance/profile";
+import { organismController, type OrganismSnapshot } from "../simulation/organismController";
+import { useExperienceStore } from "./store";
+
+const BASE_FREQUENCIES = [48, 72, 96] as const;
+const BASE_DETUNES = [0, 7, -9] as const;
+
+type AudioVoice = {
+  oscillator: OscillatorNode;
+  gain: GainNode;
+  baseFrequency: number;
+  index: number;
+};
 
 type AudioGraph = {
   context: AudioContext;
-  gain: GainNode;
+  masterGain: GainNode;
+  droneGain: GainNode;
   filter: BiquadFilterNode;
-  oscillators: OscillatorNode[];
+  voices: AudioVoice[];
   raf: number;
   closing: boolean;
 };
+
+function setGainTarget(graph: AudioGraph, gain: GainNode, value: number, timeConstant: number) {
+  if (graph.context.state === "closed") return;
+  gain.gain.cancelScheduledValues(graph.context.currentTime);
+  gain.gain.setTargetAtTime(value, graph.context.currentTime, timeConstant);
+}
+
+function disconnectVoice(voice: AudioVoice) {
+  voice.oscillator.disconnect();
+  voice.gain.disconnect();
+}
+
+function createVoice(graph: AudioGraph, index: number, fadeIn: boolean) {
+  const oscillator = graph.context.createOscillator();
+  const gain = graph.context.createGain();
+  const voice: AudioVoice = {
+    oscillator,
+    gain,
+    baseFrequency: BASE_FREQUENCIES[index]!,
+    index,
+  };
+
+  oscillator.type = index === 2 ? "triangle" : "sine";
+  oscillator.frequency.value = voice.baseFrequency;
+  oscillator.detune.value = BASE_DETUNES[index]!;
+  gain.gain.value = fadeIn ? 0 : 1;
+  oscillator.connect(gain);
+  gain.connect(graph.filter);
+  oscillator.start();
+  oscillator.onended = () => disconnectVoice(voice);
+
+  if (fadeIn) setGainTarget(graph, gain, 1, 0.06);
+  return voice;
+}
+
+function retireVoice(graph: AudioGraph, voice: AudioVoice) {
+  const now = graph.context.currentTime;
+  setGainTarget(graph, voice.gain, 0, 0.025);
+  voice.oscillator.stop(now + 0.12);
+}
+
+function applyPerformanceTier(graph: AudioGraph, tier: PerformanceTier, fade: boolean) {
+  const desiredVoiceCount = tier === "low" ? 2 : 3;
+
+  while (graph.voices.length < desiredVoiceCount) {
+    graph.voices.push(createVoice(graph, graph.voices.length, fade));
+  }
+
+  while (graph.voices.length > desiredVoiceCount) {
+    const voice = graph.voices.pop();
+    if (voice) retireVoice(graph, voice);
+  }
+}
+
+function createAudioGraph(AudioContextCtor: typeof AudioContext, tier: PerformanceTier) {
+  const context = new AudioContextCtor();
+
+  try {
+    const masterGain = context.createGain();
+    const droneGain = context.createGain();
+    const filter = context.createBiquadFilter();
+    const graph: AudioGraph = {
+      context,
+      masterGain,
+      droneGain,
+      filter,
+      voices: [],
+      raf: 0,
+      closing: false,
+    };
+
+    masterGain.gain.value = 0;
+    droneGain.gain.value = 0;
+    filter.type = "lowpass";
+    filter.frequency.value = 330;
+    filter.Q.value = 0.7;
+    filter.connect(droneGain);
+    droneGain.connect(masterGain);
+    masterGain.connect(context.destination);
+    applyPerformanceTier(graph, tier, false);
+    setGainTarget(graph, droneGain, 0.024, 0.34);
+    return graph;
+  } catch (error) {
+    if (context.state !== "closed") void context.close().catch(() => undefined);
+    throw error;
+  }
+}
 
 function closeAudioGraph(graph: AudioGraph) {
   if (graph.closing) return;
   graph.closing = true;
   cancelAnimationFrame(graph.raf);
-
-  if (graph.context.state !== "closed") {
-    graph.gain.gain.setTargetAtTime(0, graph.context.currentTime, 0.05);
-  }
+  setGainTarget(graph, graph.masterGain, 0, 0.025);
 
   window.setTimeout(() => {
-    graph.oscillators.forEach((oscillator) => oscillator.stop());
+    graph.voices.forEach((voice) => {
+      try {
+        voice.oscillator.stop();
+      } catch {
+        disconnectVoice(voice);
+      }
+    });
     if (graph.context.state !== "closed") {
-      void graph.context.close();
+      void graph.context.close().catch(() => undefined);
     }
-  }, 160);
+  }, 140);
 }
 
-export function useAetherAudio() {
+async function resumeAudioGraph(graph: AudioGraph) {
+  if (graph.closing || graph.context.state === "closed") return false;
+
+  try {
+    if (graph.context.state !== "running") await graph.context.resume();
+    return !graph.closing && graph.context.state === "running";
+  } catch {
+    return false;
+  }
+}
+
+function playContactTone(graph: AudioGraph, snapshot: OrganismSnapshot) {
+  const oscillator = graph.context.createOscillator();
+  const gain = graph.context.createGain();
+  const now = graph.context.currentTime;
+  const pitchSeed = (snapshot.interactionId * 97) % 140;
+  const f0 = 330 + pitchSeed + snapshot.energy * 125 + snapshot.contactOrigin[1] * 28;
+  const amplitude = Math.min(0.052, 0.016 + snapshot.resonance * 0.022 + snapshot.energy * 0.014);
+
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(Math.max(180, f0), now);
+  oscillator.frequency.exponentialRampToValueAtTime(Math.max(110, f0 * 0.56), now + 0.28);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.linearRampToValueAtTime(amplitude, now + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0002, now + 0.52);
+  oscillator.connect(gain);
+  gain.connect(graph.masterGain);
+  oscillator.start(now);
+  oscillator.stop(now + 0.56);
+  oscillator.onended = () => {
+    oscillator.disconnect();
+    gain.disconnect();
+  };
+}
+
+/** Opt-in liquid drone and contact tones, derived from the same snapshot as light. */
+export function useAestherAudio() {
   const graphRef = useRef<AudioGraph | null>(null);
+  const tierRef = useRef<PerformanceTier>("high");
   const audioEnabled = useExperienceStore((state) => state.audioEnabled);
+  const setAudioEnabled = useExperienceStore((state) => state.setAudioEnabled);
+  const tier = useExperienceStore((state) => state.profile?.tier ?? "high");
+
+  useEffect(() => {
+    tierRef.current = tier;
+    const graph = graphRef.current;
+    if (!graph || graph.closing) return;
+
+    try {
+      applyPerformanceTier(graph, tier, true);
+    } catch {
+      setGainTarget(graph, graph.masterGain, 0, 0.01);
+      setAudioEnabled(false);
+    }
+  }, [setAudioEnabled, tier]);
+
   useEffect(() => {
     if (!audioEnabled) {
       const graph = graphRef.current;
@@ -40,211 +195,114 @@ export function useAetherAudio() {
     }
 
     const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
-    const context = new AudioContextCtor();
-    const gain = context.createGain();
-    const filter = context.createBiquadFilter();
-    const baseFrequencies = [55, 82.5, 110, 165, 220];
-    const oscillators = baseFrequencies.map((frequency, index) => {
-      const oscillator = context.createOscillator();
-      oscillator.type =
-        index % 3 === 0 ? "sine" : index % 3 === 1 ? "triangle" : "sawtooth";
-      oscillator.frequency.value = frequency;
-      oscillator.detune.value = index * 5 - 14;
-      oscillator.connect(filter);
-      oscillator.start();
-      return oscillator;
-    });
+    if (!AudioContextCtor) {
+      setAudioEnabled(false);
+      return;
+    }
 
-    filter.type = "lowpass";
-    filter.frequency.value = 520;
-    filter.Q.value = 0.65;
-    filter.connect(gain);
-    gain.gain.value = 0;
-    gain.connect(context.destination);
-    gain.gain.setTargetAtTime(0.04, context.currentTime, 0.25);
-    void context.resume();
+    let graph: AudioGraph;
+    try {
+      graph = createAudioGraph(AudioContextCtor, tierRef.current);
+    } catch {
+      setAudioEnabled(false);
+      return;
+    }
 
-    const graph: AudioGraph = {
-      context,
-      gain,
-      filter,
-      oscillators,
-      raf: 0,
-      closing: false,
+    graphRef.current = graph;
+    let disposed = false;
+    let lastInteractionId = organismController.snapshot.interactionId;
+
+    const disableAfterFailure = () => {
+      if (disposed || graph.closing) return;
+      setGainTarget(graph, graph.masterGain, 0, 0.01);
+      setAudioEnabled(false);
     };
 
-    // One-shot "water drop" on touch: a short sine pluck with a falling
-    // pitch (the classic droplet contour) and a fast-attack/exp-decay
-    // envelope, routed straight to the destination so the drone's lowpass
-    // doesn't muffle it. Seeded with the current impulse timestamp so
-    // toggling sound on doesn't replay a stale click.
-    let lastPluckAt = useExperienceStore.getState().impulse?.startedAt ?? 0;
-    const pluck = () => {
-      const osc = context.createOscillator();
-      const pluckGain = context.createGain();
-      const now = context.currentTime;
-      const f0 = 540 + Math.random() * 140;
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(f0, now);
-      osc.frequency.exponentialRampToValueAtTime(f0 * 0.55, now + 0.22);
-      pluckGain.gain.setValueAtTime(0, now);
-      pluckGain.gain.linearRampToValueAtTime(0.055, now + 0.008);
-      pluckGain.gain.exponentialRampToValueAtTime(0.0004, now + 0.42);
-      osc.connect(pluckGain);
-      pluckGain.connect(context.destination);
-      osc.start(now);
-      osc.stop(now + 0.46);
-      osc.onended = () => {
-        osc.disconnect();
-        pluckGain.disconnect();
-      };
+    const ensureRunning = () => {
+      void resumeAudioGraph(graph).then((running) => {
+        if (disposed || graph.closing) return;
+        if (!running) {
+          disableAfterFailure();
+          return;
+        }
+
+        lastInteractionId = organismController.snapshot.interactionId;
+        setGainTarget(graph, graph.masterGain, document.hidden ? 0 : 1, document.hidden ? 0.015 : 0.08);
+      });
+    };
+
+    const onVisibilityChange = () => {
+      lastInteractionId = organismController.snapshot.interactionId;
+      if (document.hidden) {
+        setGainTarget(graph, graph.masterGain, 0, 0.015);
+      } else {
+        ensureRunning();
+      }
     };
 
     const tick = () => {
-      if (document.hidden || graph.closing) {
-        graph.raf = requestAnimationFrame(tick);
-        return;
-      }
+      if (graph.closing) return;
+      const snapshot = organismController.snapshot;
 
-      const impulse = useExperienceStore.getState().impulse;
-      if (impulse && impulse.startedAt !== lastPluckAt) {
-        lastPluckAt = impulse.startedAt;
-        pluck();
-      }
-
-      const progress = descent.value;
-      const imprint = useExperienceStore.getState().resonance;
-      const sampled = sampleExperience(progress);
-      const sig = sampled.signature;
-      const tension = sampled.simulation.tension;
-
-      // 1. Biquad filter frequency and Q sweeps
-      let targetFilterFreq = 280 +
-        tension * 820 +
-        sig.crystalline * 620 +
-        sig.fringe * 380 +
-        sig.nebula * 260 +
-        imprint * 120;
-
-      if (sig.singularity > 0.05) {
-        // lowpass drone: sweep filter frequency lower as singularity increases
-        targetFilterFreq = (targetFilterFreq - sig.singularity * 450) * (1.0 - 0.72 * Math.min(1.0, sig.singularity));
-        targetFilterFreq = Math.max(110, targetFilterFreq);
-      }
-
-      if (sig.quantum > 0.05) {
-        // open filter wide for high frequency noise
-        targetFilterFreq += sig.quantum * 1800;
-      }
-
-      filter.frequency.setTargetAtTime(
-        targetFilterFreq,
-        context.currentTime,
-        0.1,
-      );
-
-      // High resonance for Pattern (crystalline), medium for Singularity, low for others
-      const targetQ = 0.45 + sig.crystalline * 1.85 + sig.singularity * 0.95;
-      filter.Q.setTargetAtTime(
-        targetQ,
-        context.currentTime,
-        0.14,
-      );
-
-      // 2. Oscillators updates
-      oscillators.forEach((oscillator, index) => {
-        // Dynamically change oscillator types based on active signatures
-        let oscType: OscillatorType;
-        if (sig.singularity > 0.3 || sig.twist > 0.3) {
-          // Brooding drone: sawtooth
-          oscType = "sawtooth";
-        } else if (sig.crystalline > 0.3) {
-          // Pattern: glittering crystal-clear sine & triangle
-          oscType = index % 2 === 0 ? "sine" : "triangle";
-        } else if (sig.quantum > 0.3) {
-          // Quantum: triangle or sine
-          oscType = "triangle";
-        } else {
-          // Default mix
-          oscType = index % 3 === 0 ? "sine" : index % 3 === 1 ? "triangle" : "sawtooth";
+      if (document.hidden || graph.context.state !== "running") {
+        lastInteractionId = snapshot.interactionId;
+      } else {
+        if (snapshot.interactionId !== lastInteractionId) {
+          lastInteractionId = snapshot.interactionId;
+          playContactTone(graph, snapshot);
         }
 
-        if (oscillator.type !== oscType) {
-          oscillator.type = oscType;
-        }
-
-        // Frequencies shifting based on signatures
-        let targetFreq = baseFrequencies[index]!;
-        if (sig.singularity > 0.05) {
-          // brood drone: pitch down
-          targetFreq = targetFreq * (1.0 - 0.36 * Math.min(1.0, sig.singularity));
-        } else if (sig.crystalline > 0.05) {
-          // crystal harmony: perfect octaves/fifth shifts
-          targetFreq = targetFreq * (1.0 + 0.5 * sig.crystalline);
-        } else if (sig.quantum > 0.05) {
-          // quantum drift: high-frequency
-          targetFreq = targetFreq * (2.2 + 3.8 * sig.quantum);
-        }
-        targetFreq += sig.fringe * index * 8;
-
-        oscillator.frequency.setTargetAtTime(
-          targetFreq,
-          context.currentTime,
-          0.2,
+        const slosh = Math.hypot(...snapshot.slosh);
+        const energy = Math.min(snapshot.energy, 1);
+        const resonance = Math.min(snapshot.resonance, 1);
+        graph.filter.frequency.setTargetAtTime(
+          260 + energy * 740 + slosh * 180,
+          graph.context.currentTime,
+          0.12,
+        );
+        graph.filter.Q.setTargetAtTime(0.58 + resonance * 1.15, graph.context.currentTime, 0.16);
+        graph.droneGain.gain.setTargetAtTime(
+          0.019 + energy * 0.012 + resonance * 0.007,
+          graph.context.currentTime,
+          0.55,
         );
 
-        // Detunes shifting
-        const drift = Math.sin(context.currentTime * (0.12 + index * 0.03)) * 6;
-        let extraDetune = 0;
-        if (sig.singularity > 0.05) {
-          // thick detuned drone
-          extraDetune = (index + 1) * 25 * sig.singularity;
-        }
-        if (sig.quantum > 0.05) {
-          // high frequency drifting noise detunes
-          extraDetune = Math.sin(context.currentTime * (3.8 + index * 1.2)) * 120 * sig.quantum;
-        }
-
-        oscillator.detune.setTargetAtTime(
-          drift +
-            tension * (index + 1) * 4 +
-            sig.twist * (index + 2) * 3 +
-            sig.quantum * index * 2.5 +
-            sig.echo * 5 +
-            imprint * (index % 2 ? 6 : 3) +
-            extraDetune,
-          context.currentTime,
-          0.16,
-        );
-      });
-
-      // Gain breathes with the chapter — singularity/collapse are louder,
-      // nebula/aether are quieter. Range kept narrow (0.028–0.058) so it never
-      // feels like a volume jump, only a presence shift.
-      const targetGain =
-        0.04 +
-        sig.singularity * 0.018 +
-        sig.twist * 0.008 -
-        sig.nebula * 0.012 -
-        sig.veil * 0.008 +
-        imprint * 0.006;
-      gain.gain.setTargetAtTime(
-        Math.max(0.012, Math.min(0.065, targetGain)),
-        context.currentTime,
-        0.8,
-      );
+        graph.voices.forEach((voice) => {
+          const ratio =
+            1 +
+            snapshot.strain * (voice.index + 1) * 0.06 +
+            snapshot.slosh[voice.index % 3] * 0.035;
+          voice.oscillator.frequency.setTargetAtTime(
+            voice.baseFrequency * ratio,
+            graph.context.currentTime,
+            0.18,
+          );
+          voice.oscillator.detune.setTargetAtTime(
+            Math.sin(snapshot.phase * (0.14 + voice.index * 0.025)) * (3 + resonance * 5),
+            graph.context.currentTime,
+            0.2,
+          );
+        });
+      }
 
       graph.raf = requestAnimationFrame(tick);
     };
 
+    document.addEventListener("visibilitychange", onVisibilityChange);
     graph.raf = requestAnimationFrame(tick);
-    graphRef.current = graph;
+    if (document.hidden) {
+      setGainTarget(graph, graph.masterGain, 0, 0.015);
+    } else {
+      ensureRunning();
+    }
 
     return () => {
+      disposed = true;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       if (graphRef.current === graph) graphRef.current = null;
       closeAudioGraph(graph);
     };
-  }, [audioEnabled]);
+  }, [audioEnabled, setAudioEnabled]);
 }
 
 declare global {

@@ -1,16 +1,16 @@
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Suspense, useEffect, useRef } from "react";
+import { addAfterEffect, Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Suspense, useEffect, useLayoutEffect, useRef } from "react";
 import { ACESFilmicToneMapping, SRGBColorSpace } from "three";
 import { WebGPURenderer } from "three/webgpu";
 import { useExperienceStore } from "./store";
 import { AetherWorld } from "../visuals/AetherWorld";
 import { TslBloom } from "../visuals/TslBloom";
 
+const RENDERER_INIT_TIMEOUT_MS = 8000;
+
 /**
- * Pause the render loop while the tab is hidden. WebGPU setAnimationLoop is not
- * reliably throttled when backgrounded, so four full-screen raymarch shaders can
- * keep burning the GPU on an invisible tab — heating the machine and worsening
- * foreground performance after a tab switch. frameloop "never" stops all frames.
+ * Pause the live organism while the tab is hidden. This prevents a background
+ * raymarch and fixed-step simulation from burning GPU time on an invisible tab.
  */
 function VisibilityPause() {
   const setFrameloop = useThree((s) => s.setFrameloop);
@@ -23,9 +23,58 @@ function VisibilityPause() {
   return null;
 }
 
+function RendererFailureMonitor() {
+  const canvas = useThree((state) => state.gl.domElement);
+  const setReady = useExperienceStore((state) => state.setReady);
+  const setRenderError = useExperienceStore((state) => state.setRenderError);
+
+  useEffect(() => {
+    const onContextLost = (event: Event) => {
+      event.preventDefault();
+      setReady(false);
+      setRenderError(true);
+    };
+
+    canvas.addEventListener("webglcontextlost", onContextLost);
+    return () => canvas.removeEventListener("webglcontextlost", onContextLost);
+  }, [canvas, setReady, setRenderError]);
+
+  return null;
+}
+
+function RenderedFrameReadySignal() {
+  const profile = useExperienceStore((state) => state.profile);
+  const setReady = useExperienceStore((state) => state.setReady);
+  const frameStarted = useRef(false);
+
+  useLayoutEffect(() => {
+    setReady(false);
+    frameStarted.current = false;
+
+    const removeAfterEffect = addAfterEffect(() => {
+      if (!frameStarted.current) return;
+      frameStarted.current = false;
+      setReady(true);
+      removeAfterEffect();
+    });
+
+    return () => {
+      removeAfterEffect();
+      frameStarted.current = false;
+      setReady(false);
+    };
+  }, [profile, setReady]);
+
+  useFrame(() => {
+    frameStarted.current = true;
+  });
+
+  return null;
+}
+
 /**
- * Adaptive resolution: the scene is four full-screen raymarches whose cost is
- * quadratic in DPR. On a GPU that can't hold frame rate, step DPR down until it
+ * Adaptive resolution: the raymarched organism is quadratic in DPR. On a GPU
+ * that can't hold frame rate, step DPR down until it
  * can — render resolution is the cheapest quality to spend, and the emissive
  * glow + bloom hide the drop almost entirely (same rationale as profile.maxDpr).
  *
@@ -51,6 +100,18 @@ function AdaptiveResolution() {
   const dpr = useRef<number | null>(null);
   const floorReached = useRef(false);
 
+  useEffect(() => {
+    const deviceDpr = Math.max(window.devicePixelRatio || 1, 1);
+    const targetDpr = Math.min(deviceDpr, profile?.maxDpr ?? 1);
+
+    ema.current = 0;
+    warmup.current = 0;
+    cooldown.current = 0;
+    dpr.current = targetDpr;
+    floorReached.current = false;
+    setDpr(targetDpr);
+  }, [profile, reducedMotion, setDpr]);
+
   useFrame((_, delta) => {
     if (reducedMotion || profile?.tier === "low" || floorReached.current) return;
     const dt = Math.min(delta, 0.1);
@@ -59,7 +120,7 @@ function AdaptiveResolution() {
       return;
     }
     if (dpr.current === null) dpr.current = gl.getPixelRatio();
-    // smoothed frame time so a single GC/scroll spike can't trip a drop
+    // Smoothed frame time so a single GC spike cannot trip a quality drop.
     ema.current = ema.current === 0 ? dt : ema.current + (dt - ema.current) * 0.05;
     if (cooldown.current > 0) {
       cooldown.current -= dt;
@@ -81,29 +142,49 @@ function AdaptiveResolution() {
 export function ExperienceCanvas() {
   const profile = useExperienceStore((state) => state.profile);
   const reducedMotion = useExperienceStore((state) => state.reducedMotion);
-  const setReady = useExperienceStore((state) => state.setReady);
   const setRenderError = useExperienceStore((state) => state.setRenderError);
+
+  if (!profile) return null;
 
   return (
     <Canvas
+      key={profile.antialias ? "antialias-on" : "antialias-off"}
       className="aether-canvas"
-      dpr={[1, profile?.maxDpr ?? 1]}
-      camera={{ position: [0, 0, 0.65], fov: 50, near: 0.1, far: 20 }}
+      dpr={[1, profile.maxDpr]}
+      camera={{ position: [0, 0, 0.64], fov: 48, near: 0.1, far: 20 }}
       gl={async (props) => {
+        const preferWebGPU =
+          typeof window !== "undefined" &&
+          new URLSearchParams(window.location.search).has("webgpu");
         const renderer = new WebGPURenderer({
           canvas: props.canvas as HTMLCanvasElement,
-          antialias: profile?.antialias ?? true,
+          antialias: profile.antialias,
           alpha: false,
           powerPreference: "high-performance",
-          forceWebGL:
-            typeof navigator !== "undefined" &&
-            !(navigator as unknown as { gpu?: unknown }).gpu,
+          // The WebGPU adapter path can hang on some embedded browsers before
+          // it can reject. Default to Three's stable TSL WebGL backend and keep
+          // native WebGPU available as an explicit `?webgpu` opt-in.
+          forceWebGL: !preferWebGPU,
         });
+        let initTimeout: number | undefined;
+
         try {
-          await renderer.init();
-        } catch {
+          await Promise.race([
+            renderer.init(),
+            new Promise<never>((_, reject) => {
+              initTimeout = window.setTimeout(
+                () => reject(new Error("WebGPU renderer initialization timed out")),
+                RENDERER_INIT_TIMEOUT_MS,
+              );
+            }),
+          ]);
+        } catch (error) {
           setRenderError(true);
-          throw new Error("WebGPU renderer initialization failed");
+          throw new Error("WebGPU renderer initialization failed", {
+            cause: error,
+          });
+        } finally {
+          if (initTimeout !== undefined) window.clearTimeout(initTimeout);
         }
         renderer.outputColorSpace = SRGBColorSpace;
         renderer.toneMapping = ACESFilmicToneMapping;
@@ -111,15 +192,16 @@ export function ExperienceCanvas() {
         return renderer;
       }}
       onCreated={({ gl }) => {
-        gl.setClearColor("#020207", 1);
-        setReady(true);
+        gl.setClearColor("#010716", 1);
       }}
     >
+      <RendererFailureMonitor />
+      <VisibilityPause />
+      <AdaptiveResolution />
       <Suspense fallback={null}>
-        <VisibilityPause />
-        <AdaptiveResolution />
         <AetherWorld />
-        {!reducedMotion && profile?.postprocessing ? <TslBloom /> : null}
+        {!reducedMotion && profile.postprocessing ? <TslBloom /> : null}
+        <RenderedFrameReadySignal />
       </Suspense>
     </Canvas>
   );

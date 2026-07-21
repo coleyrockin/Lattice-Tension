@@ -1,5 +1,5 @@
-import { AetherExperience } from "./experience/AetherExperience";
+import { AestherExperience } from "./experience/AetherExperience";
 
 export function App() {
-  return <AetherExperience />;
+  return <AestherExperience />;
 }
