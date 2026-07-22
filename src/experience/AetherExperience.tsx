@@ -68,7 +68,7 @@ export function AestherExperience() {
 
   return (
     <ExperienceErrorBoundary onError={() => setRenderError(true)}>
-      <main className="aesther">
+      <main className="aesther" aria-label="Aesther interactive living orb">
         <div className="stage">
           {profile ? <ExperienceCanvas /> : null}
           <InterfaceOverlay />

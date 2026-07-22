@@ -10,7 +10,6 @@ export type OrganismInput = {
   contactCount: number;
   squeeze: number;
   twist: number;
-  release: { velocity: Vec2Tuple; strength: number } | null;
 };
 
 export type SurfaceWaveSample = Readonly<{
@@ -114,7 +113,6 @@ export class OrganismController {
     contactCount: 0,
     squeeze: 0,
     twist: 0,
-    release: null,
   };
 
   readonly snapshot: OrganismSnapshot;
@@ -186,7 +184,6 @@ export class OrganismController {
     this.pendingTaps.length = 0;
     this.pendingReleases.length = 0;
     copy3(this.deformationAxis, [0, 1, 0]);
-    this.input.release = null;
     this.waveCursor = 0;
     this.waves.forEach((wave) => {
       copy3(wave.origin, [0, 0, 1]);
@@ -262,7 +259,6 @@ export class OrganismController {
         strength,
         contact,
       });
-      this.input.release = { velocity: releaseVelocity, strength };
     }
   }
 
@@ -389,7 +385,6 @@ export class OrganismController {
       strength,
       contact,
     });
-    this.input.release = { velocity: [x * 1.35, y * 1.35], strength };
   }
 
   setPresentationScale(scale: number) {
@@ -481,7 +476,6 @@ export class OrganismController {
 
     if (this.pendingReleases.length > 0) {
       const releases = this.pendingReleases.splice(0, MAX_CONTACTS);
-      this.input.release = null;
       let velocityX = 0;
       let velocityY = 0;
       let weight = 0;

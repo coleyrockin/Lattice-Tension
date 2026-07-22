@@ -35,6 +35,7 @@ Every press, pull, flick, and release passes through one fixed-step controller. 
 ```bash
 npm ci
 npm run dev
+# Opens at http://127.0.0.1:5182/
 npm run test
 npm run test:coverage
 npm run lint

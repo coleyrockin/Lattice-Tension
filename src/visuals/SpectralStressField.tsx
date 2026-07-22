@@ -27,14 +27,20 @@ type DetailProfile = {
 const DETAIL: Record<string, DetailProfile> = {
   high: { filaments: 42, halos: 9, ribbons: 6, segments: 32 },
   medium: { filaments: 30, halos: 7, ribbons: 5, segments: 26 },
-  low: { filaments: 18, halos: 4, ribbons: 3, segments: 20 },
+  low: { filaments: 16, halos: 3, ribbons: 1, segments: 20 },
+};
+
+const VISUAL_INTENSITY: Record<string, number> = {
+  high: 1,
+  medium: 0.8,
+  low: 0.38,
 };
 
 const PRIMARY = new Color("#096bd5");
 const SECONDARY = new Color("#31c9f7");
 const RIBBON = new Color("#5e78ff");
-const SQUISH_VIOLET = new Color("#9b7cff");
-const TWIST_ORCHID = new Color("#cf8cff");
+const SQUISH_VIOLET = new Color("#6872e6");
+const TWIST_ORCHID = new Color("#9b79dc");
 
 function fract(value: number) {
   return value - Math.floor(value);
@@ -185,6 +191,7 @@ export function SpectralStressField() {
   const reducedMotion = useExperienceStore((state) => state.reducedMotion);
 
   const detail = DETAIL[tier] ?? DETAIL.high;
+  const visualIntensity = VISUAL_INTENSITY[tier] ?? VISUAL_INTENSITY.high;
   const geometries = useMemo(
     () => ({
       filaments: createFilamentGeometry(detail),
@@ -261,38 +268,44 @@ export function SpectralStressField() {
       ? newestWave.strength * Math.sin(waveProgress * Math.PI) * motion
       : 0;
     const fieldEnergy = MathUtils.clamp(
-      snapshot.energy * 0.85 +
+      (snapshot.energy * 0.85 +
         snapshot.resonance * 0.42 +
         waveWake * 0.24 +
         Math.abs(snapshot.squeeze) * 0.46 +
-        Math.abs(snapshot.torsion) * 0.16,
+        Math.abs(snapshot.torsion) * 0.16) *
+        visualIntensity,
       0,
       1.45,
     );
     const haloEnergy = MathUtils.clamp(
-      snapshot.resonance * 0.6 + waveWake * 0.42 + snapshot.energy * 0.18,
+      (snapshot.resonance * 0.6 + waveWake * 0.42 + snapshot.energy * 0.18) *
+        visualIntensity,
       0,
       1.35,
     );
     const ribbonEnergy = MathUtils.clamp(
-      snapshot.energy * 0.36 + waveWake * 0.2 + Math.abs(snapshot.squeeze) * 0.24,
+      (snapshot.energy * 0.36 + waveWake * 0.2 + Math.abs(snapshot.squeeze) * 0.24) *
+        visualIntensity,
       0,
       0.8,
     );
     const stretchColorStrength = MathUtils.clamp(
-      Math.max(0, snapshot.strain) * 3.15 + Math.hypot(...snapshot.bend) * 0.3,
+      (Math.max(0, snapshot.strain) * 3.15 + Math.hypot(...snapshot.bend) * 0.3) *
+        visualIntensity,
       0,
       1,
     );
     const squishColorStrength = MathUtils.clamp(
-      Math.max(0, -snapshot.strain) * 3.4 +
+      (Math.max(0, -snapshot.strain) * 3.4 +
         Math.max(0, snapshot.squeeze) * 0.72 +
-        snapshot.contactPressure * 0.72,
+        snapshot.contactPressure * 0.72) *
+        visualIntensity,
       0,
       1,
     );
     const twistColorStrength = MathUtils.clamp(
-      Math.abs(snapshot.torsion) * 0.9 + Math.abs(snapshot.squeeze) * 0.16,
+      (Math.abs(snapshot.torsion) * 0.9 + Math.abs(snapshot.squeeze) * 0.16) *
+        visualIntensity,
       0,
       1,
     );

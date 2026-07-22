@@ -18,7 +18,6 @@ describe("performance profiles", () => {
     ).toMatchObject({
       tier: "low",
       postprocessing: false,
-      depthOfField: false,
     });
   });
 

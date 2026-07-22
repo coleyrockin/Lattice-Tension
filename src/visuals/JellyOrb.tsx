@@ -54,22 +54,31 @@ export function JellyOrb() {
     const snapshot = organismController.snapshot;
     const energy = snapshot.energy;
     const resonance = snapshot.resonance;
+    // Low-tier devices keep the exact same body physics, but spend fewer bright
+    // optical layers so an energetic pull stays deep-water blue rather than
+    // bleaching into a flat cyan fill without the desktop post stack.
+    const visualScale = tier === "low" ? 0.64 : tier === "medium" ? 0.84 : 1;
+    const visualEnergy = energy * visualScale;
+    const visualResonance = resonance * visualScale;
     const bendAmount = Math.hypot(...snapshot.bend);
     const stretchColorStrength = Math.min(
       1,
-      Math.max(0, snapshot.strain) * 3.15 + bendAmount * 0.3 + energy * 0.1,
+      (Math.max(0, snapshot.strain) * 3.15 + bendAmount * 0.3 + energy * 0.1) *
+        visualScale,
     );
     const squishColorStrength = Math.min(
       1,
-      Math.max(0, -snapshot.strain) * 3.4 +
+      (Math.max(0, -snapshot.strain) * 3.4 +
         Math.max(0, snapshot.squeeze) * 0.72 +
-        snapshot.contactPressure * 0.72,
+        snapshot.contactPressure * 0.72) *
+        visualScale,
     );
     const twistColorStrength = Math.min(
       1,
-      Math.abs(snapshot.torsion) * 0.9 +
+      (Math.abs(snapshot.torsion) * 0.9 +
         Math.abs(snapshot.squeeze) * 0.16 +
-        resonance * 0.04,
+        resonance * 0.04) *
+        visualScale,
     );
 
     uniforms.phase.value = snapshot.phase;
@@ -78,11 +87,11 @@ export function JellyOrb() {
     uniforms.jiggle.value.set(...snapshot.axis);
     uniforms.bend.value.set(...snapshot.bend);
     uniforms.slosh.value.set(...snapshot.slosh);
-    uniforms.kineticEnergy.value = energy;
+    uniforms.kineticEnergy.value = visualEnergy;
     uniforms.contactOrigin.value.set(...snapshot.contactOrigin);
-    uniforms.contactPressure.value = snapshot.contactPressure;
+    uniforms.contactPressure.value = snapshot.contactPressure * visualScale;
     uniforms.secondaryContactOrigin.value.set(...snapshot.secondaryContactOrigin);
-    uniforms.secondaryContactPressure.value = snapshot.secondaryContactPressure;
+    uniforms.secondaryContactPressure.value = snapshot.secondaryContactPressure * visualScale;
     uniforms.pointer.value.set(...snapshot.pointer);
 
     applyWave(uniforms.rippleOrigin0, uniforms.rippleAge0, uniforms.rippleStrength0, snapshot.surfaceWaves[0]);
@@ -91,14 +100,14 @@ export function JellyOrb() {
     applyWave(uniforms.rippleOrigin3, uniforms.rippleAge3, uniforms.rippleStrength3, snapshot.surfaceWaves[3]);
 
     uniforms.speed.value = 0.22 + energy * 0.2;
-    uniforms.tension.value = 0.34 + energy * 0.46 + resonance * 0.12;
-    uniforms.order.value = 0.18 + energy * 0.28 + resonance * 0.11;
-    uniforms.pulse.value = Math.min(0.94, energy * 0.66 + resonance * 0.38);
-    uniforms.resonance.value = resonance;
+    uniforms.tension.value = 0.34 + visualEnergy * 0.46 + visualResonance * 0.12;
+    uniforms.order.value = 0.18 + visualEnergy * 0.28 + visualResonance * 0.11;
+    uniforms.pulse.value = Math.min(0.94, visualEnergy * 0.66 + visualResonance * 0.38);
+    uniforms.resonance.value = visualResonance;
     uniforms.presence.value = 1;
     uniforms.collapseDistort.value = 0;
-    uniforms.fringeRipple.value = energy * 0.045;
-    uniforms.lattice.value = 0.22 + energy * 0.24 + resonance * 0.1;
+    uniforms.fringeRipple.value = visualEnergy * 0.045;
+    uniforms.lattice.value = 0.22 + visualEnergy * 0.24 + visualResonance * 0.1;
     uniforms.stretchColorStrength.value = stretchColorStrength;
     uniforms.squishColorStrength.value = squishColorStrength;
     uniforms.twistColorStrength.value = twistColorStrength;
@@ -118,7 +127,7 @@ export function JellyOrb() {
       .lerp(TWIST_ORCHID, twistColorStrength * 0.12);
     uniforms.tint.value.copy(DEEP).lerp(OCEAN, stretchColorStrength * 0.03);
     uniforms.accent.value.copy(ACTIVE_ACCENT);
-    uniforms.highlight.value.copy(ACTIVE_HIGHLIGHT).lerp(VIOLET, energy * 0.04);
+    uniforms.highlight.value.copy(ACTIVE_HIGHLIGHT).lerp(VIOLET, visualEnergy * 0.04);
 
     if (!mesh.current) return;
     mesh.current.position.set(...snapshot.position);

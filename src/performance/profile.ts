@@ -3,11 +3,7 @@ export type PerformanceTier = "high" | "medium" | "low";
 export type PerformanceProfile = {
   tier: PerformanceTier;
   maxDpr: number;
-  particleCount: number;
-  nodeCount: number;
-  membraneSegments: number;
   postprocessing: boolean;
-  depthOfField: boolean;
   antialias: boolean;
 };
 
@@ -21,11 +17,7 @@ export function arePerformanceProfilesEqual(
   return (
     left.tier === right.tier &&
     left.maxDpr === right.maxDpr &&
-    left.particleCount === right.particleCount &&
-    left.nodeCount === right.nodeCount &&
-    left.membraneSegments === right.membraneSegments &&
     left.postprocessing === right.postprocessing &&
-    left.depthOfField === right.depthOfField &&
     left.antialias === right.antialias
   );
 }
@@ -54,11 +46,7 @@ export function choosePerformanceProfile(
     return {
       tier: "low",
       maxDpr: 1,
-      particleCount: 320,
-      nodeCount: 20,
-      membraneSegments: 42,
       postprocessing: false,
-      depthOfField: false,
       antialias: false,
     };
   }
@@ -71,11 +59,7 @@ export function choosePerformanceProfile(
     return {
       tier: "medium",
       maxDpr: 1.35,
-      particleCount: 650,
-      nodeCount: 28,
-      membraneSegments: 64,
       postprocessing: true,
-      depthOfField: false,
       antialias: true,
     };
   }
@@ -86,11 +70,7 @@ export function choosePerformanceProfile(
     // the bloom chain. 1.4 vs 1.75 is ~36% fewer fragments; the emissive glow +
     // ACES/bloom hide the resolution drop almost entirely on a DPR-2 display.
     maxDpr: Math.min(1.4, input.devicePixelRatio),
-    particleCount: 1100,
-    nodeCount: 34,
-    membraneSegments: 84,
     postprocessing: true,
-    depthOfField: true,
     antialias: true,
   };
 }
