@@ -33,6 +33,8 @@ const DETAIL: Record<string, DetailProfile> = {
 const PRIMARY = new Color("#096bd5");
 const SECONDARY = new Color("#31c9f7");
 const RIBBON = new Color("#5e78ff");
+const SQUISH_VIOLET = new Color("#9b7cff");
+const TWIST_ORCHID = new Color("#cf8cff");
 
 function fract(value: number) {
   return value - Math.floor(value);
@@ -277,6 +279,23 @@ export function SpectralStressField() {
       0,
       0.8,
     );
+    const stretchColorStrength = MathUtils.clamp(
+      Math.max(0, snapshot.strain) * 3.15 + Math.hypot(...snapshot.bend) * 0.3,
+      0,
+      1,
+    );
+    const squishColorStrength = MathUtils.clamp(
+      Math.max(0, -snapshot.strain) * 3.4 +
+        Math.max(0, snapshot.squeeze) * 0.72 +
+        snapshot.contactPressure * 0.72,
+      0,
+      1,
+    );
+    const twistColorStrength = MathUtils.clamp(
+      Math.abs(snapshot.torsion) * 0.9 + Math.abs(snapshot.squeeze) * 0.16,
+      0,
+      1,
+    );
 
     if (group.current) {
       group.current.visible = fieldEnergy > 0.018 || haloEnergy > 0.028;
@@ -311,9 +330,18 @@ export function SpectralStressField() {
       );
     }
 
-    materials.filaments.color.copy(PRIMARY);
-    materials.halos.color.copy(SECONDARY);
-    materials.ribbons.color.copy(RIBBON);
+    materials.filaments.color
+      .copy(PRIMARY)
+      .lerp(SECONDARY, stretchColorStrength * 0.76)
+      .lerp(SQUISH_VIOLET, squishColorStrength * 0.46);
+    materials.halos.color
+      .copy(SECONDARY)
+      .lerp(SQUISH_VIOLET, squishColorStrength * 0.62)
+      .lerp(TWIST_ORCHID, twistColorStrength * 0.34);
+    materials.ribbons.color
+      .copy(RIBBON)
+      .lerp(SECONDARY, stretchColorStrength * 0.5)
+      .lerp(TWIST_ORCHID, twistColorStrength * 0.48);
     materials.filaments.opacity = MathUtils.clamp(
       0.008 + fieldEnergy * 0.1,
       0,

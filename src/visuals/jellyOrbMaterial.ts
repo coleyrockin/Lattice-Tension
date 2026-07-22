@@ -56,6 +56,12 @@ export function createJellyOrbMaterial(steps: number) {
   const tint = uniform(new Color('#003366')); // deeper ocean glass
   const accent = uniform(new Color('#88e0ff')); // brighter rim and caustics
   const highlight = uniform(new Color('#e0faff')); // enhanced wet glints
+  const stretchColor = uniform(new Color('#20b8ea'));
+  const squishColor = uniform(new Color('#6872e6'));
+  const twistColor = uniform(new Color('#9b79dc'));
+  const stretchColorStrength = uniform(0);
+  const squishColorStrength = uniform(0);
+  const twistColorStrength = uniform(0);
   const lattice = uniform(0.14);
   const resonance = uniform(0);
   const presence = uniform(1);
@@ -707,6 +713,26 @@ export function createJellyOrbMaterial(steps: number) {
           .mul(0.5)
           .add(0.5);
         const liquidCurrent = currentA.mul(0.62).add(currentB.mul(0.38));
+        const liquidDirection = lp.div(max(length(lp), float(1e-4))).toVar();
+        const liquidSurfaceWave = sin(
+          lp.x
+            .mul(7.4)
+            .sub(lp.z.mul(5.1))
+            .add(animationPhase.mul(0.76))
+            .add(slosh.x.mul(7.2)),
+        )
+          .mul(sin(
+            lp.y
+              .mul(5.8)
+              .add(lp.z.mul(4.3))
+              .sub(animationPhase.mul(0.53))
+              .add(slosh.y.mul(5.8)),
+          ))
+          .mul(0.5)
+          .add(0.5);
+        const liquidSurfaceCaustic = smoothstep(0.58, 0.96, liquidSurfaceWave)
+          .mul(liquidFill)
+          .mul(float(0.035).add(kineticEnergy.mul(0.12)).add(contactPressure.mul(0.09)));
         const innerLiquid = mix(tint, accent, float(0.3).add(liquidCurrent.mul(0.24)))
           .mul(liquidFill)
           .mul(
@@ -715,6 +741,33 @@ export function createJellyOrbMaterial(steps: number) {
               .add(kineticEnergy.mul(0.22))
               .add(contactPressure.mul(0.16)),
           );
+        // A press concentrates a tiny amount of refracted light into the
+        // submerged liquid. It follows the contact normals rather than the
+        // screen, which makes two-finger squishes feel like pressure entering
+        // a volume instead of a flat color flash.
+        const contactFocus = min(
+          pow(max(dot(liquidDirection, contactOrigin), 0), 15)
+            .mul(contactPressure)
+            .add(
+              pow(max(dot(liquidDirection, secondaryContactOrigin), 0), 15).mul(
+                secondaryContactPressure,
+              ),
+            ),
+          float(1),
+        );
+        const pressureCaustic = mix(accent, squishColor, squishColorStrength.mul(0.72))
+          .mul(contactFocus)
+          .mul(float(0.08).add(kineticEnergy.mul(0.18)).add(resonance.mul(0.08)));
+        const liquidPrism = mix(stretchColor, squishColor, liquidSurfaceWave)
+          .add(twistColor.mul(twistColorStrength.mul(0.18)));
+        const liquidSurfaceColor = mix(
+          accent,
+          liquidPrism,
+          stretchColorStrength.mul(0.28).add(squishColorStrength.mul(0.32)),
+        );
+        const liquidSurfaceGlow = mix(liquidSurfaceColor, highlight, 0.16)
+          .mul(liquidSurfaceCaustic)
+          .mul(float(0.7).add(fresnel.mul(0.3)));
         const meniscus = exp(abs(liquidHeight).mul(-20)).mul(
           float(0.11)
             .add(kineticEnergy.mul(0.38))
@@ -758,7 +811,78 @@ export function createJellyOrbMaterial(steps: number) {
             .add(rippleWave(rippleHitDir, rippleOrigin2, rippleAge2, rippleStrength2))
             .add(rippleWave(rippleHitDir, rippleOrigin3, rippleAge3, rippleStrength3)),
         ).toVar();
-        const rippleGlow = mix(accent, highlight, 0.25).mul(crest).mul(0.84);
+        // Spectral tension is tied to the same modes that alter the silhouette:
+        // cyan follows elongated poles, violet pools under direct compression,
+        // and a restrained orchid band appears only while the mass is twisting.
+        // All three strengths are zero at rest, so this remains water, not a
+        // constantly color-shifting toy.
+        const stressAxis = normalize(jiggle.add(vec3(0, 0.0001, 0)));
+        const poleMask = pow(abs(dot(nW, stressAxis)), 1.55);
+        const stretchBand = sin(
+          dot(p, stressAxis).mul(13).add(animationPhase.mul(1.45)),
+        )
+          .mul(0.5)
+          .add(0.5);
+        const stretchFilament = smoothstep(0.7, 0.96, stretchBand);
+        const stretchMask = stretchColorStrength
+          .mul(poleMask.mul(0.42).add(stretchFilament.mul(0.58)))
+          .toVar();
+        const primaryHitDistance = acos(
+          max(float(-1), min(float(1), dot(rippleHitDir, contactOrigin))),
+        );
+        const secondaryHitDistance = acos(
+          max(float(-1), min(float(1), dot(rippleHitDir, secondaryContactOrigin))),
+        );
+        const contactBloom = min(
+          exp(primaryHitDistance.mul(primaryHitDistance).mul(-22))
+            .mul(contactPressure)
+            .add(
+              exp(secondaryHitDistance.mul(secondaryHitDistance).mul(-22)).mul(
+                secondaryContactPressure,
+              ),
+            ),
+          float(1),
+        );
+        const squishMask = squishColorStrength
+          .mul(contactBloom.mul(0.82).add(crest.mul(0.26)))
+          .toVar();
+        const twistBand = sin(
+          p.x
+            .mul(8.7)
+            .sub(p.y.mul(6.1))
+            .add(p.z.mul(4.3))
+            .add(animationPhase.mul(1.1)),
+        )
+          .mul(0.5)
+          .add(0.5);
+        const twistMask = twistColorStrength
+          .mul(twistBand.mul(0.55).add(crest.mul(0.2)).add(poleMask.mul(0.25)))
+          .toVar();
+        // A stressed membrane separates its wavelengths instead of merely
+        // brightening. The flowing blend makes a long pull reveal cyan and
+        // violet bands in the same body, while the pressure/twist terms stay
+        // anchored to the actual contact and torsion signals.
+        const stretchPrism = mix(
+          stretchColor,
+          squishColor,
+          stretchBand.mul(0.6).add(twistColorStrength.mul(0.16)),
+        );
+        const spectralVeil = stretchPrism
+          .mul(stretchMask.mul(0.34))
+          .add(squishColor.mul(squishMask.mul(0.58)))
+          .add(twistColor.mul(twistMask.mul(0.38)));
+        const activeRippleColor = mix(
+          squishColor,
+          twistColor,
+          min(twistColorStrength, float(0.65)),
+        );
+        const rippleGlow = mix(
+          mix(accent, activeRippleColor, squishColorStrength.mul(0.78)),
+          highlight,
+          0.25,
+        )
+          .mul(crest)
+          .mul(0.84);
 
         // Tight sun-glint that twinkles on wave crests (gated by a wavelet mask)
         // — sparkles like sun on water, additive on the light highlight colour.
@@ -787,10 +911,13 @@ export function createJellyOrbMaterial(steps: number) {
             .add(latticeCol)
             .add(waterGlow)
             .add(innerLiquid)
+            .add(liquidSurfaceGlow)
+            .add(pressureCaustic)
             .add(meniscusGlow)
             .add(coreLight)
             .add(interiorBloom)
             .add(accent.mul(caustic))
+            .add(spectralVeil)
             .add(rim)
             .add(milkRim),
           envCol,
@@ -805,9 +932,14 @@ export function createJellyOrbMaterial(steps: number) {
         const dispR = pow(eInv, 4.4);
         const dispG = pow(eInv, 3.6);
         const dispB = pow(eInv, 2.9);
-        const rimGlow = mix(accent, highlight, fresnel)
+        const spectralRim = mix(
+          accent,
+          stretchPrism,
+          stretchColorStrength.mul(0.42).add(twistColorStrength.mul(0.1)),
+        );
+        const rimGlow = mix(spectralRim, highlight, fresnel)
           .mul(vec3(dispR, dispG, dispB))
-          .mul(0.55);
+          .mul(0.58);
         const col = glass
           .add(spec)
           .add(softSpec.mul(0.5))
@@ -815,6 +947,7 @@ export function createJellyOrbMaterial(steps: number) {
           .add(sunGlint)
           .add(rimGlow)
           .add(rippleGlow)
+          .add(spectralVeil.mul(0.46))
           .toVar();
         // Hue-preserving floor keeps overlaps inside the ocean palette; a
         // Reinhard soft-knee then compresses only the brights, so mids and the
@@ -865,6 +998,12 @@ export function createJellyOrbMaterial(steps: number) {
     tint,
     accent,
     highlight,
+    stretchColor,
+    squishColor,
+    twistColor,
+    stretchColorStrength,
+    squishColorStrength,
+    twistColorStrength,
     lattice,
     resonance,
     presence,
